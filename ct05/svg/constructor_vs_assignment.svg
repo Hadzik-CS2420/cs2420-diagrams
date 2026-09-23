@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 810" font-family="Segoe UI, system-ui, sans-serif" font-size="13" role="img" aria-label="A two by two grid comparing constructors with assignment operators for FancyNameTag, which owns a Bio on the heap. The columns are constructor, where the object is being born and owns nothing yet, and assignment, where the object already exists and already owns a Bio. The rows are copy and move. Copy constructor: allocate a new Bio as a deep copy of the source, in one step, leaving the source unchanged. Copy assignment: first guard against self-assignment, then delete the old Bio, then allocate a new deep copy, then return a reference to this object. Move constructor: take the source's pointer and set the source's pointer to nullptr, with no allocation and nothing to free. Move assignment: guard against self-assignment, delete the old Bio, take the source's pointer, set the source's pointer to nullptr, then return a reference to this object. The shared conclusion is that assignment equals the destructor's work of freeing the old resource plus the constructor's work, with a self-assignment guard and a return of this object.">
+  <title>Constructor versus assignment, for copy and for move</title>
+  <rect width="100%" height="100%" fill="white"/>
+
+  <text x="590" y="32" text-anchor="middle" font-size="20" font-weight="bold" fill="#2c3e50">Constructor vs. Assignment: the extra step</text>
+  <text x="590" y="54" text-anchor="middle" font-size="13" fill="#6e6e6e">A constructor starts from nothing. An assignment starts from an object that already owns a Bio, and that Bio has to go somewhere.</text>
+
+  <!-- column headers -->
+  <rect x="115" y="72" width="515" height="44" rx="8" fill="#e0f2f1" stroke="#00695c" stroke-width="1.5"/>
+  <text x="372" y="92" text-anchor="middle" font-size="15" font-weight="bold" fill="#00695c">CONSTRUCTOR</text>
+  <text x="372" y="109" text-anchor="middle" font-size="12" fill="#2c3e50">the object is being born: it owns nothing yet</text>
+
+  <rect x="645" y="72" width="515" height="44" rx="8" fill="#fce4ec" stroke="#c0392b" stroke-width="1.5"/>
+  <text x="902" y="92" text-anchor="middle" font-size="15" font-weight="bold" fill="#c0392b">ASSIGNMENT</text>
+  <text x="902" y="109" text-anchor="middle" font-size="12" fill="#2c3e50">the object already exists: it already owns a Bio</text>
+
+  <!-- row labels -->
+  <rect x="20" y="128" width="80" height="300" rx="8" fill="#f2fbf4" stroke="#1c7e45" stroke-width="1.5"/>
+  <text x="50" y="278" text-anchor="middle" font-size="17" font-weight="bold" fill="#1c7e45" transform="rotate(-90 50 278)">COPY</text>
+  <text x="76" y="278" text-anchor="middle" font-size="11" fill="#1b5e20" transform="rotate(-90 76 278)">two Bios at the end</text>
+
+  <rect x="20" y="448" width="80" height="300" rx="8" fill="#f3e8ff" stroke="#8e44ad" stroke-width="1.5"/>
+  <text x="50" y="598" text-anchor="middle" font-size="17" font-weight="bold" fill="#8e44ad" transform="rotate(-90 50 598)">MOVE</text>
+  <text x="76" y="598" text-anchor="middle" font-size="11" fill="#4527a0" transform="rotate(-90 76 598)">one Bio at the end</text>
+
+  <!-- ============ COPY CONSTRUCTOR ============ -->
+  <rect x="115" y="128" width="515" height="300" rx="10" fill="#f2fbf4" stroke="#1c7e45" stroke-width="2"/>
+  <text x="135" y="155" font-family="Consolas, monospace" font-size="14" font-weight="bold" fill="#1b5e20">FancyNameTag b(a);</text>
+  <text x="135" y="176" font-size="12" fill="#6e6e6e">b did not exist a moment ago, so there is nothing to clean up.</text>
+
+  <circle cx="148" cy="209" r="13" fill="#1c7e45"/>
+  <text x="148" y="214" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">1</text>
+  <text x="172" y="205" font-family="Consolas, monospace" font-size="12.5" fill="#2c3e50">bio_ = new Bio(*other.bio_);</text>
+  <text x="172" y="223" font-size="12" fill="#6e6e6e">allocate a second Bio and copy the fields across</text>
+
+  <rect x="135" y="248" width="475" height="60" rx="6" fill="white" stroke="#1c7e45"/>
+  <text x="150" y="270" font-size="12.5" font-weight="bold" fill="#1b5e20">That is the whole function.</text>
+  <text x="150" y="292" font-size="12.5" fill="#2c3e50">One step. The source is untouched and still owns its own Bio.</text>
+
+  <rect x="135" y="326" width="475" height="82" rx="6" fill="#e8f5e9" stroke="#1c7e45" stroke-dasharray="4 3"/>
+  <text x="150" y="348" font-size="12" font-weight="bold" fill="#1b5e20">Afterwards</text>
+  <text x="150" y="370" font-family="Consolas, monospace" font-size="12" fill="#2c3e50">a.bio_ &#x2192; Bio at 0x7f10</text>
+  <text x="360" y="370" font-family="Consolas, monospace" font-size="12" fill="#6e6e6e">(unchanged)</text>
+  <text x="150" y="392" font-family="Consolas, monospace" font-size="12" fill="#2c3e50">b.bio_ &#x2192; Bio at 0x9c40</text>
+  <text x="360" y="392" font-family="Consolas, monospace" font-size="12" font-weight="bold" fill="#c64500">(brand new)</text>
+
+  <!-- ============ COPY ASSIGNMENT ============ -->
+  <rect x="645" y="128" width="515" height="300" rx="10" fill="#fdf3f4" stroke="#c0392b" stroke-width="2"/>
+  <text x="665" y="155" font-family="Consolas, monospace" font-size="14" font-weight="bold" fill="#c0392b">b = a;</text>
+  <text x="665" y="176" font-size="12" fill="#6e6e6e">b is already alive and already owns a Bio of its own.</text>
+
+  <circle cx="678" cy="205" r="13" fill="#6e6e6e"/>
+  <text x="678" y="210" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">1</text>
+  <text x="702" y="210" font-family="Consolas, monospace" font-size="12.5" fill="#2c3e50">if (this == &amp;other) return *this;</text>
+
+  <circle cx="678" cy="245" r="13" fill="#c0392b"/>
+  <text x="678" y="250" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">2</text>
+  <text x="702" y="243" font-family="Consolas, monospace" font-size="12.5" font-weight="bold" fill="#c0392b">delete bio_;</text>
+  <text x="702" y="260" font-size="12" fill="#c0392b">the step a constructor never has: free what you already own</text>
+
+  <circle cx="678" cy="292" r="13" fill="#1c7e45"/>
+  <text x="678" y="297" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">3</text>
+  <text x="702" y="290" font-family="Consolas, monospace" font-size="12.5" fill="#2c3e50">bio_ = new Bio(*other.bio_);</text>
+  <text x="702" y="307" font-size="12" fill="#6e6e6e">now do exactly what the copy constructor does</text>
+
+  <circle cx="678" cy="339" r="13" fill="#6e6e6e"/>
+  <text x="678" y="344" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">4</text>
+  <text x="702" y="344" font-family="Consolas, monospace" font-size="12.5" fill="#2c3e50">return *this;</text>
+
+  <rect x="665" y="366" width="475" height="42" rx="6" fill="#fce4ec" stroke="#c0392b" stroke-dasharray="4 3"/>
+  <text x="680" y="392" font-size="12" fill="#2c3e50">Skip step 2 and b's old Bio leaks. Skip step 1 and <tspan font-family="Consolas, monospace">a = a;</tspan> frees its own source.</text>
+
+  <!-- ============ MOVE CONSTRUCTOR ============ -->
+  <rect x="115" y="448" width="515" height="300" rx="10" fill="#f3e8ff" stroke="#8e44ad" stroke-width="2"/>
+  <text x="135" y="475" font-family="Consolas, monospace" font-size="14" font-weight="bold" fill="#4527a0">FancyNameTag b(std::move(a));</text>
+  <text x="135" y="496" font-size="12" fill="#6e6e6e">Again b is new, so again there is nothing to free.</text>
+
+  <circle cx="148" cy="529" r="13" fill="#8e44ad"/>
+  <text x="148" y="534" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">1</text>
+  <text x="172" y="525" font-family="Consolas, monospace" font-size="12.5" fill="#2c3e50">bio_ = other.bio_;</text>
+  <text x="172" y="543" font-size="12" fill="#6e6e6e">take the pointer: no allocation, no copying</text>
+
+  <circle cx="148" cy="577" r="13" fill="#c64500"/>
+  <text x="148" y="582" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">2</text>
+  <text x="172" y="573" font-family="Consolas, monospace" font-size="12.5" font-weight="bold" fill="#c64500">other.bio_ = nullptr;</text>
+  <text x="172" y="591" font-size="12" fill="#c64500">without this line, two objects free one Bio</text>
+
+  <rect x="135" y="612" width="475" height="46" rx="6" fill="white" stroke="#8e44ad"/>
+  <text x="150" y="640" font-size="12.5" fill="#2c3e50">Two steps, both of them pointer assignments.</text>
+
+  <rect x="135" y="672" width="475" height="60" rx="6" fill="#ede7f6" stroke="#8e44ad" stroke-dasharray="4 3"/>
+  <text x="150" y="694" font-size="12" font-weight="bold" fill="#4527a0">Afterwards</text>
+  <text x="150" y="716" font-family="Consolas, monospace" font-size="12" fill="#2c3e50">b.bio_ &#x2192; Bio at 0x7f10</text>
+  <text x="360" y="716" font-family="Consolas, monospace" font-size="12" fill="#2c3e50">a.bio_ = nullptr</text>
+
+  <!-- ============ MOVE ASSIGNMENT ============ -->
+  <rect x="645" y="448" width="515" height="300" rx="10" fill="#fdf3f4" stroke="#c0392b" stroke-width="2"/>
+  <text x="665" y="475" font-family="Consolas, monospace" font-size="14" font-weight="bold" fill="#c0392b">b = std::move(a);</text>
+  <text x="665" y="496" font-size="12" fill="#6e6e6e">The same two pointer steps, with the cleanup in front of them.</text>
+
+  <circle cx="678" cy="525" r="13" fill="#6e6e6e"/>
+  <text x="678" y="530" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">1</text>
+  <text x="702" y="530" font-family="Consolas, monospace" font-size="12.5" fill="#2c3e50">if (this == &amp;other) return *this;</text>
+
+  <circle cx="678" cy="565" r="13" fill="#c0392b"/>
+  <text x="678" y="570" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">2</text>
+  <text x="702" y="563" font-family="Consolas, monospace" font-size="12.5" font-weight="bold" fill="#c0392b">delete bio_;</text>
+  <text x="702" y="580" font-size="12" fill="#c0392b">the same extra step: free what you already own</text>
+
+  <circle cx="678" cy="612" r="13" fill="#8e44ad"/>
+  <text x="678" y="617" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">3</text>
+  <text x="702" y="617" font-family="Consolas, monospace" font-size="12.5" fill="#2c3e50">bio_ = other.bio_;</text>
+
+  <circle cx="678" cy="652" r="13" fill="#c64500"/>
+  <text x="678" y="657" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">4</text>
+  <text x="702" y="657" font-family="Consolas, monospace" font-size="12.5" font-weight="bold" fill="#c64500">other.bio_ = nullptr;</text>
+
+  <circle cx="678" cy="692" r="13" fill="#6e6e6e"/>
+  <text x="678" y="697" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">5</text>
+  <text x="702" y="697" font-family="Consolas, monospace" font-size="12.5" fill="#2c3e50">return *this;</text>
+
+  <rect x="665" y="712" width="475" height="24" rx="6" fill="#fce4ec" stroke="#c0392b" stroke-dasharray="4 3"/>
+  <text x="680" y="729" font-size="12" fill="#2c3e50">Steps 3 and 4 are the move constructor, word for word.</text>
+
+  <!-- bottom banner -->
+  <rect x="20" y="762" width="1140" height="36" rx="8" fill="#e0f2f1" stroke="#00695c" stroke-width="1.5"/>
+  <text x="590" y="785" text-anchor="middle" font-size="13.5" fill="#2c3e50"><tspan font-weight="bold" fill="#00695c">Assignment = the destructor's job, then the constructor's job.</tspan> Free the old Bio, do what the constructor does, and return <tspan font-family="Consolas, monospace">*this</tspan>.</text>
+</svg>

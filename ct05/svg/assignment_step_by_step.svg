@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 880" font-family="Segoe UI, system-ui, sans-serif" font-size="13" role="img" aria-label="A step by step trace of copy assignment and move assignment for FancyNameTag. Both start from the same state: object b already owns a Bio holding Old at heap address 0x9c40, and object a owns a Bio holding Ada at 0x7f10. Copy assignment, b equals a, in four frames. Frame one, the self-assignment guard: the addresses differ so the operator continues, and nothing has changed. Frame two, delete bio_: b's old Bio at 0x9c40 is freed, and b's pointer temporarily dangles. Frame three, bio_ equals new Bio of star other dot bio_: a second copy of Ada is allocated at a fresh address 0xb2a0 and b points at it. Frame four, return star this: two objects each own their own Bio, and a is unchanged. Move assignment, b equals std move of a, in four frames. Frame one, the guard passes. Frame two, delete bio_ frees b's old Bio at 0x9c40 exactly as in copy assignment. Frame three, take the pointer and null the source: b points at the Bio at 0x7f10 and a's pointer becomes nullptr, with no allocation. Frame four, return star this: one Bio survives, owned by b, and a is valid but empty. Two closing notes. First, return star this returns a reference to the assigned object so assignments can chain, as in c equals b equals a, which runs right to left. Second, an exception safety improvement: allocate the new Bio into a temporary pointer first, then delete the old one, then assign, so that if the allocation throws, the object is left unchanged instead of holding a dangling pointer.">
+  <title>Copy assignment and move assignment, step by step</title>
+  <rect width="100%" height="100%" fill="white"/>
+
+  <text x="590" y="30" text-anchor="middle" font-size="20" font-weight="bold" fill="#2c3e50">Assignment, line by line</text>
+  <text x="590" y="52" text-anchor="middle" font-size="12.5" fill="#6e6e6e">Both start here: <tspan font-family="Consolas, monospace" fill="#2c3e50">b</tspan> already owns a Bio, and that is what makes assignment different from construction.</text>
+
+  <rect x="20" y="66" width="1140" height="44" rx="8" fill="#eaf2f8" stroke="#2573a7" stroke-width="1.5"/>
+  <text x="38" y="94" font-size="12.5" font-weight="bold" fill="#2573a7">START</text>
+  <text x="110" y="94" font-family="Consolas, monospace" font-size="12.5" fill="#2c3e50">b.bio_ &#x2192; Bio "Old" @ 0x9c40</text>
+  <text x="430" y="94" font-family="Consolas, monospace" font-size="12.5" fill="#2c3e50">a.bio_ &#x2192; Bio "Ada" @ 0x7f10</text>
+  <text x="760" y="94" font-size="12" fill="#6e6e6e">two live objects, two Bios on the heap</text>
+
+  <!-- ===================== COPY ASSIGNMENT ===================== -->
+  <text x="20" y="142" font-size="15" font-weight="bold" fill="#1c7e45">COPY ASSIGNMENT</text>
+  <text x="188" y="142" font-family="Consolas, monospace" font-size="14" font-weight="bold" fill="#2c3e50">b = a;</text>
+  <text x="300" y="142" font-size="12" fill="#6e6e6e">b ends up with its own second copy of Ada</text>
+
+  <rect x="20" y="154" width="265" height="200" rx="8" fill="#f2fbf4" stroke="#1c7e45" stroke-width="1.5"/>
+  <rect x="20" y="154" width="265" height="30" rx="8" fill="#e8f5e9" stroke="#1c7e45" stroke-width="1.5"/>
+  <text x="34" y="175" font-size="12.5" font-weight="bold" fill="#1b5e20">1. the guard</text>
+  <text x="34" y="205" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">if (this == &amp;other)</text>
+  <text x="34" y="221" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">    return *this;</text>
+  <text x="34" y="249" font-size="11.5" fill="#6e6e6e">&amp;b is not &amp;a, so carry on.</text>
+  <rect x="32" y="264" width="241" height="76" rx="6" fill="white" stroke="#1c7e45"/>
+  <text x="42" y="284" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">b.bio_ &#x2192; "Old" @9c40</text>
+  <text x="42" y="304" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">a.bio_ &#x2192; "Ada" @7f10</text>
+  <text x="42" y="328" font-size="11" fill="#6e6e6e">nothing has changed yet</text>
+
+  <rect x="310" y="154" width="265" height="200" rx="8" fill="#fdf3f4" stroke="#c0392b" stroke-width="1.5"/>
+  <rect x="310" y="154" width="265" height="30" rx="8" fill="#fce4ec" stroke="#c0392b" stroke-width="1.5"/>
+  <text x="324" y="175" font-size="12.5" font-weight="bold" fill="#c0392b">2. free what you own</text>
+  <text x="324" y="205" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#c0392b">delete bio_;</text>
+  <text x="324" y="233" font-size="11.5" fill="#2c3e50">The Bio holding "Old" is gone</text>
+  <text x="324" y="249" font-size="11.5" fill="#2c3e50">for good. A constructor has no</text>
+  <text x="324" y="265" font-size="11.5" fill="#2c3e50">such step.</text>
+  <rect x="322" y="276" width="241" height="64" rx="6" fill="white" stroke="#c0392b"/>
+  <text x="332" y="296" font-family="Consolas, monospace" font-size="11" fill="#c0392b">b.bio_ &#x2192; freed (dangling)</text>
+  <text x="332" y="316" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">a.bio_ &#x2192; "Ada" @7f10</text>
+  <text x="332" y="334" font-size="10.5" fill="#6e6e6e">nobody may read b.bio_ now</text>
+
+  <rect x="600" y="154" width="265" height="200" rx="8" fill="#f2fbf4" stroke="#1c7e45" stroke-width="1.5"/>
+  <rect x="600" y="154" width="265" height="30" rx="8" fill="#e8f5e9" stroke="#1c7e45" stroke-width="1.5"/>
+  <text x="614" y="175" font-size="12.5" font-weight="bold" fill="#1b5e20">3. do the copy</text>
+  <text x="614" y="205" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">bio_ = new Bio(</text>
+  <text x="614" y="221" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">        *other.bio_);</text>
+  <text x="614" y="249" font-size="11.5" fill="#6e6e6e">The copy constructor's line.</text>
+  <rect x="612" y="264" width="241" height="76" rx="6" fill="white" stroke="#1c7e45"/>
+  <text x="622" y="284" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#c64500">b.bio_ &#x2192; "Ada" @b2a0</text>
+  <text x="622" y="304" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">a.bio_ &#x2192; "Ada" @7f10</text>
+  <text x="622" y="328" font-size="11" fill="#6e6e6e">a fresh block, not a's block</text>
+
+  <rect x="890" y="154" width="270" height="200" rx="8" fill="#e8f5e9" stroke="#1c7e45" stroke-width="2"/>
+  <rect x="890" y="154" width="270" height="30" rx="8" fill="#d7ecd9" stroke="#1c7e45" stroke-width="2"/>
+  <text x="904" y="175" font-size="12.5" font-weight="bold" fill="#1b5e20">4. hand yourself back</text>
+  <text x="904" y="205" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">return *this;</text>
+  <text x="904" y="233" font-size="11.5" fill="#2c3e50">Two objects, two Bios, each</text>
+  <text x="904" y="249" font-size="11.5" fill="#2c3e50">freed by its own destructor.</text>
+  <rect x="902" y="264" width="246" height="76" rx="6" fill="white" stroke="#1c7e45"/>
+  <text x="912" y="284" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">b.bio_ &#x2192; "Ada" @b2a0</text>
+  <text x="912" y="304" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">a.bio_ &#x2192; "Ada" @7f10</text>
+  <text x="912" y="328" font-size="11" fill="#1b5e20">a was never touched</text>
+
+  <!-- ===================== MOVE ASSIGNMENT ===================== -->
+  <text x="20" y="410" font-size="15" font-weight="bold" fill="#8e44ad">MOVE ASSIGNMENT</text>
+  <text x="200" y="410" font-family="Consolas, monospace" font-size="14" font-weight="bold" fill="#2c3e50">b = std::move(a);</text>
+  <text x="380" y="410" font-size="12" fill="#6e6e6e">b takes over a's Bio, and a is emptied</text>
+
+  <rect x="20" y="422" width="265" height="200" rx="8" fill="#f3e8ff" stroke="#8e44ad" stroke-width="1.5"/>
+  <rect x="20" y="422" width="265" height="30" rx="8" fill="#ede7f6" stroke="#8e44ad" stroke-width="1.5"/>
+  <text x="34" y="443" font-size="12.5" font-weight="bold" fill="#4527a0">1. the same guard</text>
+  <text x="34" y="473" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">if (this == &amp;other)</text>
+  <text x="34" y="489" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">    return *this;</text>
+  <text x="34" y="517" font-size="11.5" fill="#6e6e6e">Guards <tspan font-family="Consolas, monospace">a = std::move(a);</tspan></text>
+  <rect x="32" y="532" width="241" height="76" rx="6" fill="white" stroke="#8e44ad"/>
+  <text x="42" y="552" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">b.bio_ &#x2192; "Old" @9c40</text>
+  <text x="42" y="572" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">a.bio_ &#x2192; "Ada" @7f10</text>
+  <text x="42" y="596" font-size="11" fill="#6e6e6e">same start as above</text>
+
+  <rect x="310" y="422" width="265" height="200" rx="8" fill="#fdf3f4" stroke="#c0392b" stroke-width="1.5"/>
+  <rect x="310" y="422" width="265" height="30" rx="8" fill="#fce4ec" stroke="#c0392b" stroke-width="1.5"/>
+  <text x="324" y="443" font-size="12.5" font-weight="bold" fill="#c0392b">2. free what you own</text>
+  <text x="324" y="473" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#c0392b">delete bio_;</text>
+  <text x="324" y="501" font-size="11.5" fill="#2c3e50">Identical to copy assignment.</text>
+  <text x="324" y="517" font-size="11.5" fill="#2c3e50">b's old Bio must still go.</text>
+  <rect x="322" y="532" width="241" height="76" rx="6" fill="white" stroke="#c0392b"/>
+  <text x="332" y="552" font-family="Consolas, monospace" font-size="11" fill="#c0392b">b.bio_ &#x2192; freed (dangling)</text>
+  <text x="332" y="572" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">a.bio_ &#x2192; "Ada" @7f10</text>
+  <text x="332" y="596" font-size="11" fill="#6e6e6e">"Old" is destroyed either way</text>
+
+  <rect x="600" y="422" width="265" height="200" rx="8" fill="#f3e8ff" stroke="#8e44ad" stroke-width="1.5"/>
+  <rect x="600" y="422" width="265" height="30" rx="8" fill="#ede7f6" stroke="#8e44ad" stroke-width="1.5"/>
+  <text x="614" y="443" font-size="12.5" font-weight="bold" fill="#4527a0">3. steal, then blank</text>
+  <text x="614" y="473" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">bio_ = other.bio_;</text>
+  <text x="614" y="489" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#c64500">other.bio_ = nullptr;</text>
+  <text x="614" y="517" font-size="11.5" fill="#6e6e6e">No <tspan font-family="Consolas, monospace">new</tspan>. Two pointer writes.</text>
+  <rect x="612" y="532" width="241" height="76" rx="6" fill="white" stroke="#8e44ad"/>
+  <text x="622" y="552" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#4527a0">b.bio_ &#x2192; "Ada" @7f10</text>
+  <text x="622" y="572" font-family="Consolas, monospace" font-size="11" font-weight="bold" fill="#c0392b">a.bio_ = nullptr</text>
+  <text x="622" y="596" font-size="11" fill="#6e6e6e">the same block, new owner</text>
+
+  <rect x="890" y="422" width="270" height="200" rx="8" fill="#ede7f6" stroke="#8e44ad" stroke-width="2"/>
+  <rect x="890" y="422" width="270" height="30" rx="8" fill="#e2d5f5" stroke="#8e44ad" stroke-width="2"/>
+  <text x="904" y="443" font-size="12.5" font-weight="bold" fill="#4527a0">4. hand yourself back</text>
+  <text x="904" y="473" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">return *this;</text>
+  <text x="904" y="501" font-size="11.5" fill="#2c3e50">One Bio survives. a still</text>
+  <text x="904" y="517" font-size="11.5" fill="#2c3e50">destructs safely: it owns none.</text>
+  <rect x="902" y="532" width="246" height="76" rx="6" fill="white" stroke="#8e44ad"/>
+  <text x="912" y="552" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">b.bio_ &#x2192; "Ada" @7f10</text>
+  <text x="912" y="572" font-family="Consolas, monospace" font-size="11" fill="#2c3e50">a.bio_ = nullptr</text>
+  <text x="912" y="596" font-size="11" fill="#4527a0">a is valid, just empty</text>
+
+  <!-- ===================== NOTES ===================== -->
+  <rect x="20" y="648" width="560" height="208" rx="10" fill="#e0f2f1" stroke="#00695c" stroke-width="1.5"/>
+  <text x="40" y="676" font-size="14" font-weight="bold" fill="#00695c">Why <tspan font-family="Consolas, monospace">return *this;</tspan></text>
+  <text x="40" y="702" font-size="12" fill="#2c3e50">It hands back a reference to the object just assigned to,</text>
+  <text x="40" y="720" font-size="12" fill="#2c3e50">which is what lets assignments chain:</text>
+  <rect x="40" y="732" width="520" height="52" rx="6" fill="white" stroke="#00695c"/>
+  <text x="54" y="753" font-family="Consolas, monospace" font-size="12" fill="#2c3e50">c = b = a;</text>
+  <text x="54" y="773" font-size="11.5" fill="#6e6e6e">runs right to left: b = a happens, and its result feeds c =</text>
+  <text x="40" y="806" font-size="12" fill="#2c3e50">The return type is <tspan font-family="Consolas, monospace" font-weight="bold">FancyNameTag&amp;</tspan>, a reference.</text>
+  <text x="40" y="828" font-size="12" fill="#2c3e50">Return by value and you would copy the object you just</text>
+  <text x="40" y="846" font-size="12" fill="#2c3e50">built, every single time.</text>
+
+  <rect x="600" y="648" width="560" height="208" rx="10" fill="#fff3e0" stroke="#a95c19" stroke-width="1.5"/>
+  <text x="620" y="676" font-size="14" font-weight="bold" fill="#c64500">Safer order for step 2 and step 3</text>
+  <text x="620" y="702" font-size="12" fill="#2c3e50">Deleting before allocating leaves a hole: if <tspan font-family="Consolas, monospace">new</tspan> throws,</text>
+  <text x="620" y="720" font-size="12" fill="#2c3e50">b's pointer is already dangling. Allocate first instead:</text>
+  <rect x="620" y="732" width="520" height="76" rx="6" fill="white" stroke="#a95c19"/>
+  <text x="634" y="752" font-family="Consolas, monospace" font-size="11.5" fill="#2c3e50">Bio* fresh = new Bio(*other.bio_);</text>
+  <text x="634" y="772" font-family="Consolas, monospace" font-size="11.5" fill="#2c3e50">delete bio_;</text>
+  <text x="634" y="792" font-family="Consolas, monospace" font-size="11.5" fill="#2c3e50">bio_ = fresh;</text>
+  <text x="620" y="828" font-size="12" fill="#2c3e50">If the allocation fails, nothing has been touched and the</text>
+  <text x="620" y="846" font-size="12" fill="#2c3e50">object is exactly as it was. Move assignment cannot throw at all.</text>
+</svg>

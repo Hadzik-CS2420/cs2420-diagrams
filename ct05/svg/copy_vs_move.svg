@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 640" font-family="Segoe UI, system-ui, sans-serif" font-size="13" role="img" aria-label="Side-by-side comparison of the copy constructor and the move constructor for FancyNameTag, which holds a Bio pointer on the heap. On the left, the copy constructor: stack objects a and b each hold their own bio_ pointer, and the heap holds two separate Bio objects at different addresses, because the copy constructor runs new Bio of the source Bio. Both objects stay usable and each destructor deletes its own Bio. On the right, the move constructor: the heap holds only one Bio at the same address as before, nothing is allocated. Object b's bio_ points at it, and the moved-from object a has bio_ set to nullptr, shown by a crossed-out arrow. The moved-from object is still valid but empty, and its destructor deletes nothing.">
+  <title>Copy constructor versus move constructor</title>
+  <rect width="100%" height="100%" fill="white"/>
+
+  <text x="590" y="32" text-anchor="middle" font-size="20" font-weight="bold" fill="#2c3e50">Copy vs. Move: what happens to the heap Bio</text>
+  <text x="590" y="54" text-anchor="middle" font-size="13" fill="#6e6e6e">FancyNameTag holds a Bio* on the heap. The two constructors treat it in opposite ways.</text>
+
+  <!-- ===================== COPY (left) ===================== -->
+  <rect x="20" y="68" width="560" height="500" rx="10" fill="#f2fbf4" stroke="#1c7e45" stroke-width="2"/>
+  <text x="300" y="95" text-anchor="middle" font-size="16" font-weight="bold" fill="#1c7e45">COPY CONSTRUCTOR: deep copy</text>
+  <text x="300" y="116" text-anchor="middle" font-size="13" fill="#2c3e50" font-family="Consolas, monospace">FancyNameTag b(a);</text>
+
+  <rect x="40" y="130" width="240" height="330" rx="8" fill="#eaf2f8" stroke="#2573a7" stroke-width="1.5"/>
+  <text x="52" y="150" font-size="12" font-weight="bold" fill="#2573a7">STACK</text>
+
+  <rect x="55" y="162" width="210" height="112" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+  <text x="160" y="184" text-anchor="middle" font-size="14" font-weight="bold" fill="#2c3e50">a (the original)</text>
+  <rect x="67" y="194" width="186" height="28" rx="4" fill="#eaf2f8" stroke="#2573a7"/>
+  <text x="77" y="213" font-family="Consolas, monospace" fill="#2c3e50">name_ = "Ada"</text>
+  <rect x="67" y="230" width="186" height="28" rx="4" fill="#fff3e0" stroke="#a95c19"/>
+  <text x="77" y="249" font-family="Consolas, monospace" fill="#2c3e50">bio_ =</text>
+  <circle cx="240" cy="244" r="5" fill="#a95c19"/>
+
+  <rect x="55" y="310" width="210" height="112" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+  <text x="160" y="332" text-anchor="middle" font-size="14" font-weight="bold" fill="#2c3e50">b (the copy)</text>
+  <rect x="67" y="342" width="186" height="28" rx="4" fill="#eaf2f8" stroke="#2573a7"/>
+  <text x="77" y="361" font-family="Consolas, monospace" fill="#2c3e50">name_ = "Ada"</text>
+  <rect x="67" y="378" width="186" height="28" rx="4" fill="#fff3e0" stroke="#a95c19"/>
+  <text x="77" y="397" font-family="Consolas, monospace" fill="#2c3e50">bio_ =</text>
+  <circle cx="240" cy="392" r="5" fill="#a95c19"/>
+
+  <rect x="300" y="130" width="260" height="330" rx="8" fill="#fef5ec" stroke="#a95c19" stroke-width="1.5"/>
+  <text x="312" y="150" font-size="12" font-weight="bold" fill="#a95c19">HEAP</text>
+
+  <rect x="315" y="180" width="230" height="76" rx="6" fill="white" stroke="#a95c19" stroke-width="2"/>
+  <text x="430" y="206" text-anchor="middle" font-family="Consolas, monospace" fill="#2c3e50">Bio { "Ada", 1815 }</text>
+  <text x="430" y="234" text-anchor="middle" font-size="12" fill="#6e6e6e">at 0x7f10</text>
+
+  <rect x="315" y="328" width="230" height="76" rx="6" fill="white" stroke="#c64500" stroke-width="2"/>
+  <text x="430" y="354" text-anchor="middle" font-family="Consolas, monospace" fill="#2c3e50">Bio { "Ada", 1815 }</text>
+  <text x="430" y="382" text-anchor="middle" font-size="12" font-weight="bold" fill="#c64500">at 0x9c40 (brand new)</text>
+
+  <path d="M 248 244 L 310 218" stroke="#a95c19" stroke-width="2.5" fill="none" marker-end="url(#arrowOrange)"/>
+  <path d="M 248 392 L 310 366" stroke="#c64500" stroke-width="2.5" fill="none" marker-end="url(#arrowDarkOrange)"/>
+
+  <text x="52" y="494" font-family="Consolas, monospace" font-size="12.5" fill="#1b5e20">bio_ = new Bio(*other.bio_);</text>
+  <text x="52" y="521" fill="#2c3e50">Two objects, two Bios, two addresses.</text>
+  <text x="52" y="543" fill="#2c3e50">The original is untouched and still usable.</text>
+  <text x="52" y="565" fill="#2c3e50">Each destructor deletes its own Bio.</text>
+
+  <!-- ===================== MOVE (right) ===================== -->
+  <rect x="600" y="68" width="560" height="500" rx="10" fill="#f3e8ff" stroke="#8e44ad" stroke-width="2"/>
+  <text x="880" y="95" text-anchor="middle" font-size="16" font-weight="bold" fill="#8e44ad">MOVE CONSTRUCTOR: transfer</text>
+  <text x="880" y="116" text-anchor="middle" font-size="13" fill="#2c3e50" font-family="Consolas, monospace">FancyNameTag b(std::move(a));</text>
+
+  <rect x="620" y="130" width="240" height="330" rx="8" fill="#eaf2f8" stroke="#2573a7" stroke-width="1.5"/>
+  <text x="632" y="150" font-size="12" font-weight="bold" fill="#2573a7">STACK</text>
+
+  <rect x="635" y="162" width="210" height="112" rx="6" fill="white" stroke="#c0392b" stroke-width="2"/>
+  <text x="740" y="184" text-anchor="middle" font-size="14" font-weight="bold" fill="#c0392b">a (moved from)</text>
+  <rect x="647" y="194" width="186" height="28" rx="4" fill="#eaf2f8" stroke="#2573a7"/>
+  <text x="657" y="213" font-family="Consolas, monospace" fill="#2c3e50">name_ = ""</text>
+  <rect x="647" y="230" width="186" height="28" rx="4" fill="#fce4ec" stroke="#c0392b"/>
+  <text x="657" y="249" font-family="Consolas, monospace" font-weight="bold" fill="#c0392b">bio_ = nullptr</text>
+
+  <rect x="635" y="310" width="210" height="112" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+  <text x="740" y="332" text-anchor="middle" font-size="14" font-weight="bold" fill="#2c3e50">b (the new owner)</text>
+  <rect x="647" y="342" width="186" height="28" rx="4" fill="#eaf2f8" stroke="#2573a7"/>
+  <text x="657" y="361" font-family="Consolas, monospace" fill="#2c3e50">name_ = "Ada"</text>
+  <rect x="647" y="378" width="186" height="28" rx="4" fill="#fff3e0" stroke="#a95c19"/>
+  <text x="657" y="397" font-family="Consolas, monospace" fill="#2c3e50">bio_ =</text>
+  <circle cx="820" cy="392" r="5" fill="#a95c19"/>
+
+  <rect x="880" y="130" width="260" height="330" rx="8" fill="#fef5ec" stroke="#a95c19" stroke-width="1.5"/>
+  <text x="892" y="150" font-size="12" font-weight="bold" fill="#a95c19">HEAP</text>
+
+  <rect x="895" y="254" width="230" height="76" rx="6" fill="white" stroke="#a95c19" stroke-width="2"/>
+  <text x="1010" y="280" text-anchor="middle" font-family="Consolas, monospace" fill="#2c3e50">Bio { "Ada", 1815 }</text>
+  <text x="1010" y="308" text-anchor="middle" font-size="12" font-weight="bold" fill="#00695c">still at 0x7f10</text>
+  <text x="1010" y="352" text-anchor="middle" font-size="12" fill="#6e6e6e">nothing was allocated, nothing was copied</text>
+
+  <path d="M 828 244 L 890 268" stroke="#c0392b" stroke-width="2" stroke-dasharray="6 5" fill="none" opacity="0.65"/>
+  <path d="M 850 246 L 870 266 M 870 246 L 850 266" stroke="#c0392b" stroke-width="3" fill="none"/>
+  <path d="M 828 392 L 890 316" stroke="#a95c19" stroke-width="2.5" fill="none" marker-end="url(#arrowOrange)"/>
+
+  <text x="632" y="494" font-family="Consolas, monospace" font-size="12.5" fill="#4527a0">bio_ = other.bio_; other.bio_ = nullptr;</text>
+  <text x="632" y="521" fill="#2c3e50">One Bio, one address, ownership handed over.</text>
+  <text x="632" y="543" fill="#2c3e50">The source is left valid but empty.</text>
+  <text x="632" y="565" fill="#2c3e50">Its destructor deletes nothing, so no double free.</text>
+
+  <text x="590" y="606" text-anchor="middle" font-size="13.5" fill="#2c3e50">Copy when you need a second object. Move when the source is finished with, and forget the <tspan font-family="Consolas, monospace" font-weight="bold" fill="#c0392b">nullptr</tspan> at your peril.</text>
+  <text x="590" y="628" text-anchor="middle" font-size="12.5" fill="#6e6e6e">Leave the source pointing at the same Bio and both destructors free it: that is the double delete.</text>
+
+  <defs>
+    <marker id="arrowOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#a95c19"/>
+    </marker>
+    <marker id="arrowDarkOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c64500"/>
+    </marker>
+  </defs>
+</svg>

@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 780" font-family="Segoe UI, system-ui, sans-serif" font-size="13" role="img" aria-label="An explanation of the self-assignment guard, if this equals ampersand other, in a copy assignment operator. The keyword this is the address of the object being assigned to, and ampersand other is the address of the source object. Case one: b equals a. Object b sits at address 0x1000 and object a at 0x2000, so this and ampersand other are different addresses, the guard does nothing and the assignment proceeds normally. Case two: a equals a. There is only one object, at address 0x2000, and both this and ampersand other point at it, so the addresses match and the operator returns immediately without doing anything. Below, what the guard prevents: without it, self-assignment runs delete bio_, which frees the Bio, and then runs bio_ equals new Bio of star other dot bio_, which reads the Bio that was just freed, because other is the same object. That is undefined behavior: it may crash, print garbage, or appear to work. At the bottom, three ways self-assignment reaches your code without anyone typing a equals a: assigning one array element from another when the two indices are equal, assigning through a reference that names the same object, and assigning through two pointers that point at the same object.">
+  <title>The self-assignment guard: if (this == &amp;other)</title>
+  <rect width="100%" height="100%" fill="white"/>
+
+  <text x="590" y="32" text-anchor="middle" font-size="20" font-weight="bold" fill="#2c3e50">Step 1: the self-assignment guard</text>
+  <text x="590" y="55" text-anchor="middle" font-size="13.5" font-family="Consolas, monospace" fill="#c0392b">if (this == &amp;other) return *this;</text>
+  <text x="590" y="77" text-anchor="middle" font-size="12.5" fill="#6e6e6e">Every member function knows the address of the object it was called on: that address is <tspan font-family="Consolas, monospace" font-weight="bold" fill="#2573a7">this</tspan>. Compare it with the address of the source, <tspan font-family="Consolas, monospace" font-weight="bold" fill="#8e44ad">&amp;other</tspan>.</text>
+
+  <!-- ============ CASE 1 ============ -->
+  <rect x="20" y="95" width="560" height="270" rx="10" fill="#f2fbf4" stroke="#1c7e45" stroke-width="2"/>
+  <text x="40" y="122" font-size="15" font-weight="bold" fill="#1c7e45">Two different objects</text>
+  <text x="40" y="144" font-family="Consolas, monospace" font-size="13.5" font-weight="bold" fill="#2c3e50">b = a;</text>
+
+  <rect x="45" y="160" width="200" height="72" rx="6" fill="white" stroke="#2573a7" stroke-width="2"/>
+  <text x="145" y="182" text-anchor="middle" font-size="13" font-weight="bold" fill="#2c3e50">b</text>
+  <text x="145" y="204" text-anchor="middle" font-family="Consolas, monospace" font-size="12" fill="#6e6e6e">lives at 0x1000</text>
+  <text x="145" y="223" text-anchor="middle" font-family="Consolas, monospace" font-size="12" font-weight="bold" fill="#2573a7">this = 0x1000</text>
+
+  <rect x="355" y="160" width="200" height="72" rx="6" fill="white" stroke="#8e44ad" stroke-width="2"/>
+  <text x="455" y="182" text-anchor="middle" font-size="13" font-weight="bold" fill="#2c3e50">a</text>
+  <text x="455" y="204" text-anchor="middle" font-family="Consolas, monospace" font-size="12" fill="#6e6e6e">lives at 0x2000</text>
+  <text x="455" y="223" text-anchor="middle" font-family="Consolas, monospace" font-size="12" font-weight="bold" fill="#8e44ad">&amp;other = 0x2000</text>
+
+  <text x="300" y="204" text-anchor="middle" font-size="15" font-weight="bold" fill="#6e6e6e">vs</text>
+
+  <rect x="45" y="252" width="510" height="44" rx="6" fill="white" stroke="#1c7e45"/>
+  <text x="300" y="280" text-anchor="middle" font-family="Consolas, monospace" font-size="13" fill="#2c3e50">0x1000 == 0x2000 &#x2192; <tspan font-weight="bold" fill="#c0392b">false</tspan></text>
+
+  <rect x="45" y="306" width="510" height="42" rx="6" fill="#e8f5e9" stroke="#1c7e45"/>
+  <text x="300" y="333" text-anchor="middle" font-size="13" fill="#1b5e20">The guard does nothing. The assignment runs as normal.</text>
+
+  <!-- ============ CASE 2 ============ -->
+  <rect x="600" y="95" width="560" height="270" rx="10" fill="#fdf3f4" stroke="#c0392b" stroke-width="2"/>
+  <text x="620" y="122" font-size="15" font-weight="bold" fill="#c0392b">One object, two names</text>
+  <text x="620" y="144" font-family="Consolas, monospace" font-size="13.5" font-weight="bold" fill="#2c3e50">a = a;</text>
+
+  <rect x="805" y="160" width="200" height="72" rx="6" fill="white" stroke="#c0392b" stroke-width="2"/>
+  <text x="905" y="182" text-anchor="middle" font-size="13" font-weight="bold" fill="#2c3e50">a</text>
+  <text x="905" y="204" text-anchor="middle" font-family="Consolas, monospace" font-size="12" fill="#6e6e6e">lives at 0x2000</text>
+  <text x="905" y="223" text-anchor="middle" font-family="Consolas, monospace" font-size="12" font-weight="bold" fill="#c0392b">one object only</text>
+
+  <text x="648" y="180" font-family="Consolas, monospace" font-size="12" font-weight="bold" fill="#2573a7">this</text>
+  <text x="648" y="222" font-family="Consolas, monospace" font-size="12" font-weight="bold" fill="#8e44ad">&amp;other</text>
+  <path d="M 690 176 L 798 190" stroke="#2573a7" stroke-width="2.5" fill="none" marker-end="url(#gArrowBlue)"/>
+  <path d="M 700 218 L 798 206" stroke="#8e44ad" stroke-width="2.5" fill="none" marker-end="url(#gArrowPurple)"/>
+
+  <rect x="625" y="252" width="510" height="44" rx="6" fill="white" stroke="#c0392b"/>
+  <text x="880" y="280" text-anchor="middle" font-family="Consolas, monospace" font-size="13" fill="#2c3e50">0x2000 == 0x2000 &#x2192; <tspan font-weight="bold" fill="#1c7e45">true</tspan></text>
+
+  <rect x="625" y="306" width="510" height="42" rx="6" fill="#fce4ec" stroke="#c0392b"/>
+  <text x="880" y="333" text-anchor="middle" font-size="13" fill="#c0392b">Return at once. There is nothing to do, and doing it would be fatal.</text>
+
+  <!-- ============ WHAT IT PREVENTS ============ -->
+  <rect x="20" y="386" width="1140" height="250" rx="10" fill="#fdf3f4" stroke="#c0392b" stroke-width="2"/>
+  <text x="40" y="414" font-size="15" font-weight="bold" fill="#c0392b">What the guard prevents: <tspan font-family="Consolas, monospace">a = a;</tspan> with the check removed</text>
+
+  <rect x="40" y="430" width="340" height="120" rx="8" fill="white" stroke="#c0392b" stroke-width="1.5"/>
+  <circle cx="68" cy="458" r="13" fill="#c0392b"/>
+  <text x="68" y="463" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">1</text>
+  <text x="90" y="463" font-family="Consolas, monospace" font-size="12.5" font-weight="bold" fill="#c0392b">delete bio_;</text>
+  <text x="58" y="492" font-size="12" fill="#2c3e50">a's Bio is freed. That memory now</text>
+  <text x="58" y="510" font-size="12" fill="#2c3e50">belongs to no one.</text>
+  <text x="58" y="534" font-family="Consolas, monospace" font-size="12" fill="#6e6e6e">a.bio_ &#x2192; freed memory</text>
+
+  <rect x="410" y="430" width="340" height="120" rx="8" fill="white" stroke="#c0392b" stroke-width="1.5"/>
+  <circle cx="438" cy="458" r="13" fill="#c0392b"/>
+  <text x="438" y="463" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">2</text>
+  <text x="460" y="463" font-family="Consolas, monospace" font-size="12.5" font-weight="bold" fill="#c0392b">new Bio(*other.bio_)</text>
+  <text x="428" y="492" font-size="12" fill="#2c3e50">But <tspan font-family="Consolas, monospace">other</tspan> is <tspan font-family="Consolas, monospace">a</tspan>, so <tspan font-family="Consolas, monospace">other.bio_</tspan> is the</text>
+  <text x="428" y="510" font-size="12" fill="#2c3e50">pointer you just freed in step 1.</text>
+  <text x="428" y="534" font-size="12" font-weight="bold" fill="#c0392b">It reads memory that is gone.</text>
+
+  <rect x="780" y="430" width="340" height="120" rx="8" fill="#fce4ec" stroke="#c0392b" stroke-width="2"/>
+  <circle cx="808" cy="458" r="13" fill="#c0392b"/>
+  <text x="808" y="463" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">3</text>
+  <text x="830" y="463" font-size="13" font-weight="bold" fill="#c0392b">Undefined behaviour</text>
+  <text x="798" y="492" font-size="12" fill="#2c3e50">It may crash. It may copy garbage. It</text>
+  <text x="798" y="510" font-size="12" fill="#2c3e50">may look fine today and fail in a lab</text>
+  <text x="798" y="528" font-size="12" fill="#2c3e50">demo. All three are the same bug.</text>
+
+  <path d="M 384 490 L 406 490" stroke="#c0392b" stroke-width="2.5" fill="none" marker-end="url(#gArrowRed)"/>
+  <path d="M 754 490 L 776 490" stroke="#c0392b" stroke-width="2.5" fill="none" marker-end="url(#gArrowRed)"/>
+
+  <text x="40" y="584" font-size="12.5" fill="#2c3e50">The guard is cheap: one pointer comparison, on every assignment, to rule out the one case that destroys its own input.</text>
+  <text x="40" y="610" font-size="12.5" fill="#2c3e50">Note it compares <tspan font-weight="bold">addresses</tspan>, not contents. Two separate tags holding identical data are still two objects, and they copy normally.</text>
+
+  <!-- ============ HOW IT HAPPENS ============ -->
+  <rect x="20" y="656" width="1140" height="104" rx="10" fill="#eaf2f8" stroke="#2573a7" stroke-width="1.5"/>
+  <text x="40" y="682" font-size="14" font-weight="bold" fill="#2573a7">Nobody writes <tspan font-family="Consolas, monospace">a = a;</tspan> on purpose. Aliasing writes it for you.</text>
+  <text x="46" y="710" font-family="Consolas, monospace" font-size="12.5" fill="#2c3e50">tags[i] = tags[j];</text>
+  <text x="46" y="730" font-size="12" fill="#6e6e6e">fine until i and j are equal</text>
+  <text x="430" y="710" font-family="Consolas, monospace" font-size="12.5" fill="#2c3e50">FancyNameTag&amp; ref = a;  a = ref;</text>
+  <text x="430" y="730" font-size="12" fill="#6e6e6e">one object, two names</text>
+  <text x="830" y="710" font-family="Consolas, monospace" font-size="12.5" fill="#2c3e50">*p = *q;</text>
+  <text x="830" y="730" font-size="12" fill="#6e6e6e">two pointers, one object</text>
+
+  <defs>
+    <marker id="gArrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2573a7"/>
+    </marker>
+    <marker id="gArrowPurple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8e44ad"/>
+    </marker>
+    <marker id="gArrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c0392b"/>
+    </marker>
+  </defs>
+</svg>
