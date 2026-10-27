@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CS 2420 — Sorting Algorithm Steppers</title>
+<style>
+  :root {
+    --ink:#2c3e50; --muted:#555555; --rule:#d8dee6;
+    --green:#1c7e45; --blue:#2573a7; --deep:#4527a0; --teal:#00695c;
+    --tint-green:#f2fbf4; --tint-blue:#eaf2f8; --tint-purple:#ede7f6;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:2rem 1.25rem 3rem;
+         font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+         color:var(--ink); background:#fff; line-height:1.6; }
+  .wrap { max-width:62rem; margin:0 auto; }
+  header { border-bottom:2px solid var(--rule); padding-bottom:1.1rem; margin-bottom:1.6rem; }
+  h1 { font-size:1.6rem; margin:0 0 .35rem; }
+  .sub { color:var(--muted); margin:0; font-size:1rem; }
+  .lede { background:var(--tint-purple); border-left:5px solid var(--deep);
+          border-radius:8px; padding:1rem 1.25rem; margin:0 0 1.8rem; }
+  .lede p { margin:0 0 .6rem; }
+  .lede p:last-child { margin:0; }
+  .cards { display:grid; gap:1.1rem; grid-template-columns:repeat(auto-fit,minmax(17rem,1fr)); }
+  .card { border:1px solid var(--rule); border-radius:10px; overflow:hidden;
+          display:flex; flex-direction:column; }
+  .card h2 { font-size:1.05rem; margin:0; padding:.7rem 1rem;
+             background:var(--tint-blue); border-bottom:1px solid var(--rule); }
+  .card.b h2 { background:var(--tint-green); }
+  .card.c h2 { background:var(--tint-purple); }
+  .card .body { padding:.9rem 1rem 1.1rem; flex:1; display:flex; flex-direction:column; }
+  .card p { margin:0 0 .75rem; font-size:.93rem; }
+  .card ul { margin:0 0 1rem; padding-left:1.15rem; font-size:.88rem; color:var(--muted); }
+  .card li { margin-bottom:.3rem; }
+  .open { margin-top:auto; display:inline-block; text-align:center;
+          background:var(--deep); color:#fff; text-decoration:none;
+          padding:.55rem 1rem; border-radius:7px; font-weight:600; font-size:.95rem; }
+  .open:hover { background:#38208a; }
+  .how { margin-top:2.2rem; border:1px solid var(--rule); border-radius:10px;
+         padding:1.1rem 1.35rem; background:#fcfcfd; }
+  .how h2 { font-size:1.05rem; margin:0 0 .6rem; color:var(--teal); }
+  .how ol { margin:0; padding-left:1.3rem; font-size:.93rem; }
+  .how li { margin-bottom:.4rem; }
+  kbd { font-family:Consolas,monospace; font-size:.85em; background:#eef2f6;
+        border:1px solid var(--rule); border-radius:4px; padding:.1em .4em; }
+  footer { margin-top:2.2rem; padding-top:1rem; border-top:1px solid var(--rule);
+           color:var(--muted); font-size:.86rem; }
+  @media (prefers-color-scheme: dark) {
+    /* The steppers themselves are light-on-white by design, for projection.
+       Keep this page consistent with them rather than inverting one of two. */
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>CS 2420 — Sorting Algorithm Steppers</h1>
+  <p class="sub">Interactive teaching tools · Data Structures &amp; Algorithms · Weber State University</p>
+</header>
+
+<div class="lede">
+  <p><strong>Nothing to install.</strong> Click any of the three below and it runs in this browser
+  — no account, no download, no setup. Each one is a single self-contained page.</p>
+  <p>These were built to solve a specific classroom problem. A sorting algorithm is a process that
+  unfolds over time, and a textbook can only show you single frozen frames of it. Each stepper
+  walks one algorithm one step at a time, with its source code beside the data, so the code and
+  what the code is <em>doing</em> are visible at the same moment.</p>
+</div>
+
+<div class="cards">
+
+  <div class="card">
+    <h2>O(n²) Sorts</h2>
+    <div class="body">
+      <p>Bubble, insertion and selection sort — the three that are easy to write and slow to run.</p>
+      <ul>
+        <li>Loop bounds shown as live numbers, so <code>j &lt; n-1-i</code> stops being abstract</li>
+        <li>A generated pass-by-pass table of the whole run</li>
+        <li>Why bubble sort's early exit is fragile, and what happens without it</li>
+        <li>A case where only one of the three preserves the order of equal values</li>
+      </ul>
+      <a class="open" href="quadratic-sorts.html">Open the stepper</a>
+    </div>
+  </div>
+
+  <div class="card b">
+    <h2>O(n log n) Sorts</h2>
+    <div class="body">
+      <p>Merge, quick and heap sort. Each works on a structure a flat array cannot show, so the
+      stepper draws it.</p>
+      <ul>
+        <li>Merge sort's temporary halves, with all three cursors on them</li>
+        <li>Quick sort's pivot and the boundary the partition maintains</li>
+        <li>Heap sort as an <strong>actual binary tree</strong>, which is the one of the three that
+            is genuinely unreadable as a row of numbers</li>
+        <li>Comparison counts verified against the real C++ implementation</li>
+      </ul>
+      <a class="open" href="efficient-sorts.html">Open the stepper</a>
+    </div>
+  </div>
+
+  <div class="card c">
+    <h2>Non-Comparison Sorts</h2>
+    <div class="body">
+      <p>Counting, bucket and radix sort — three algorithms that sort without ever comparing two
+      elements to each other.</p>
+      <ul>
+        <li>The count array, labelled with the value each counter stands for</li>
+        <li>Buckets drawn as rows showing the range each one covers</li>
+        <li>Radix sort's ten digit counters, and the output array filling
+            <strong>from the right</strong></li>
+        <li>Four inputs showing why the memory cost runs from 9 cells to 801</li>
+      </ul>
+      <a class="open" href="non-comparison-sorts.html">Open the stepper</a>
+    </div>
+  </div>
+
+</div>
+
+<div class="how">
+  <h2>How to use one</h2>
+  <ol>
+    <li>Take the tabs <strong>in order</strong>. The first three walk a single algorithm each; the
+        last one compares all three.</li>
+    <li><strong>Next</strong> advances one step, or press <strong>Play</strong> and watch it run.
+        <kbd>←</kbd> and <kbd>→</kbd> also work.</li>
+    <li><strong>Click any line of code</strong> for a plain-language breakdown of that line — what
+        it does, and the specific mistake it invites. The explanation stays pinned while you keep
+        stepping.</li>
+    <li>Switch the <strong>input</strong> buttons to see the same algorithm on sorted, reverse-sorted
+        and duplicate-heavy data.</li>
+  </ol>
+</div>
+
+<footer>
+  <p>Each page carries a self-check that runs on load and reports at the top: it re-runs every
+  algorithm on every input and verifies the results are correctly sorted, that each step highlights
+  a real line of code, and that the comparison counts match the C++ the students actually write. A
+  green bar means the demonstration you are watching is a correct one.</p>
+  <p>Built for CS 2420 by Scott Hadzik. Served from the course's public diagram repository.</p>
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CT 14 Stepper — Merge, Quick, Heap</title>
+<style>
+  :root {
+    --ink:#2c3e50; --muted:#6e6e6e; --rule:#d8dee6;
+    --green:#1c7e45; --blue:#2573a7; --orange:#a95c19;
+    --red:#c0392b; --purple:#8e44ad; --deep:#4527a0; --teal:#00695c;
+    --tint-green:#f2fbf4; --tint-blue:#eaf2f8; --tint-orange:#fff3e0;
+    --tint-red:#fce4ec; --tint-purple:#ede7f6; --tint-teal:#e0f2f1;
+    --code-bg:#1e1e2e; --code-fg:#cdd6f4; --code-dim:#6c7086; --code-hit:#45475a;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; padding:1.5rem 1.25rem 3rem;
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+    color:var(--ink); background:#fff; line-height:1.5;
+  }
+  .wrap { max-width:1280px; margin:0 auto; }
+  h1 { font-size:1.35rem; margin:0 0 .2rem; }
+  .sub { color:var(--muted); font-size:.9rem; margin:0 0 1.1rem; }
+
+  .tabs { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:1rem;
+          border-bottom:2px solid var(--rule); padding-bottom:.6rem; }
+  .tabs button {
+    font:inherit; font-size:.9rem; font-weight:600; padding:.45rem 1rem;
+    border:1px solid var(--rule); border-radius:7px 7px 0 0;
+    background:#f7f9fb; color:var(--muted); cursor:pointer;
+  }
+  .tabs button:hover { color:var(--ink); }
+  .tabs button.on { background:#fff; border-bottom-color:#fff; }
+  .tabs button[data-mode="merge"].on   { border-top:3px solid var(--blue);   color:var(--blue); }
+  .tabs button[data-mode="quick"].on   { border-top:3px solid var(--orange); color:var(--orange); }
+  .tabs button[data-mode="heap"].on    { border-top:3px solid var(--purple); color:var(--purple); }
+  .tabs button[data-mode="compare"].on { border-top:3px solid var(--deep);   color:var(--deep); }
+  .tabs .spacer { flex:1; }
+  .tabs .step-hint { align-self:center; font-size:.76rem; color:var(--muted); }
+
+  .panel { border:1px solid var(--rule); border-radius:10px;
+           padding:.85rem 1rem; margin-bottom:1.1rem; background:#fcfdfe; }
+  .row { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+  .row + .row { margin-top:.6rem; }
+  .lbl { font-size:.73rem; text-transform:uppercase; letter-spacing:.05em;
+         color:var(--muted); min-width:6.5rem; }
+  button.ctl { font:inherit; font-size:.86rem; padding:.38rem .8rem;
+               border:1px solid var(--rule); border-radius:6px;
+               background:#fff; color:var(--ink); cursor:pointer; }
+  button.ctl:hover:not(:disabled) { border-color:var(--blue); color:var(--blue); }
+  button.ctl:disabled { opacity:.4; cursor:default; }
+  button.ctl.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+  button.ctl.primary { background:var(--deep); border-color:var(--deep); color:#fff; }
+  .count { font-variant-numeric:tabular-nums; font-size:.84rem; color:var(--muted); margin-left:auto; }
+
+  .solo { display:grid; grid-template-columns:1.1fr .9fr; gap:1.1rem; align-items:start; }
+  @media (max-width:1000px) { .solo { grid-template-columns:1fr; } }
+  .card { border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
+  .card > h2 { font-size:.92rem; margin:0; padding:.5rem .85rem;
+               border-bottom:1px solid var(--rule); background:#f7f9fb; }
+  .card-body { padding:.85rem; }
+
+  .lanes { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; }
+  @media (max-width:1000px) { .lanes { grid-template-columns:1fr; } }
+  .lane { border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
+  .lane h2 { font-size:.92rem; margin:0; padding:.5rem .85rem; border-bottom:1px solid var(--rule); }
+  .lane.merge h2 { background:var(--tint-blue);   color:var(--blue); }
+  .lane.quick h2 { background:var(--tint-orange); color:var(--orange); }
+  .lane.heap  h2 { background:var(--tint-purple); color:var(--purple); }
+  .done-badge { float:right; font-size:.66rem; font-weight:600; text-transform:uppercase;
+                letter-spacing:.04em; padding:.1rem .45rem; border-radius:4px;
+                background:var(--green); color:#fff; }
+
+  .cells { display:flex; gap:.3rem; flex-wrap:wrap; min-height:3rem; }
+  .cells.big .cell { min-width:3rem; font-size:1.02rem; padding:.5rem .25rem .25rem; }
+  .cell { position:relative; min-width:2.4rem; padding:.42rem .2rem .2rem;
+          border:2px solid var(--rule); border-radius:6px; text-align:center;
+          font-variant-numeric:tabular-nums; font-weight:600; background:#fff; }
+  .cell .tag { display:block; font-size:.6rem; font-weight:400; color:var(--muted); }
+  .cell .ix  { display:block; font-size:.57rem; font-weight:400; color:#aab2bd; }
+  .cell.outside { opacity:.35; }
+  .cell.sorted  { border-color:var(--green);  background:var(--tint-green); }
+  .cell.compare { border-color:var(--blue);   background:var(--tint-blue); }
+  .cell.moved   { border-color:var(--red);    background:var(--tint-red); }
+  .cell.pivot   { border-color:var(--orange); background:var(--tint-orange); }
+  .cell.bound   { border-color:var(--teal);   background:var(--tint-teal); }
+  .cell.node    { border-color:var(--purple); background:var(--tint-purple); }
+
+  .temps { margin-top:.6rem; font-size:.78rem; }
+  .temps .trow { display:flex; align-items:center; gap:.3rem; margin-bottom:.3rem; }
+  .temps .tname { min-width:5.2rem; color:var(--muted); font-family:Consolas,monospace; }
+  .temps .cell { min-width:2.3rem; font-size:.95rem; padding:.3rem .15rem .15rem; }
+  .temps .cell.cursor { border-color:var(--blue); background:var(--tint-blue); }
+  .temps .cell.used { opacity:.35; }
+
+  .bounds { display:flex; gap:.7rem; flex-wrap:wrap; margin-top:.5rem; min-height:1.15rem;
+            font-size:.74rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .bounds code { background:#eef2f6; border-radius:4px; padding:.05em .35em;
+                 font-family:Consolas,monospace; color:var(--ink); }
+  .note { font-size:.85rem; margin:.65rem 0 0; min-height:3.6rem; }
+  .lane .note { font-size:.79rem; min-height:4.4rem; }
+
+  .code { background:var(--code-bg); color:var(--code-fg); border-radius:8px;
+          padding:.6rem 0; overflow-x:auto;
+          font-family:Consolas,"Courier New",monospace; font-size:1.02rem; line-height:1.72; }
+  .code div { padding:0 .8rem; white-space:pre; cursor:pointer; }
+  .code div:hover { background:#313244; }
+  .code div.active { background:var(--code-hit); }
+  .code div.active::before { content:"\25B8 "; color:#f9e2af; }
+  .code div:not(.active)::before { content:"  "; }
+  .code div.cont::before { content:"  " !important; }
+  .code div.pinned { box-shadow:inset 3px 0 0 #f9e2af; }
+  .code div:focus-visible { outline:2px solid #89dceb; outline-offset:-2px; }
+
+  /* ---- per-line breakdown ---- */
+  .lineinfo { border-top:1px solid var(--rule); margin-top:.7rem; padding-top:.7rem; font-size:.82rem; }
+  .lineinfo .li-head { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:.45rem; }
+  .lineinfo .li-src-wrap { overflow-x:auto; max-width:100%; }
+  .lineinfo code.li-src { font-family:Consolas,monospace; font-size:.95rem;
+    background:#1e1e2e; color:#cdd6f4; padding:.2em .5em; border-radius:4px; white-space:pre; }
+  .lineinfo .li-tag { font-size:.65rem; font-weight:600; text-transform:uppercase;
+    letter-spacing:.04em; padding:.1rem .4rem; border-radius:4px; background:#eef2f6; color:var(--muted); }
+  .lineinfo .li-tag.pin { background:#fff8e1; color:#8a6d3b; }
+  .lineinfo .li-what { margin:.35rem 0 .5rem; }
+  .lineinfo ul.li-items { margin:0; padding-left:1.1rem; }
+  .lineinfo ul.li-items li { margin-bottom:.34rem; }
+  .lineinfo code { font-family:Consolas,monospace; font-size:.95em; }
+  .lineinfo .li-kind { font-size:.64rem; font-weight:600; text-transform:uppercase;
+    letter-spacing:.03em; padding:.05rem .32rem; border-radius:3px; margin-right:.35rem; }
+  .li-kind.syntax { background:var(--tint-blue);   color:var(--blue); }
+  .li-kind.idiom  { background:var(--tint-green);  color:var(--green); }
+  .li-kind.trap   { background:var(--tint-red);    color:var(--red); }
+  .li-kind.why    { background:var(--tint-purple); color:var(--deep); }
+  .lineinfo button.li-clear { font:inherit; font-size:.73rem; padding:.15rem .5rem;
+    margin-left:auto; border:1px solid var(--rule); border-radius:5px; background:#fff;
+    color:var(--muted); cursor:pointer; }
+  .lineinfo button.li-clear:hover { color:var(--ink); border-color:var(--blue); }
+  .code .kw { color:#cba6f7; } .code .fn { color:#89dceb; }
+  .code .nm { color:#fab387; } .code .cm { color:var(--code-dim); font-style:italic; }
+
+  .stats { display:flex; gap:.9rem; margin-top:.55rem; padding-top:.5rem;
+           border-top:1px dashed var(--rule);
+           font-size:.78rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .stats b { color:var(--ink); font-weight:600; }
+
+  table { border-collapse:collapse; width:100%; font-size:.78rem; }
+  th,td { border:1px solid var(--rule); padding:.3rem .48rem; text-align:left; }
+  th { background:#f4f7fa; font-weight:600; }
+  td.num { font-variant-numeric:tabular-nums; }
+  tr.now td { background:#fff8e1; font-weight:600; }
+  td.yes { color:var(--green); font-weight:600; }
+  td.no  { color:var(--red);   font-weight:600; }
+  .mono { font-family:Consolas,monospace; }
+
+  .facts { font-size:.8rem; }
+  .facts dt { font-weight:600; float:left; width:7.5rem; clear:left; color:var(--muted); }
+  .facts dd { margin:0 0 .3rem 7.5rem; }
+
+  .callout { font-size:.82rem; padding:.6rem .8rem; border-radius:6px; margin-top:.7rem;
+             background:var(--tint-purple); border:1px solid #d1c4e9; color:var(--deep); }
+  .callout.warn { background:var(--tint-red); border-color:#f5c6cb; color:var(--red); }
+  .legend { margin-top:.85rem; font-size:.75rem; color:var(--muted); }
+  .legend span { display:inline-block; margin-right:.9rem; white-space:nowrap; }
+  .sw { display:inline-block; width:.7rem; height:.7rem; border-radius:3px;
+        border:2px solid var(--rule); vertical-align:-1px; margin-right:.25rem; }
+  .selftest { margin-top:1rem; font-size:.79rem; padding:.5rem .75rem; border-radius:6px;
+              border:1px solid var(--rule); }
+  .selftest.pass { background:var(--tint-green); border-color:var(--green); color:var(--green); }
+  .selftest.fail { background:var(--tint-red);   border-color:var(--red);   color:var(--red); }
+  .hint { margin-top:.9rem; font-size:.83rem; color:var(--muted);
+          border-left:3px solid var(--rule); padding-left:.75rem; }
+  .verdict { margin-top:1.15rem; }
+  svg.tree { width:100%; height:auto; display:block; }
+  svg.tree text { font-family:"Segoe UI",system-ui,sans-serif; font-size:13px; font-weight:600; }
+  svg.tree text.ix { font-size:9px; font-weight:400; fill:#aab2bd; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Merge, Quick and Heap — step them one at a time, then compare</h1>
+  <p class="sub">
+    Take the three tabs in order. Each walks a single algorithm with its code, the
+    line that is executing, and the structure that algorithm actually works on —
+    the temporary halves for merge sort, the pivot boundary for quick sort, and the
+    binary tree hiding in the array for heap sort. <strong>Click any line of code</strong>
+    for a breakdown of it. The last tab races all three.
+  </p>
+
+  <div class="tabs" id="tabs">
+    <button data-mode="merge">1 &middot; Merge Sort</button>
+    <button data-mode="quick">2 &middot; Quick Sort</button>
+    <button data-mode="heap">3 &middot; Heap Sort</button>
+    <button data-mode="compare">4 &middot; Compare all three</button>
+    <span class="spacer"></span>
+    <span class="step-hint">&larr; &rarr; arrow keys step &middot; space plays</span>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <span class="lbl">Input</span>
+      <button class="ctl" data-preset="random">[5, 3, 8, 1, 9, 2]</button>
+      <button class="ctl" data-preset="sorted">already sorted</button>
+      <button class="ctl" data-preset="reverse">reverse sorted</button>
+      <button class="ctl" data-preset="dupes">[3a, 1, 3b, 2] — stability</button>
+      <span class="count" id="frameCount"></span>
+    </div>
+    <div class="row">
+      <span class="lbl">Step</span>
+      <button class="ctl" id="first">&laquo; First</button>
+      <button class="ctl" id="prev">&lsaquo; Prev</button>
+      <button class="ctl primary" id="play">&#9654; Play</button>
+      <button class="ctl" id="next">Next &rsaquo;</button>
+      <button class="ctl" id="last">Last &raquo;</button>
+      <button class="ctl" id="nextEvent">Next call &raquo;&raquo;</button>
+    </div>
+  </div>
+
+  <div id="stage"></div>
+
+  <div class="legend">
+    <span><i class="sw" style="border-color:#2573a7;background:#eaf2f8"></i>being compared</span>
+    <span><i class="sw" style="border-color:#c0392b;background:#fce4ec"></i>just written</span>
+    <span><i class="sw" style="border-color:#a95c19;background:#fff3e0"></i>pivot</span>
+    <span><i class="sw" style="border-color:#00695c;background:#e0f2f1"></i>the i boundary</span>
+    <span><i class="sw" style="border-color:#8e44ad;background:#ede7f6"></i>heap node in play</span>
+    <span><i class="sw" style="border-color:#1c7e45;background:#f2fbf4"></i>final position</span>
+    <span style="opacity:.5"><i class="sw"></i>outside the active range</span>
+  </div>
+
+  <div class="selftest" id="selftest"></div>
+</div>
+
+<script>
+"use strict";
+
+var PRESETS = {
+  random:  [5, 3, 8, 1, 9, 2],
+  sorted:  [1, 2, 3, 4, 5],
+  reverse: [5, 4, 3, 2, 1],
+  dupes:   [3, 1, 3, 2]
+};
+
+function build(values) {
+  var seen = {}, counts = {};
+  values.forEach(function (v) { counts[v] = (counts[v] || 0) + 1; });
+  return values.map(function (v, i) {
+    var tag = "";
+    if (counts[v] > 1) { seen[v] = (seen[v] || 0) + 1; tag = String.fromCharCode(96 + seen[v]); }
+    return { v: v, tag: tag, id: i };
+  });
+}
+
+var K = '<span class="kw">', F = '<span class="fn">', N = '<span class="nm">',
+    C = '<span class="cm">', E = '</span>';
+
+var CODE = {
+  merge: [
+    {k:'rsig',  t:K+'static void'+E+' '+F+'merge_sort_recursive'+E+'(v&amp; data, '+K+'int'+E+' left, '+K+'int'+E+' right) {'},
+    {k:'base',  t:'  '+K+'if'+E+' (left &gt;= right) '+K+'return'+E+';   '+C+'// 0 or 1 element'+E},
+    {k:'mid',   t:'  '+K+'int'+E+' mid = left + (right - left) / '+N+'2'+E+';'},
+    {k:'recL',  t:'  '+F+'merge_sort_recursive'+E+'(data, left, mid);'},
+    {k:'recR',  t:'  '+F+'merge_sort_recursive'+E+'(data, mid + '+N+'1'+E+', right);'},
+    {k:'call',  t:'  '+F+'merge'+E+'(data, left, mid, right);'},
+    {k:'rend',  t:'}'},
+    {k:'msig',  t:K+'static void'+E+' '+F+'merge'+E+'(v&amp; data, '+K+'int'+E+' left, '+K+'int'+E+' mid, '+K+'int'+E+' right) {'},
+    {k:'copy',  t:'  '+C+'// 1. copy both halves out BEFORE overwriting'+E},
+    {k:'copy2', t:'  vector&lt;'+K+'int'+E+'&gt; L(..left..mid), R(..mid+1..right);'},
+    {k:'cmp',   t:'  '+K+'while'+E+' (i &lt; L.size() &amp;&amp; j &lt; R.size())'},
+    {k:'take',  t:'    data[k++] = '+F+'counted_le'+E+'(L[i], R[j]) ? L[i++] : R[j++];'},
+    {k:'drain', t:'  '+C+'// 3. drain whichever half still has elements'+E},
+    {k:'mend',  t:'}'}
+  ],
+  quick: [
+    {k:'rsig',  t:K+'static void'+E+' '+F+'quick_sort_recursive'+E+'(v&amp; data, '+K+'int'+E+' low, '+K+'int'+E+' high) {'},
+    {k:'base',  t:'  '+K+'if'+E+' (low &gt;= high) '+K+'return'+E+';'},
+    {k:'part',  t:'  '+K+'int'+E+' p = '+F+'partition'+E+'(data, low, high);'},
+    {k:'recL',  t:'  '+F+'quick_sort_recursive'+E+'(data, low, p - '+N+'1'+E+');'},
+    {k:'recR',  t:'  '+F+'quick_sort_recursive'+E+'(data, p + '+N+'1'+E+', high);'},
+    {k:'rend',  t:'}'},
+    {k:'psig',  t:K+'static int'+E+' '+F+'partition'+E+'(v&amp; data, '+K+'int'+E+' low, '+K+'int'+E+' high) {'},
+    {k:'med',   t:'  '+C+'// 1. median-of-three -> the median ends up at data[high]'+E},
+    {k:'med2',  t:'  '+K+'if'+E+' ('+F+'counted_lt'+E+'(data[mid], data[low]))  '+F+'swap'+E+'(low, mid);'},
+    {k:'med3',  t:'  '+K+'if'+E+' ('+F+'counted_lt'+E+'(data[high], data[low])) '+F+'swap'+E+'(low, high);'},
+    {k:'med4',  t:'  '+K+'if'+E+' ('+F+'counted_lt'+E+'(data[mid], data[high])) '+F+'swap'+E+'(mid, high);'},
+    {k:'pivot', t:'  '+K+'int'+E+' pivot = data[high];  '+K+'int'+E+' i = low - '+N+'1'+E+';'},
+    {k:'scan',  t:'  '+K+'for'+E+' ('+K+'int'+E+' j = low; j &lt; high; ++j)'},
+    {k:'cmp',   t:'    '+K+'if'+E+' ('+F+'counted_le'+E+'(data[j], pivot)) '+F+'swap'+E+'(++i, j);'},
+    {k:'place', t:'  '+F+'swap'+E+'(data[i+'+N+'1'+E+'], data[high]);  '+K+'return'+E+' i + '+N+'1'+E+';'},
+    {k:'pend',  t:'}'}
+  ],
+  heap: [
+    {k:'hsig',  t:K+'static void'+E+' '+F+'heapify_down'+E+'(v&amp; data, '+K+'int'+E+' heap_size, '+K+'int'+E+' index) {'},
+    {k:'init',  t:'  '+K+'int'+E+' largest = index, left = '+N+'2'+E+'*index+'+N+'1'+E+', right = '+N+'2'+E+'*index+'+N+'2'+E+';'},
+    {k:'cmpL',  t:'  '+K+'if'+E+' (left &lt; heap_size &amp;&amp;'},
+    {k:'cmpL',  c:1, t:'      '+F+'counted_gt'+E+'(data[left], data[largest]))  largest = left;'},
+    {k:'cmpR',  t:'  '+K+'if'+E+' (right &lt; heap_size &amp;&amp;'},
+    {k:'cmpR',  c:1, t:'      '+F+'counted_gt'+E+'(data[right], data[largest])) largest = right;'},
+    {k:'sink',  t:'  '+K+'if'+E+' (largest != index) { '+F+'swap'+E+'(data[index], data[largest]);'},
+    {k:'rec',   t:'    '+F+'heapify_down'+E+'(data, heap_size, largest); }   '+C+'// follow it down'+E},
+    {k:'hend',  t:'}'},
+    {k:'ssig',  t:K+'void'+E+' '+F+'heap_sort'+E+'(v&amp; data) {'},
+    {k:'build', t:'  '+C+'// phase 1: build the max-heap, last parent upward'+E},
+    {k:'bloop', t:'  '+K+'for'+E+' ('+K+'int'+E+' i = n/'+N+'2'+E+'-'+N+'1'+E+'; i &gt;= '+N+'0'+E+'; --i) '+F+'heapify_down'+E+'(data, n, i);'},
+    {k:'extr',  t:'  '+C+'// phase 2: swap the max out, shrink, repair'+E},
+    {k:'eloop', t:'  '+K+'for'+E+' ('+K+'int'+E+' i = n-'+N+'1'+E+'; i &gt; '+N+'0'+E+'; --i) {'},
+    {k:'eswap', t:'    '+F+'swap'+E+'(data['+N+'0'+E+'], data[i]);'},
+    {k:'erep',  t:'    '+F+'heapify_down'+E+'(data, i, '+N+'0'+E+'); }   '+C+'// i, not n'+E},
+    {k:'send',  t:'}'}
+  ]
+};
+
+var FACTS = {
+  merge: {
+    title: "Merge Sort",
+    idea: "Split blindly at the midpoint, sort each half by calling yourself, then do all the real work in merge() — combining two <em>already sorted</em> halves into one. The recursion is trivial; merging is the algorithm.",
+    steps: ["<strong>Copy both halves out</strong> into temporary vectors. You must copy before writing, because you are about to overwrite the region you are reading. This is merge sort's O(n) extra space.",
+            "<strong>Compare the fronts</strong> with three indices: <code>i</code> into L, <code>j</code> into R, <code>k</code> into the real array. Take the smaller front each time.",
+            "<strong>Drain the leftovers.</strong> One half runs out first; everything still in the other has to be copied across.",
+            "Use <code>&lt;=</code> on the fronts, not <code>&lt;</code> — on a tie it takes from the left half, which is what keeps merge sort stable."],
+    best: "O(n log n) — no best case, it always splits the same way",
+    avg: "O(n log n) guaranteed", space: "O(n) — the temporary halves",
+    stable: "Yes — <code>&lt;=</code> takes from the left on a tie",
+    watch: "<strong>Forgetting step 3</strong> is the classic bug: the array comes out partly sorted with stale values at the tail. Watch the L and R rows empty at different times."
+  },
+  quick: {
+    title: "Quick Sort",
+    idea: "The inverse of merge sort: do the work <em>before</em> recursing. partition() picks a pivot and rearranges so everything ≤ pivot is left of it. The pivot is then in its final position forever, and the two sides are sorted independently — no merge step, so no extra array.",
+    steps: ["<strong>Median-of-three:</strong> three conditional swaps leave the median of <code>low</code>, <code>mid</code> and <code>high</code> at <code>data[high]</code>. That becomes the pivot.",
+            "<strong>The Lomuto scan:</strong> <code>i</code> marks the end of the ≤-pivot region, starting at <code>low-1</code>. Walk <code>j</code>; whenever <code>data[j] &lt;= pivot</code>, advance <code>i</code> and swap.",
+            "<strong>Drop the pivot in</strong> at <code>i+1</code> and return that index — its final home.",
+            "Recurse on <code>low..p-1</code> and <code>p+1..high</code>. The pivot is in neither call."],
+    best: "O(n log n) — pivot near the middle",
+    avg: "O(n log n), worst O(n²)", space: "O(1) extra, O(log n) stack",
+    stable: "No — the partition swap moves elements across a distance",
+    watch: "<strong>The starter returns <code>low</code></strong> as a placeholder. Write the scan but forget to return <code>i+1</code> and the range never shrinks: it runs forever. Also note median-of-three is why sorted input is <em>not</em> the worst case here."
+  },
+  heap: {
+    title: "Heap Sort",
+    idea: "Read the flat array as a complete binary tree — no nodes, no pointers, just index arithmetic. A max-heap is that tree with one property: every parent ≥ both children, which makes <code>data[0]</code> the largest element.",
+    steps: ["<code>left = 2i+1</code>, <code>right = 2i+2</code>, and the last parent is at <code>n/2-1</code>. Everything after it is a leaf.",
+            "<strong>heapify_down:</strong> find the largest of a node and its two children; if the node is not it, swap and <em>recurse on the child you swapped into</em> — the problem moved down a level.",
+            "<strong>Phase 1, build:</strong> walk <code>i</code> from the last parent down to 0. Backwards, so each call's children are already heaps.",
+            "<strong>Phase 2, extract:</strong> swap <code>data[0]</code> to the end, shrink the heap by one, repair from the root. The tail grows sorted."],
+    best: "O(n log n) — no best case either",
+    avg: "O(n log n) guaranteed", space: "O(1) — the heap IS the array",
+    stable: "No — a sink can reorder equals",
+    watch: "<strong>Pass <code>i</code>, not <code>n</code></strong>, as <code>heap_size</code> in phase 2. Passing <code>n</code> drags the already-sorted tail back into the heap. And check <code>left &lt; heap_size</code> <em>before</em> reading <code>data[left]</code> — <code>&amp;&amp;</code> short-circuits, which is what makes it safe."
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Per-line breakdown. Click any line of code to pin its explanation; with
+// nothing pinned the box follows the line that is executing, so stepping
+// gives a running commentary.
+//
+// kind: syntax = what the C++ actually means | idiom = why it is written so
+//       trap   = the mistake this line invites | why = the design reason
+// ---------------------------------------------------------------------------
+var LINE_INFO = {
+  merge: {
+    rsig: { src: "static void merge_sort_recursive(v& data, int left, int right)",
+      what: "The recursive worker. It sorts the slice of <code>data</code> from <code>left</code> to <code>right</code>, inclusive.",
+      items: [
+        ["idiom", "<code>static</code> here means <em>internal to this file</em>, not the class-member sense. It keeps the helper out of other translation units, which is why only <code>merge_sort()</code> is declared in the header."],
+        ["why", "Taking <code>left</code> and <code>right</code> rather than a sub-vector is what makes this O(1) extra space <em>per call</em> &mdash; the slice is described, not copied."],
+        ["syntax", "Both bounds are <strong>inclusive</strong>. Every <code>+1</code> and <code>-1</code> below follows from that one choice."]
+      ] },
+    base: { src: "if (left >= right) return;",
+      what: "Stops the recursion on a slice of one element, or none.",
+      items: [
+        ["why", "A single element is already sorted, so there is nothing to do and nothing to merge."],
+        ["trap", "It must be <code>&gt;=</code>, not <code>==</code>. An empty slice can arrive with <code>left &gt; right</code>, and <code>==</code> would sail straight past it into an infinite recursion."]
+      ] },
+    mid: { src: "int mid = left + (right - left) / 2;",
+      what: "Finds the split point. The left half is <code>left..mid</code>, the right half <code>mid+1..right</code>.",
+      items: [
+        ["trap", "Not <code>(left + right) / 2</code>. That addition can overflow <code>int</code> once the indices are large, producing a negative midpoint. It is the textbook bug that sat in Java's binary search for nine years."],
+        ["why", "Merge sort never looks at the <em>values</em> to decide where to split. That is the difference from quick sort, and it is why merge sort's running time is identical on every input."]
+      ] },
+    recL: { src: "merge_sort_recursive(data, left, mid);",
+      what: "Sorts the left half, by calling this same function on a smaller slice.",
+      items: [
+        ["why", "When this returns, <code>left..mid</code> is fully sorted. Trusting that without tracing it is the whole trick to reading recursion."],
+        ["syntax", "The recursion goes all the way down to single elements before any merging happens, which is why the first merge you see in the stepper is two one-element halves."]
+      ] },
+    recR: { src: "merge_sort_recursive(data, mid + 1, right);",
+      what: "Sorts the right half.",
+      items: [
+        ["syntax", "<code>mid + 1</code>, because <code>mid</code> already belongs to the left half &mdash; the bounds are inclusive."],
+        ["trap", "Passing <code>mid</code> instead of <code>mid + 1</code> makes the halves overlap, so the slice never shrinks and the recursion does not terminate."]
+      ] },
+    call: { src: "merge(data, left, mid, right);",
+      what: "Both halves are sorted, so combine them into one sorted run.",
+      items: [
+        ["why", "This is the only line in the recursion that does real work. Everything above it just divides; all the sorting effort is here, on the way back <em>up</em>."],
+        ["idiom", "Quick sort is the mirror image: it does its work before recursing, and needs no combine step at all."]
+      ] },
+    rend: { src: "}   // closes merge_sort_recursive",
+      what: "This slice is sorted. Control returns to whichever call asked for it.",
+      items: [
+        ["why", "There are about log&#8322;n levels of these calls, and each level merges n elements in total &mdash; which is where O(n log n) comes from."]
+      ] },
+    msig: { src: "static void merge(v& data, int left, int mid, int right)",
+      what: "Merges two adjacent sorted runs, <code>left..mid</code> and <code>mid+1..right</code>, into one.",
+      items: [
+        ["why", "It relies on both halves <em>already</em> being sorted. Called on unsorted input it produces nonsense, which is why the two recursive calls must come first."],
+        ["syntax", "Three bounds, not two, because the function needs to know where one run ends and the next begins."]
+      ] },
+    copy: { src: "// 1. copy both halves out BEFORE overwriting",
+      what: "The step that makes merge sort work &mdash; and the reason it needs extra memory.",
+      items: [
+        ["why", "The merged output is written back into <code>data[left..right]</code>, which is the very region being read. Without a copy, writing the first element would destroy a value still needed."],
+        ["trap", "This is the step people try to optimise away. You cannot merge two adjacent runs in place in O(n) without a much more complicated algorithm."]
+      ] },
+    copy2: { src: "vector<int> L(..left..mid), R(..mid+1..right);",
+      what: "Allocates the two temporary halves and fills them from the array.",
+      items: [
+        ["idiom", "Constructing from a pair of iterators &mdash; <code>vector&lt;int&gt; L(data.begin()+left, data.begin()+mid+1)</code> &mdash; copies the range in one expression, with no loop to get wrong."],
+        ["syntax", "The end iterator is <strong>one past</strong> the last element you want, so an inclusive bound of <code>mid</code> becomes <code>begin()+mid+1</code>."],
+        ["why", "These two vectors are merge sort's <strong>O(n) extra space</strong>. Heap sort and quick sort allocate nothing comparable, which is the trade you are being asked to notice."]
+      ] },
+    cmp: { src: "while (i < L.size() && j < R.size())",
+      what: "Runs for as long as <em>both</em> halves still have elements left to place.",
+      items: [
+        ["why", "The loop ends as soon as one half empties, which is exactly why the two drain loops below are needed. Forgetting them is the classic merge bug."],
+        ["syntax", "<code>size()</code> returns unsigned, so comparing against an <code>int</code> index draws a warning on some compilers; the starter casts to keep it quiet."]
+      ] },
+    take: { src: "data[k++] = counted_le(L[i], R[j]) ? L[i++] : R[j++];",
+      what: "Takes the smaller of the two front elements and writes it into the output.",
+      items: [
+        ["why", "<code>&lt;=</code> and not <code>&lt;</code>. On a tie this takes from the <strong>left</strong> half, which is the half that came earlier in the original array &mdash; and that is the entire reason merge sort is stable. Change one character and it stops being."],
+        ["syntax", "Three indices advance independently: <code>i</code> through L, <code>j</code> through R, <code>k</code> through the real array. Each <code>++</code> is a post-increment, so the old value is used as the index and then the counter moves on."],
+        ["idiom", "<code>counted_le</code> is the course helper: exactly <code>a &lt;= b</code>, plus a tick on the comparison counter the tests read."]
+      ] },
+    drain: { src: "// 3. drain whichever half still has elements",
+      what: "Copies across everything left over once the other half has emptied.",
+      items: [
+        ["trap", "<strong>Skip this and the array ends up partly sorted with stale values at the tail.</strong> It is the single most common merge sort bug, and it only shows up when the two halves empty at different times."],
+        ["why", "Only one of the two drain loops ever does anything on a given call &mdash; the other's condition is already false. Both still have to be written."],
+        ["idiom", "No comparisons happen here. Whatever is left in a sorted half is already in order, so it can be copied straight across."]
+      ] },
+    mend: { src: "}   // closes merge",
+      what: "The whole range <code>left..right</code> is now one sorted run.",
+      items: [
+        ["why", "The temporaries go out of scope here and their memory is released, so the O(n) cost is per-merge rather than cumulative."]
+      ] }
+  },
+  quick: {
+    rsig: { src: "static void quick_sort_recursive(v& data, int low, int high)",
+      what: "The recursive worker, sorting the inclusive slice <code>low..high</code>.",
+      items: [
+        ["why", "Same shape as merge sort's worker, but the body is the reverse order: partition first, recurse second."],
+        ["syntax", "Inclusive bounds again, which is why the recursive calls below use <code>p-1</code> and <code>p+1</code>."]
+      ] },
+    base: { src: "if (low >= high) return;",
+      what: "Stops on a slice of one element or none.",
+      items: [
+        ["trap", "Must be <code>&gt;=</code>. A pivot landing at either end produces an empty slice with <code>low &gt; high</code>, and <code>==</code> would miss it and recurse forever."]
+      ] },
+    part: { src: "int p = partition(data, low, high);",
+      what: "Rearranges the slice around a pivot and reports where that pivot ended up.",
+      items: [
+        ["why", "After this line <code>data[p]</code> is in its <strong>final</strong> position for the whole sort. Nothing will move it again &mdash; that is what makes the two recursive calls independent."],
+        ["trap", "The starter ships <code>return low;</code> as a placeholder so the file compiles. Write the scan but forget to return <code>i + 1</code> and the slice never shrinks: the program hangs rather than failing a test."]
+      ] },
+    recL: { src: "quick_sort_recursive(data, low, p - 1);",
+      what: "Sorts everything left of the pivot.",
+      items: [
+        ["why", "<code>p - 1</code> deliberately <strong>excludes</strong> the pivot. Including it is the other way to get infinite recursion, because the slice would never get smaller."]
+      ] },
+    recR: { src: "quick_sort_recursive(data, p + 1, high);",
+      what: "Sorts everything right of the pivot.",
+      items: [
+        ["why", "The pivot appears in neither call, so the two sides never interact. No combine step is needed, which is why quick sort allocates no second array."],
+        ["idiom", "The recursion depth is what costs memory here: O(log n) stack frames when the pivots are good, O(n) in the worst case."]
+      ] },
+    rend: { src: "}   // closes quick_sort_recursive",
+      what: "This slice is sorted.",
+      items: [
+        ["why", "With pivots near the middle there are about log&#8322;n levels and each does O(n) work. With pivots at the edge there are n levels, which is the O(n&sup2;) worst case."]
+      ] },
+    psig: { src: "static int partition(v& data, int low, int high)",
+      what: "Does the real work: picks a pivot, splits the slice around it, and returns the pivot's final index.",
+      items: [
+        ["why", "It returns an <code>int</code>, not <code>void</code>, because the caller cannot know where the pivot landed &mdash; and the recursion is built entirely on that index."]
+      ] },
+    med: { src: "// 1. median-of-three -> the median ends up at data[high]",
+      what: "Chooses a pivot by looking at three candidates instead of blindly taking one.",
+      items: [
+        ["why", "Taking <code>data[high]</code> straight off would make <strong>already-sorted input the worst case</strong> &mdash; the pivot would be the largest element every time, giving n levels of recursion. Sorted input is the most common real-world input, so that matters."],
+        ["idiom", "Three comparisons up front buy away the pathological case. Step the sorted preset and the reverse preset and compare the totals: both cost the same."]
+      ] },
+    med2: { src: "if (counted_lt(data[mid], data[low])) swap(low, mid);",
+      what: "First of three conditional swaps. After it, <code>data[low]</code> &le; <code>data[mid]</code>.",
+      items: [
+        ["idiom", "The three swaps together are a hand-written sorting network for three elements. Each one enforces one ordering, and the combination leaves the median in the middle slot."]
+      ] },
+    med3: { src: "if (counted_lt(data[high], data[low])) swap(low, high);",
+      what: "Second swap. After it, <code>data[low]</code> is the smallest of the three.",
+      items: [
+        ["why", "Order matters: these three lines only produce a median if they run in this sequence. Rearranging them gives a different &mdash; and wrong &mdash; answer."]
+      ] },
+    med4: { src: "if (counted_lt(data[mid], data[high])) swap(mid, high);",
+      what: "Third swap. The median of the three now sits at <code>data[high]</code>, ready to be used as the pivot.",
+      items: [
+        ["why", "Parking the pivot at <code>high</code> is what lets the scan below run from <code>low</code> to <code>high-1</code> without having to step over it."]
+      ] },
+    pivot: { src: "int pivot = data[high];  int i = low - 1;",
+      what: "Copies the pivot value out and sets up the boundary marker.",
+      items: [
+        ["why", "<code>i</code> marks the <strong>last index known to hold a value &le; pivot</strong>. Starting at <code>low - 1</code> says that region is empty so far."],
+        ["idiom", "The pivot is copied by value. Holding a reference or an index would break the moment the scan swaps that slot."]
+      ] },
+    scan: { src: "for (int j = low; j < high; ++j)",
+      what: "Walks every element of the slice except the pivot itself.",
+      items: [
+        ["syntax", "<code>j &lt; high</code>, not <code>&lt;= high</code>: <code>data[high]</code> is the pivot and is handled separately at the end."],
+        ["why", "This is the Lomuto partition scheme &mdash; one forward pass with two indices. Hoare's version walks inward from both ends and does fewer swaps, but is harder to get right."]
+      ] },
+    cmp: { src: "if (counted_le(data[j], pivot)) swap(++i, j);",
+      what: "If this element belongs on the left, grow the &le;-region by one and move it in.",
+      items: [
+        ["syntax", "<code>++i</code> is a <strong>pre</strong>-increment used as an argument: <code>i</code> advances first, then the new value is passed. Writing <code>i++</code> here would swap into the wrong slot."],
+        ["why", "Using <code>&lt;=</code> rather than <code>&lt;</code> keeps runs of equal values from all piling onto one side, which is what protects against quadratic behaviour on an array of duplicates."],
+        ["trap", "Quick sort is <strong>not stable</strong>, and this swap is why: <code>i</code> and <code>j</code> can be far apart, so an element jumps over everything in between &mdash; including values equal to it."]
+      ] },
+    place: { src: "swap(data[i+1], data[high]);  return i + 1;",
+      what: "Drops the pivot into the gap between the two regions and reports that index.",
+      items: [
+        ["why", "Everything at or below <code>i</code> is &le; pivot and everything above is greater, so slot <code>i+1</code> is exactly where the pivot belongs &mdash; permanently."],
+        ["trap", "Returning <code>i</code> instead of <code>i + 1</code> is an off-by-one that still sorts <em>some</em> inputs, which makes it unpleasant to track down. Watch the cell turn green in the stepper to confirm the index."]
+      ] },
+    pend: { src: "}   // closes partition",
+      what: "The slice is split and the pivot is home.",
+      items: [
+        ["why", "No memory was allocated anywhere in here. That is quick sort's advantage over merge sort, and the reason it is usually the faster of the two in practice."]
+      ] }
+  },
+  heap: {
+    hsig: { src: "static void heapify_down(v& data, int heap_size, int index)",
+      what: "Repairs the heap property at one node by letting it sink to where it belongs.",
+      items: [
+        ["why", "<code>heap_size</code> is a separate parameter from the array's actual length, and that is the whole point: phase 2 shrinks the heap while the array stays the same size."],
+        ["idiom", "Known as sift-down or percolate-down. It assumes both subtrees below <code>index</code> are already valid heaps &mdash; only the node itself may be out of place."]
+      ] },
+    init: { src: "int largest = index, left = 2*index+1, right = 2*index+2;",
+      what: "Works out where this node's children live, using nothing but arithmetic.",
+      items: [
+        ["why", "<code>2i+1</code> and <code>2i+2</code> are the whole data structure. There are no node objects and no pointers &mdash; the tree is <em>implied</em> by the indices, which is why a heap costs no extra memory."],
+        ["idiom", "Going the other way, the parent of <code>i</code> is <code>(i-1)/2</code>. That is how the last parent in the array is found: <code>n/2 - 1</code>."],
+        ["syntax", "<code>largest</code> starts as <code>index</code>, so if neither child beats it the node is already correct."]
+      ] },
+    cmpL: { src: "if (left < heap_size && counted_gt(data[left], data[largest]))",
+      what: "Checks the left child, if there is one inside the heap.",
+      items: [
+        ["why", "<strong>Order matters.</strong> The bounds test is the left operand of <code>&amp;&amp;</code>, and C++ guarantees short-circuit evaluation &mdash; so when <code>left</code> is past the end, <code>data[left]</code> is never read at all."],
+        ["trap", "Swap the two halves round and the program reads past the heap before checking whether that is legal. In phase 2 that means reading the sorted tail, which silently drags finished elements back into the heap."],
+        ["syntax", "<code>&lt; heap_size</code>, not <code>&lt; data.size()</code>. Those are the same thing in phase 1 and very different in phase 2."]
+      ] },
+    cmpR: { src: "if (right < heap_size && counted_gt(data[right], data[largest]))",
+      what: "Checks the right child against whichever is currently the largest.",
+      items: [
+        ["why", "It compares against <code>data[largest]</code>, not <code>data[index]</code>. If the left child already won, this has to beat <em>that</em> &mdash; otherwise a node could sink the wrong way."],
+        ["idiom", "A complete binary tree can have a left child and no right child, but never the reverse. That is why the left test comes first and why this one can simply be skipped."]
+      ] },
+    sink: { src: "if (largest != index) { swap(data[index], data[largest]);",
+      what: "If a child was bigger, exchange them so the larger value moves up.",
+      items: [
+        ["why", "The guard matters: when the node is already the largest, the heap property holds here and the recursion stops. Without it this would swap a node with itself forever."],
+        ["trap", "This is a <strong>long-distance</strong> move within the tree, which is why heap sort is <strong>not stable</strong> &mdash; the same reason selection sort in CT 13 is not."]
+      ] },
+    rec: { src: "heapify_down(data, heap_size, largest);",
+      what: "Follows the problem down to the child that was just swapped into.",
+      items: [
+        ["why", "Only the subtree that received the smaller value can now be broken, so one recursive call is enough &mdash; not both children."],
+        ["idiom", "The recursion is at most the height of the tree, log&#8322;n levels, which is why one <code>heapify_down</code> costs O(log n) rather than O(n)."],
+        ["syntax", "<code>largest</code> is passed, not <code>index</code>. Passing <code>index</code> again would recurse on the node that is now correct &mdash; an infinite loop."]
+      ] },
+    hend: { src: "}   // closes heapify_down",
+      what: "The subtree rooted at the original index is a valid max-heap again.",
+      items: [
+        ["why", "Nothing was allocated, so the repair is O(1) space as well as O(log n) time."]
+      ] },
+    ssig: { src: "void heap_sort(v& data)",
+      what: "The public entry point. Two phases, both built on <code>heapify_down</code>.",
+      items: [
+        ["why", "The only function declared in the header. <code>heapify_down</code> is <code>static</code> and invisible outside the .cpp, because students call neither of them directly."]
+      ] },
+    build: { src: "// phase 1: build the max-heap, last parent upward",
+      what: "Turns an arbitrary array into a valid max-heap, in place.",
+      items: [
+        ["why", "Surprisingly this is O(n), not O(n log n). Most nodes are near the bottom and can only sink a short way, and the sum works out linear."],
+        ["idiom", "After this phase <code>data[0]</code> is the largest element in the array &mdash; which is the fact phase 2 exploits n times over."]
+      ] },
+    bloop: { src: "for (int i = n/2-1; i >= 0; --i) heapify_down(data, n, i);",
+      what: "Heapifies every parent node, starting at the last one and working back to the root.",
+      items: [
+        ["why", "<code>n/2 - 1</code> is the last node that <em>has</em> a child. Everything after it is a leaf, and a single element is already a valid heap, so there is nothing to do there."],
+        ["trap", "It must run <strong>backwards</strong>. <code>heapify_down</code> assumes the subtrees below a node are already heaps, and only going from the bottom up guarantees that. Loop forwards and you get an array that is not a heap, with no error anywhere."],
+        ["syntax", "<code>heap_size</code> is <code>n</code> throughout this phase &mdash; the whole array is the heap."]
+      ] },
+    extr: { src: "// phase 2: swap the max out, shrink, repair",
+      what: "Repeatedly moves the largest remaining element to the end of the unsorted region.",
+      items: [
+        ["why", "Each iteration places exactly one element permanently, so the sorted tail grows from the right and the heap shrinks from the right. The array is never copied."]
+      ] },
+    eloop: { src: "for (int i = n-1; i > 0; --i)",
+      what: "Counts down through the positions that still need filling.",
+      items: [
+        ["syntax", "<code>i &gt; 0</code>, not <code>i &gt;= 0</code>. When one element is left it must already be the smallest, so there is nothing to swap it with."],
+        ["why", "<code>i</code> does double duty: it is the slot being filled <em>and</em> the new heap size for the repair on the next line."]
+      ] },
+    eswap: { src: "swap(data[0], data[i]);",
+      what: "Moves the root &mdash; the maximum &mdash; out to its final position.",
+      items: [
+        ["why", "The element displaced from <code>data[i]</code> goes to the root, where it is almost certainly in the wrong place. That is exactly the one-node violation <code>heapify_down</code> is built to fix."],
+        ["idiom", "Two writes per extraction, n-1 extractions &mdash; which is why heap sort writes more than selection sort but far less than merge sort."]
+      ] },
+    erep: { src: "heapify_down(data, i, 0);   // i, not n",
+      what: "Repairs the heap from the root, over the shrunken region only.",
+      items: [
+        ["trap", "<strong>Pass <code>i</code>, not <code>n</code>.</strong> This is the single most common heap sort bug. Passing <code>n</code> leaves the already-sorted tail inside the heap, so the largest element gets pulled straight back to the root and the sort never finishes correctly."],
+        ["why", "Because the bounds checks in <code>heapify_down</code> compare against <code>heap_size</code>, this one argument is what defines the boundary between heap and sorted tail. Watch the green nodes in the tree view: they are the ones <code>i</code> has excluded."]
+      ] },
+    send: { src: "}   // closes heap_sort",
+      what: "The array is sorted ascending, in place.",
+      items: [
+        ["why", "A <em>max</em>-heap produces <em>ascending</em> order, which catches people out. The largest goes to the back first, then the next largest just in front of it, and so on."],
+        ["idiom", "Guaranteed O(n log n) like merge sort, O(1) extra space like quick sort &mdash; and unstable, which merge sort is not. That combination of two strengths and one sacrifice is the whole reason it exists."]
+      ] }
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Recorders. Frames carry whatever structure the algorithm works on, so each
+// tab can draw the thing the old step-by-step diagrams drew.
+// ---------------------------------------------------------------------------
+function Recorder(items) {
+  this.frames = []; this.log = [];
+  this.a = items.map(function (e) { return { v: e.v, tag: e.tag, id: e.id }; });
+  this.comparisons = 0; this.writes = 0;
+}
+Recorder.prototype.snap = function (line, note, marks) {
+  this.frames.push({
+    a: this.a.map(function (e) { return { v: e.v, tag: e.tag, id: e.id }; }),
+    line: line, note: note, marks: marks || {},
+    comparisons: this.comparisons, writes: this.writes, logLen: this.log.length
+  });
+};
+Recorder.prototype.event = function (depth, label, detail) {
+  this.log.push({ depth: depth, label: label, detail: detail });
+};
+
+// ---- merge sort -----------------------------------------------------------
+function mergeSort(items) {
+  var r = new Recorder(items), a = r.a, n = a.length;
+  function lab(e) { return e.v + (e.tag || ""); }
+
+  function merge(left, mid, right, depth) {
+    var L = a.slice(left, mid + 1).map(function (e) { return e; });
+    var R = a.slice(mid + 1, right + 1).map(function (e) { return e; });
+    r.event(depth, "merge " + left + ".." + right,
+            "L=[" + L.map(lab).join(",") + "] R=[" + R.map(lab).join(",") + "]");
+    var i = 0, j = 0, k = left;
+    r.snap('copy2', "Copy both halves out first: L has " + L.length + " element(s), R has " +
+           R.length + ". The originals in data are about to be overwritten, so they must be " +
+           "saved before the merge starts.",
+           { range: [left, right], depth: depth, temps: { L: L, R: R, i: i, j: j, k: k } });
+    while (i < L.length && j < R.length) {
+      r.comparisons++;
+      var takeLeft = L[i].v <= R[j].v;
+      r.snap('cmp', "Compare the fronts: L[" + i + "]=" + L[i].v + " <= R[" + j + "]=" + R[j].v +
+             "? " + (takeLeft ? "Yes" : "No") + " — take from the " + (takeLeft ? "left" : "right") +
+             " half." + (L[i].v === R[j].v ? " They are equal, and <= takes the LEFT one: that is stability." : ""),
+             { range: [left, right], depth: depth, temps: { L: L, R: R, i: i, j: j, k: k },
+               compare: [k] });
+      a[k] = takeLeft ? L[i++] : R[j++];
+      r.writes++;
+      r.snap('take', "Wrote " + a[k].v + " into data[" + k + "].",
+             { range: [left, right], depth: depth, moved: [k],
+               temps: { L: L, R: R, i: i, j: j, k: k + 1 } });
+      k++;
+    }
+    while (i < L.length) {
+      a[k] = L[i++]; r.writes++;
+      r.snap('drain', "R is empty, so drain L: " + a[k].v + " copied to data[" + k + "].",
+             { range: [left, right], depth: depth, moved: [k],
+               temps: { L: L, R: R, i: i, j: j, k: k + 1 } });
+      k++;
+    }
+    while (j < R.length) {
+      a[k] = R[j++]; r.writes++;
+      r.snap('drain', "L is empty, so drain R: " + a[k].v + " copied to data[" + k + "].",
+             { range: [left, right], depth: depth, moved: [k],
+               temps: { L: L, R: R, i: i, j: j, k: k + 1 } });
+      k++;
+    }
+    r.snap('mend', "Range " + left + ".." + right + " is now one sorted run.",
+           { range: [left, right], depth: depth, sortedRange: [left, right] });
+  }
+
+  function rec(left, right, depth) {
+    if (left >= right) {
+      r.snap('base', "Range " + left + ".." + right + " holds " + (right - left + 1) +
+             " element(s) — already sorted by definition, so return.",
+             { range: [left, Math.max(left, right)], depth: depth });
+      return;
+    }
+    var mid = left + Math.floor((right - left) / 2);
+    r.event(depth, "split " + left + ".." + right, "mid = " + mid);
+    r.snap('mid', "Split " + left + ".." + right + " at mid = " + mid +
+           ". Note left + (right-left)/2, not (left+right)/2 — the second overflows.",
+           { range: [left, right], depth: depth, compare: [mid] });
+    r.snap('recL', "Recurse into the left half, " + left + ".." + mid + ".",
+           { range: [left, mid], depth: depth + 1 });
+    rec(left, mid, depth + 1);
+    r.snap('recR', "Left half done. Recurse into the right half, " + (mid + 1) + ".." + right + ".",
+           { range: [mid + 1, right], depth: depth + 1 });
+    rec(mid + 1, right, depth + 1);
+    r.snap('call', "Both halves are sorted. Now merge " + left + ".." + mid + " with " +
+           (mid + 1) + ".." + right + ".", { range: [left, right], depth: depth });
+    merge(left, mid, right, depth);
+  }
+
+  r.snap('rsig', "Start. Merge sort splits without looking at the values, and does all its work " +
+         "on the way back up.", {});
+  if (n > 1) rec(0, n - 1, 0);
+  r.snap('rend', "Sorted.", { sortedRange: [0, n - 1] });
+  return r;
+}
+
+// ---- quick sort -----------------------------------------------------------
+function quickSort(items) {
+  var r = new Recorder(items), a = r.a, n = a.length;
+  function sw(x, y) { var t = a[x]; a[x] = a[y]; a[y] = t; r.writes += 2; }
+
+  function partition(low, high, depth) {
+    var mid = low + Math.floor((high - low) / 2);
+    r.snap('med', "Median-of-three on low=" + low + ", mid=" + mid + ", high=" + high +
+           ". Three conditional swaps leave the median at data[high].",
+           { range: [low, high], depth: depth, compare: [low, mid, high] });
+    r.comparisons++;
+    if (a[mid].v < a[low].v) { sw(low, mid);
+      r.snap('med2', "data[mid] < data[low] — swap them.", { range: [low, high], depth: depth, moved: [low, mid] }); }
+    else r.snap('med2', "data[mid] < data[low]? No — leave them.", { range: [low, high], depth: depth, compare: [low, mid] });
+    r.comparisons++;
+    if (a[high].v < a[low].v) { sw(low, high);
+      r.snap('med3', "data[high] < data[low] — swap them.", { range: [low, high], depth: depth, moved: [low, high] }); }
+    else r.snap('med3', "data[high] < data[low]? No — leave them.", { range: [low, high], depth: depth, compare: [low, high] });
+    r.comparisons++;
+    if (a[mid].v < a[high].v) { sw(mid, high);
+      r.snap('med4', "data[mid] < data[high] — swap, and now the median sits at data[high].",
+             { range: [low, high], depth: depth, moved: [mid, high] }); }
+    else r.snap('med4', "data[mid] < data[high]? No — the median is already at data[high].",
+             { range: [low, high], depth: depth, compare: [mid, high] });
+
+    var pivot = a[high].v, i = low - 1;
+    r.event(depth, "partition " + low + ".." + high, "pivot = " + pivot);
+    r.snap('pivot', "pivot = " + pivot + ". i starts at low-1 = " + i +
+           "; it marks the end of the ≤ pivot region.",
+           { range: [low, high], depth: depth, pivot: high, bound: i });
+    for (var j = low; j < high; j++) {
+      r.comparisons++;
+      var le = a[j].v <= pivot;
+      r.snap('cmp', "Is data[" + j + "]=" + a[j].v + " <= pivot " + pivot + "? " + (le ? "Yes" : "No") +
+             (le ? " — advance i and swap it into the ≤ region." : " — leave it; it belongs on the right."),
+             { range: [low, high], depth: depth, pivot: high, bound: i, compare: [j] });
+      if (le) { i++; sw(i, j);
+        r.snap('cmp', "i is now " + i + ", and data[" + i + "] holds " + a[i].v + ".",
+               { range: [low, high], depth: depth, pivot: high, bound: i, moved: [i, j] }); }
+    }
+    sw(i + 1, high);
+    r.snap('place', "Swap the pivot into position " + (i + 1) +
+           ". That is its FINAL home — it is never moved again. Return " + (i + 1) + ".",
+           { range: [low, high], depth: depth, moved: [i + 1], sortedIdx: [i + 1] });
+    return i + 1;
+  }
+
+  function rec(low, high, depth) {
+    if (low >= high) {
+      r.snap('base', "Range " + low + ".." + high + " has " + Math.max(0, high - low + 1) +
+             " element(s) — nothing to do.",
+             { range: [Math.min(low, high), Math.max(low, high)], depth: depth });
+      return;
+    }
+    var p = partition(low, high, depth);
+    r.snap('recL', "Recurse left of the pivot: " + low + ".." + (p - 1) + ". The pivot itself is " +
+           "excluded — including it is how you get infinite recursion.",
+           { range: [low, Math.max(low, p - 1)], depth: depth + 1, sortedIdx: [p] });
+    rec(low, p - 1, depth + 1);
+    r.snap('recR', "Recurse right of the pivot: " + (p + 1) + ".." + high + ".",
+           { range: [Math.min(p + 1, high), high], depth: depth + 1, sortedIdx: [p] });
+    rec(p + 1, high, depth + 1);
+  }
+
+  r.snap('rsig', "Start. Quick sort partitions first and recurses after — the opposite order to " +
+         "merge sort.", {});
+  if (n > 1) rec(0, n - 1, 0);
+  r.snap('rend', "Sorted.", { sortedRange: [0, n - 1] });
+  return r;
+}
+
+// ---- heap sort ------------------------------------------------------------
+function heapSort(items) {
+  var r = new Recorder(items), a = r.a, n = a.length;
+  function sw(x, y) { var t = a[x]; a[x] = a[y]; a[y] = t; r.writes += 2; }
+
+  function heapify(heapSize, index, phase, depth) {
+    var largest = index, left = 2 * index + 1, right = 2 * index + 2;
+    r.snap('init', "heapify_down at index " + index + ". Children are " + left + " and " + right +
+           " (2i+1 and 2i+2). heap_size is " + heapSize + ".",
+           { heapSize: heapSize, phase: phase, node: index, kids: [left, right], depth: depth });
+    if (left < heapSize) {
+      r.comparisons++;
+      if (a[left].v > a[largest].v) {
+        largest = left;
+        r.snap('cmpL', "Left child " + a[left].v + " > " + a[index].v + " — largest is now " + left + ".",
+               { heapSize: heapSize, phase: phase, node: index, compare: [left], largest: largest, depth: depth });
+      } else {
+        r.snap('cmpL', "Left child " + a[left].v + " is not bigger than " + a[largest].v + ".",
+               { heapSize: heapSize, phase: phase, node: index, compare: [left], largest: largest, depth: depth });
+      }
+    } else {
+      r.snap('cmpL', "No left child inside the heap — index " + left + " is past heap_size " +
+             heapSize + ", so the comparison is short-circuited and never reads data[" + left + "].",
+             { heapSize: heapSize, phase: phase, node: index, largest: largest, depth: depth });
+    }
+    if (right < heapSize) {
+      r.comparisons++;
+      if (a[right].v > a[largest].v) {
+        largest = right;
+        r.snap('cmpR', "Right child " + a[right].v + " > " + a[largest === right ? index : largest].v +
+               " — largest is now " + right + ".",
+               { heapSize: heapSize, phase: phase, node: index, compare: [right], largest: largest, depth: depth });
+      } else {
+        r.snap('cmpR', "Right child " + a[right].v + " is not bigger than " + a[largest].v + ".",
+               { heapSize: heapSize, phase: phase, node: index, compare: [right], largest: largest, depth: depth });
+      }
+    }
+    if (largest !== index) {
+      sw(index, largest);
+      r.snap('sink', "The parent was not the largest, so swap it down with " + largest +
+             " and follow the problem to that child.",
+             { heapSize: heapSize, phase: phase, moved: [index, largest], node: largest, depth: depth });
+      heapify(heapSize, largest, phase, depth + 1);
+    } else {
+      r.snap('sink', "The parent is already the largest of the three — the heap property holds here.",
+             { heapSize: heapSize, phase: phase, node: index, depth: depth });
+    }
+  }
+
+  r.snap('ssig', "Start. The array is about to be read as a complete binary tree: children of i " +
+         "are 2i+1 and 2i+2.", { heapSize: n, phase: 'build' });
+  r.snap('bloop', "Phase 1: build the max-heap. Start at the LAST PARENT, n/2-1 = " +
+         (Math.floor(n / 2) - 1) + ", and work backwards — leaves are already valid one-element heaps.",
+         { heapSize: n, phase: 'build' });
+  for (var i = Math.floor(n / 2) - 1; i >= 0; i--) {
+    r.event(0, "build: heapify " + i, "heap_size = " + n);
+    heapify(n, i, 'build', 0);
+  }
+  r.snap('extr', "The heap is built: data[0] is now the largest element in the array. Phase 2 " +
+         "repeatedly moves it to the end.", { heapSize: n, phase: 'build', node: 0 });
+  for (var e = n - 1; e > 0; e--) {
+    r.event(0, "extract to " + e, "heap_size shrinks to " + e);
+    sw(0, e);
+    r.snap('eswap', "Swap the maximum " + a[e].v + " out to index " + e +
+           " — its final position. The heap now covers only 0.." + (e - 1) + ".",
+           { heapSize: e, phase: 'extract', moved: [0, e], sortedFrom: e });
+    r.snap('erep', "Repair from the root with heap_size = " + e + ", NOT n. Passing n would drag " +
+           "the sorted tail back into the heap.",
+           { heapSize: e, phase: 'extract', node: 0, sortedFrom: e });
+    heapify(e, 0, 'extract', 0);
+  }
+  r.snap('send', "Sorted.", { heapSize: 0, phase: 'extract', sortedFrom: 0 });
+  return r;
+}
+
+function isStable(run) {
+  var a = run.frames[run.frames.length - 1].a, i;
+  for (i = 1; i < a.length; i++) {
+    if (a[i].v === a[i - 1].v && a[i].id < a[i - 1].id) return false;
+  }
+  return true;
+}
+function isSorted(run) {
+  var a = run.frames[run.frames.length - 1].a, i;
+  for (i = 1; i < a.length; i++) if (a[i].v < a[i - 1].v) return false;
+  return true;
+}
+function hasDuplicates(v) { return new Set(v).size !== v.length; }
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+var LANES = [
+  { key: "merge", title: "Merge Sort" },
+  { key: "quick", title: "Quick Sort" },
+  { key: "heap",  title: "Heap Sort" }
+];
+var state = { mode: "merge", preset: "random", step: 0, runs: null,
+              timer: null, pinned: null };
+
+function compute() {
+  var items = build(PRESETS[state.preset]);
+  state.runs = { merge: mergeSort(items), quick: quickSort(items), heap: heapSort(items) };
+  state.maxFrames = state.mode === "compare"
+    ? Math.max.apply(null, LANES.map(function (l) { return state.runs[l.key].frames.length; }))
+    : state.runs[state.mode].frames.length;
+  state.step = 0;
+}
+
+function cellClass(idx, f) {
+  var m = f.marks, c = ["cell"];
+  function has(l) { return l && l.indexOf(idx) !== -1; }
+  if (m.range && (idx < m.range[0] || idx > m.range[1])) c.push("outside");
+  if (m.sortedRange && idx >= m.sortedRange[0] && idx <= m.sortedRange[1]) c.push("sorted");
+  if (m.sortedFrom !== undefined && idx >= m.sortedFrom) c.push("sorted");
+  if (has(m.sortedIdx)) c.push("sorted");
+  if (has(m.kids)) c.push("node");
+  if (m.node === idx) c.push("node");
+  if (m.bound === idx) c.push("bound");
+  if (m.pivot === idx) c.push("pivot");
+  if (has(m.compare)) c.push("compare");
+  if (has(m.moved)) c.push("moved");
+  return c.join(" ");
+}
+
+function cellsHtml(f, big) {
+  return f.a.map(function (e, i) {
+    return '<div class="' + cellClass(i, f) + '">' + e.v +
+           '<span class="tag">' + (e.tag || "&nbsp;") + '</span>' +
+           (big ? '<span class="ix">' + i + '</span>' : '') + '</div>';
+  }).join("");
+}
+
+// The temporary halves — this is merge() steps 1-3, which a flat array cannot show.
+function tempsHtml(m) {
+  if (!m.temps) return "";
+  function row(name, arr, cur) {
+    return '<div class="trow"><span class="tname">' + name + '</span>' +
+      (arr.length ? arr.map(function (e, i) {
+        var cls = "cell" + (i === cur ? " cursor" : (i < cur ? " used" : ""));
+        return '<div class="' + cls + '">' + e.v + '<span class="tag">' + (e.tag || "&nbsp;") + '</span></div>';
+      }).join("") : '<span style="color:#6e6e6e">(empty)</span>') + '</div>';
+  }
+  return '<div class="temps">' + row("L (i=" + m.temps.i + ")", m.temps.L, m.temps.i) +
+         row("R (j=" + m.temps.j + ")", m.temps.R, m.temps.j) +
+         '<div class="trow"><span class="tname">k</span><span style="color:#6e6e6e">writing into data[' +
+         m.temps.k + ']</span></div></div>';
+}
+
+// The binary tree hiding in the array. Heap sort is the one algorithm here that
+// is unreadable as a flat row, so it gets drawn properly.
+function treeHtml(f) {
+  var m = f.marks, a = f.a, n = a.length;
+  if (m.heapSize === undefined) return "";
+  var levels = Math.floor(Math.log2(n)) + 1;
+  var W = 560, rowH = 62, H = levels * rowH + 16, nodes = [];
+  for (var i = 0; i < n; i++) {
+    var lvl = Math.floor(Math.log2(i + 1));
+    var first = Math.pow(2, lvl) - 1, count = Math.pow(2, lvl);
+    var slot = i - first;
+    nodes.push({ i: i, x: W * (slot + 0.5) / count, y: 24 + lvl * rowH });
+  }
+  var edges = "";
+  for (i = 0; i < n; i++) {
+    [2 * i + 1, 2 * i + 2].forEach(function (c) {
+      if (c < n) {
+        var dim = (c >= m.heapSize || i >= m.heapSize);
+        edges += '<line x1="' + nodes[i].x + '" y1="' + nodes[i].y + '" x2="' + nodes[c].x +
+                 '" y2="' + nodes[c].y + '" stroke="' + (dim ? "#e6e9ed" : "#b9c2cc") +
+                 '" stroke-width="2"/>';
+      }
+    });
+  }
+  function fill(i) {
+    if (m.moved && m.moved.indexOf(i) !== -1) return ["#fce4ec", "#c0392b"];
+    if (m.compare && m.compare.indexOf(i) !== -1) return ["#eaf2f8", "#2573a7"];
+    if (m.largest === i) return ["#f2fbf4", "#1c7e45"];
+    if (m.node === i) return ["#ede7f6", "#8e44ad"];
+    if (i >= m.heapSize) return ["#f2fbf4", "#1c7e45"];
+    return ["#ffffff", "#b9c2cc"];
+  }
+  var circles = nodes.map(function (nd) {
+    var c = fill(nd.i), out = nd.i >= m.heapSize;
+    return '<circle cx="' + nd.x + '" cy="' + nd.y + '" r="17" fill="' + c[0] + '" stroke="' +
+           c[1] + '" stroke-width="2.5"' + (out ? ' opacity="0.75"' : '') + '/>' +
+           '<text x="' + nd.x + '" y="' + (nd.y + 4) + '" text-anchor="middle" fill="#2c3e50">' +
+           a[nd.i].v + (a[nd.i].tag || "") + '</text>' +
+           '<text class="ix" x="' + nd.x + '" y="' + (nd.y + 28) + '" text-anchor="middle">' + nd.i + '</text>';
+  }).join("");
+  return '<svg class="tree" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="the array drawn as a binary heap">' +
+         edges + circles + '</svg>' +
+         '<p style="margin:.3rem 0 0;font-size:.74rem;color:#6e6e6e">' +
+         'Green nodes are outside the heap — already in their final sorted position. ' +
+         'heap_size = ' + m.heapSize + '.</p>';
+}
+
+function boundsHtml(key, f, n) {
+  var m = f.marks, out = [];
+  if (m.range) out.push('range <code>' + m.range[0] + '..' + m.range[1] + '</code>');
+  if (m.depth !== undefined) out.push('depth <code>' + m.depth + '</code>');
+  if (m.pivot !== undefined) out.push('pivot <code>data[' + m.pivot + ']</code>');
+  if (m.bound !== undefined) out.push('<code>i = ' + m.bound + '</code>');
+  if (m.heapSize !== undefined) out.push('<code>heap_size = ' + m.heapSize + '</code>');
+  if (m.phase) out.push('phase <code>' + m.phase + '</code>');
+  return out.map(function (x) { return "<span>" + x + "</span>"; }).join("");
+}
+
+// The call log — what the "tracing the calls" diagrams showed, generated.
+function logTable(run, upto) {
+  var len = run.frames[Math.min(upto, run.frames.length - 1)].logLen;
+  var rows = run.log.slice(0, len).map(function (e, i) {
+    return '<tr' + (i === len - 1 ? ' class="now"' : '') + '><td class="num">' + e.depth +
+           '</td><td class="mono">' + "&nbsp;".repeat(e.depth * 2) + e.label +
+           '</td><td class="mono">' + e.detail + '</td></tr>';
+  });
+  if (!rows.length) rows.push('<tr><td colspan="3" style="color:#6e6e6e">step forward to begin</td></tr>');
+  return '<table><thead><tr><th>Depth</th><th>Call</th><th>Detail</th></tr></thead><tbody>' +
+         rows.join("") + '</tbody></table>';
+}
+
+// The breakdown for one line. `shown` is the line actually on screen: the
+// pinned one if there is one, otherwise whatever is executing.
+function lineInfoHtml(key, executing) {
+  var table = LINE_INFO[key];
+  if (!table) return "";
+  var shown = (state.pinned && table[state.pinned]) ? state.pinned : executing;
+  var e = table[shown];
+  if (!e) return "";
+  var pinned = state.pinned === shown;
+  return '<div class="lineinfo">' +
+    '<div class="li-head">' +
+      '<span class="li-tag' + (pinned ? ' pin' : '') + '">' +
+        (pinned ? 'pinned' : 'executing') + '</span>' +
+      '<span class="li-src-wrap"><code class="li-src">' + e.src + '</code></span>' +
+      (pinned ? '<button class="li-clear" id="li-clear">Unpin &times;</button>' : '') +
+    '</div>' +
+    '<p class="li-what">' + e.what + '</p>' +
+    '<ul class="li-items">' + e.items.map(function (it) {
+      return '<li><span class="li-kind ' + it[0] + '">' + it[0] + '</span>' + it[1] + '</li>';
+    }).join("") + '</ul>' +
+    '<p style="margin:.55rem 0 0;font-size:.74rem;color:#6e6e6e">' +
+      (pinned ? 'Showing the line you clicked. Unpin to follow execution again.'
+              : 'Click any line above to pin its breakdown while you step.') +
+    '</p></div>';
+}
+
+function renderSolo() {
+  var key = state.mode, run = state.runs[key], f = FACTS[key];
+  var idx = Math.min(state.step, run.frames.length - 1);
+  var fr = run.frames[idx], last = run.frames[run.frames.length - 1];
+  var done = idx === run.frames.length - 1;
+  var extra = key === "heap" ? treeHtml(fr) : tempsHtml(fr.marks);
+
+  document.getElementById("stage").innerHTML =
+    '<div class="solo"><div>' +
+      '<div class="card"><h2>' + f.title + (done ? ' <span class="done-badge">done</span>' : '') +
+        '</h2><div class="card-body">' +
+        '<div class="cells big">' + cellsHtml(fr, true) + '</div>' +
+        '<div class="bounds">' + boundsHtml(key, fr, fr.a.length) + '</div>' +
+        extra +
+        '<p class="note">' + fr.note + '</p>' +
+        '<div class="stats"><span>compares <b>' + fr.comparisons + '</b></span>' +
+          '<span>writes <b>' + fr.writes + '</b></span></div>' +
+      '</div></div>' +
+      '<div class="card" style="margin-top:1rem"><h2>The code</h2><div class="card-body">' +
+        '<div class="code" id="code-solo"></div>' +
+          lineInfoHtml(key, fr.line) +
+        '</div></div>' +
+    '</div><div>' +
+      '<div class="card"><h2>How it works</h2><div class="card-body">' +
+        '<p style="margin:0 0 .6rem;font-size:.85rem">' + f.idea + '</p>' +
+        '<ol style="margin:0;padding-left:1.2rem;font-size:.83rem">' +
+          f.steps.map(function (s) { return '<li style="margin-bottom:.3rem">' + s + '</li>'; }).join("") +
+        '</ol><div class="callout warn">' + f.watch + '</div>' +
+      '</div></div>' +
+      '<div class="card" style="margin-top:1rem"><h2>' +
+        (key === "heap" ? "Phases and repairs" : "Call trace") + '</h2><div class="card-body">' +
+        logTable(run, idx) + '</div></div>' +
+      '<div class="card" style="margin-top:1rem"><h2>For the record</h2><div class="card-body">' +
+        '<dl class="facts"><dt>Best case</dt><dd>' + f.best + '</dd>' +
+        '<dt>Average/worst</dt><dd>' + f.avg + '</dd>' +
+        '<dt>Extra space</dt><dd>' + f.space + '</dd>' +
+        '<dt>Stable</dt><dd>' + f.stable + '</dd>' +
+        '<dt>This run</dt><dd>' + last.comparisons + ' comparisons, ' + last.writes + ' writes</dd>' +
+        '</dl></div></div>' +
+    '</div></div>';
+
+  var code = document.getElementById("code-solo");
+  var clickable = !!LINE_INFO[key];
+  code.innerHTML = CODE[key].map(function (ln) {
+    var explained = clickable && LINE_INFO[key][ln.k];
+    var cls = ln.c ? "cont" : "";
+    return '<div data-k="' + ln.k + '"' + (cls ? ' class="' + cls + '"' : '') +
+           (explained ? ' role="button" tabindex="0" title="Click for a breakdown of this line"' : '') +
+           '>' + ln.t + '</div>';
+  }).join("");
+  Array.prototype.forEach.call(code.children, function (d) {
+    var k = d.getAttribute("data-k");
+    // Both halves of a split statement share a key, so both light up together.
+    d.classList.toggle("active", k === fr.line);
+    d.classList.toggle("pinned", state.pinned === k);
+    if (!clickable || !LINE_INFO[key][k]) { d.style.cursor = "default"; return; }
+    d.addEventListener("click", function () { pinLine(k); });
+    d.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") { ev.preventDefault(); pinLine(k); }
+    });
+  });
+  var clear = document.getElementById("li-clear");
+  if (clear) clear.addEventListener("click", function () { pinLine(null); });
+}
+
+// Clicking the already-pinned line unpins it, so one control does both.
+function pinLine(k) {
+  state.pinned = (state.pinned === k) ? null : k;
+  render();
+}
+
+function renderCompare() {
+  var dupes = hasDuplicates(PRESETS[state.preset]);
+  var lanes = LANES.map(function (l) {
+    var run = state.runs[l.key];
+    var idx = Math.min(state.step, run.frames.length - 1);
+    var fr = run.frames[idx], done = idx === run.frames.length - 1;
+    return '<section class="lane ' + l.key + '"><h2>' + l.title +
+      (done ? '<span class="done-badge">done</span>' : '') + '</h2><div class="card-body">' +
+      '<div class="cells">' + cellsHtml(fr, false) + '</div>' +
+      '<div class="bounds">' + boundsHtml(l.key, fr, fr.a.length) + '</div>' +
+      '<p class="note">' + fr.note + '</p>' +
+      '<div class="stats"><span>compares <b>' + fr.comparisons + '</b></span>' +
+        '<span>writes <b>' + fr.writes + '</b></span></div></div></section>';
+  }).join("");
+
+  var verdict = LANES.map(function (l) {
+    var run = state.runs[l.key], last = run.frames[run.frames.length - 1];
+    var v = !dupes ? '<td style="color:#6e6e6e">no equal values to reorder</td>'
+                   : (isStable(run) ? '<td class="yes">yes &#x2714;</td>' : '<td class="no">NO &#x2716;</td>');
+    return '<tr><td>' + l.title + '</td><td class="num">' + last.comparisons + '</td><td class="num">' +
+           last.writes + '</td>' + v + '<td>' + FACTS[l.key].space + '</td></tr>';
+  }).join("");
+
+  var hints = {
+    sorted: "None of these three has an O(n) best case — compare this with CT 13, where bubble and " +
+      "insertion sort finished in one pass. Merge and heap sort do the same work whatever the order, " +
+      "and quick sort does <em>not</em> blow up either: that is what median-of-three buys.",
+    reverse: "Reverse-sorted costs quick sort the same as sorted input, for the same reason. Watch " +
+      "the <strong>writes</strong> column — merge sort writes every element at every level.",
+    dupes: "Only <strong>merge sort</strong> keeps 3a ahead of 3b. Quick sort's partition swap and " +
+      "heap sort's sink both move elements across a distance, so both can reorder equals.",
+    random: "All three are O(n log n), but the costs differ. Merge sort pays O(n) memory for its " +
+      "guarantee; heap sort gets the same guarantee for O(1) space but gives up stability; quick " +
+      "sort is usually fastest in practice and risks O(n²)."
+  };
+
+  document.getElementById("stage").innerHTML =
+    '<p class="sub" style="margin:-.4rem 0 .9rem">You have stepped each one on its own, so the code ' +
+    'is not repeated here &mdash; what is worth comparing is the <em>cost</em> and the trade.</p>' +
+    '<div class="lanes">' + lanes + '</div>' +
+    '<div class="verdict"><table><thead><tr><th>Algorithm</th><th>Comparisons</th><th>Writes</th>' +
+    '<th>Stable here</th><th>Extra space</th></tr></thead><tbody>' + verdict + '</tbody></table>' +
+    '<div class="hint">' + hints[state.preset] + '</div></div>';
+}
+
+function render() {
+  if (state.mode === "compare") renderCompare(); else renderSolo();
+  document.getElementById("frameCount").textContent =
+    "step " + (state.step + 1) + " of " + state.maxFrames;
+  document.getElementById("prev").disabled = state.step === 0;
+  document.getElementById("first").disabled = state.step === 0;
+  document.getElementById("next").disabled = state.step >= state.maxFrames - 1;
+  document.getElementById("last").disabled = state.step >= state.maxFrames - 1;
+  document.getElementById("nextEvent").disabled = state.step >= state.maxFrames - 1;
+  Array.prototype.forEach.call(document.querySelectorAll("#tabs [data-mode]"), function (b) {
+    b.classList.toggle("on", b.getAttribute("data-mode") === state.mode);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function (b) {
+    b.classList.toggle("on", b.getAttribute("data-preset") === state.preset);
+  });
+}
+
+function go(n) { state.step = Math.max(0, Math.min(n, state.maxFrames - 1)); render(); }
+
+function nextEvent() {
+  var run = state.mode === "compare" ? state.runs.merge : state.runs[state.mode];
+  var here = run.frames[Math.min(state.step, run.frames.length - 1)].logLen, i;
+  for (i = state.step + 1; i < state.maxFrames; i++) {
+    if (run.frames[Math.min(i, run.frames.length - 1)].logLen > here) { go(i); return; }
+  }
+  go(state.maxFrames - 1);
+}
+
+function stop() {
+  if (state.timer) { clearInterval(state.timer); state.timer = null; }
+  document.getElementById("play").innerHTML = "&#9654; Play";
+}
+function togglePlay() {
+  if (state.timer) { stop(); return; }
+  if (state.step >= state.maxFrames - 1) state.step = 0;
+  document.getElementById("play").innerHTML = "&#10073;&#10073; Pause";
+  state.timer = setInterval(function () {
+    if (state.step >= state.maxFrames - 1) { stop(); return; }
+    go(state.step + 1);
+  }, 550);
+}
+function reset() { stop(); state.pinned = null; compute(); render(); }
+
+function selfTest() {
+  var fails = [], runs = 0, keysOf = {};
+  Object.keys(CODE).forEach(function (k) { keysOf[k] = CODE[k].map(function (l) { return l.k; }); });
+  Object.keys(PRESETS).forEach(function (name) {
+    var items = build(PRESETS[name]);
+    [["merge", mergeSort(items)], ["quick", quickSort(items)], ["heap", heapSort(items)]]
+      .forEach(function (p) {
+      var lane = p[0], run = p[1];
+      runs++;
+      if (!isSorted(run)) fails.push(name + "/" + lane + ": not sorted");
+      if (lane === "merge" && !isStable(run)) fails.push(name + "/merge: must be stable");
+      run.frames.forEach(function (f, i) {
+        if (keysOf[lane].indexOf(f.line) === -1) {
+          fails.push(name + "/" + lane + " frame " + i + ": unknown line '" + f.line + "'");
+        }
+        if (!f.note || !f.note.trim()) fails.push(name + "/" + lane + " frame " + i + ": no note");
+      });
+    });
+  });
+  // The counts the Canvas page quotes, measured from the real C++ in the
+  // devcontainer. If the JS drifts from the C++ these stop matching.
+  var s = build(PRESETS.sorted), rnd = build(PRESETS.random);
+  var expect = [["merge/sorted", mergeSort(s), 7], ["quick/sorted", quickSort(s), 15],
+                ["heap/sorted", heapSort(s), 12], ["merge/random", mergeSort(rnd), 11],
+                ["quick/random", quickSort(rnd), 17], ["heap/random", heapSort(rnd), 15]];
+  expect.forEach(function (e) {
+    var got = e[1].frames[e[1].frames.length - 1].comparisons;
+    if (got !== e[2]) fails.push(e[0] + ": " + got + " comparisons, C++ does " + e[2]);
+  });
+  ["merge", "quick", "heap"].forEach(function (k) {
+    if (!FACTS[k] || !FACTS[k].steps || FACTS[k].steps.length < 3) fails.push(k + ": summary missing");
+    // Where a per-line breakdown exists it must cover EVERY line, or clicking
+    // one of them silently does nothing.
+    if (LINE_INFO[k]) {
+      CODE[k].forEach(function (ln) {
+        var e = LINE_INFO[k][ln.k];
+        if (!e) fails.push(k + "/" + ln.k + ": no line breakdown");
+        else if (!e.src || !e.what || !e.items || !e.items.length) {
+          fails.push(k + "/" + ln.k + ": breakdown incomplete");
+        } else {
+          e.items.forEach(function (it) {
+            if (["syntax", "idiom", "trap", "why"].indexOf(it[0]) === -1) {
+              fails.push(k + "/" + ln.k + ": unknown kind '" + it[0] + "'");
+            }
+          });
+        }
+      });
+    }
+  });
+  var el = document.getElementById("selftest");
+  if (fails.length) {
+    el.className = "selftest fail";
+    el.textContent = "Self-check FAILED (" + fails.length + "): " + fails.slice(0, 6).join("; ");
+  } else {
+    el.className = "selftest pass";
+    el.textContent = "Self-check passed: " + runs + " runs across " + Object.keys(PRESETS).length +
+      " inputs — every result sorted, merge sort stable, every step highlights a real line and " +
+      "carries an explanation, and all six comparison counts match the C++ measured in the container.";
+  }
+}
+
+Array.prototype.forEach.call(document.querySelectorAll("#tabs [data-mode]"), function (b) {
+  b.addEventListener("click", function () { state.mode = b.getAttribute("data-mode"); reset(); });
+});
+Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function (b) {
+  b.addEventListener("click", function () { state.preset = b.getAttribute("data-preset"); reset(); });
+});
+document.getElementById("first").addEventListener("click", function () { stop(); go(0); });
+document.getElementById("prev").addEventListener("click", function () { stop(); go(state.step - 1); });
+document.getElementById("next").addEventListener("click", function () { stop(); go(state.step + 1); });
+document.getElementById("last").addEventListener("click", function () { stop(); go(state.maxFrames - 1); });
+document.getElementById("nextEvent").addEventListener("click", function () { stop(); nextEvent(); });
+document.getElementById("play").addEventListener("click", togglePlay);
+document.addEventListener("keydown", function (e) {
+  // A focused code line handles its own Enter; everything else is navigation.
+  var onCodeLine = e.target && e.target.parentNode &&
+                   e.target.parentNode.classList &&
+                   e.target.parentNode.classList.contains("code");
+  if (e.key === "ArrowRight") { stop(); go(state.step + 1); }
+  if (e.key === "ArrowLeft")  { stop(); go(state.step - 1); }
+  if (e.key === " " && !onCodeLine) { e.preventDefault(); togglePlay(); }
+});
+
+compute();
+render();
+selfTest();
+</script>
+</body>
+</html>
