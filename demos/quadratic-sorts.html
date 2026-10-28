@@ -287,7 +287,7 @@ var CODE = {
     {k:'outer',  t:'  '+K+'for'+E+' ('+K+'int'+E+' i = '+N+'0'+E+'; i &lt; n-'+N+'1'+E+'; ++i) {'},
     {k:'flag',   t:'    '+K+'bool'+E+' swapped = '+N+'false'+E+';'},
     {k:'inner',  t:'    '+K+'for'+E+' ('+K+'int'+E+' j = '+N+'0'+E+'; j &lt; n-'+N+'1'+E+'-i; ++j) {'},
-    {k:'cmp',    t:'      '+K+'if'+E+' ('+F+'counted_gt'+E+'(data[j], data[j+'+N+'1'+E+'])) {'},
+    {k:'cmp',    t:'      '+K+'if'+E+' (data[j] &gt; data[j+'+N+'1'+E+']) {'},
     {k:'swap',   t:'        '+F+'swap'+E+'(data[j], data[j+'+N+'1'+E+']);'},
     {k:'set',    t:'        swapped = '+N+'true'+E+';'},
     {k:'close',  t:'      }'},
@@ -302,7 +302,7 @@ var CODE = {
     {k:'key',    t:'    '+K+'int'+E+' key = data[i];'},
     {k:'pos',    t:'    '+K+'int'+E+' shift_pos = i - '+N+'1'+E+';'},
     {k:'cmp',    t:'    '+K+'while'+E+' (shift_pos &gt;= '+N+'0'+E+' &amp;&amp;'},
-    {k:'cmp2',   t:'           '+F+'counted_gt'+E+'(data[shift_pos], key)) {'},
+    {k:'cmp2',   t:'           data[shift_pos] &gt; key) {'},
     {k:'shift',  t:'      data[shift_pos+'+N+'1'+E+'] = data[shift_pos];'},
     {k:'dec',    t:'      --shift_pos;'},
     {k:'close',  t:'    }'},
@@ -315,7 +315,7 @@ var CODE = {
     {k:'outer',  t:'  '+K+'for'+E+' ('+K+'int'+E+' i = '+N+'0'+E+'; i &lt; n-'+N+'1'+E+'; ++i) {'},
     {k:'min',    t:'    '+K+'int'+E+' min_idx = i;'},
     {k:'inner',  t:'    '+K+'for'+E+' ('+K+'int'+E+' j = i+'+N+'1'+E+'; j &lt; n; ++j) {'},
-    {k:'cmp',    t:'      '+K+'if'+E+' ('+F+'counted_lt'+E+'(data[j], data[min_idx]))'},
+    {k:'cmp',    t:'      '+K+'if'+E+' (data[j] &lt; data[min_idx])'},
     {k:'newmin', t:'        min_idx = j;'},
     {k:'close',  t:'    }'},
     {k:'check',  t:'    '+K+'if'+E+' (min_idx != i)'},
@@ -405,10 +405,10 @@ var LINE_INFO = {
         ["why", "The <code>-i</code> skips the settled tail. Leave it off and the sort is still <em>correct</em>, just slower: it keeps re-comparing elements that are already final."],
         ["idiom", "This shrinking bound is why bubble sort does about n&sup2;/2 comparisons rather than n&sup2;."]
       ] },
-    cmp: { src: "if (counted_gt(data[j], data[j+1]))",
+    cmp: { src: "if (data[j] > data[j+1])",
       what: "Asks whether this adjacent pair is out of order.",
       items: [
-        ["idiom", "<code>counted_gt(a, b)</code> is the course helper. It returns exactly what <code>a &gt; b</code> returns and also ticks a counter the tests read. Write a bare <code>&gt;</code> and the sort still works, but <code>AlreadySorted</code> fails with a comparison count of 0."],
+        ["idiom", "<code>a > b</code> is the course helper. It returns exactly what <code>a &gt; b</code> returns and also ticks a counter the tests read. Write a bare <code>&gt;</code> and the sort still works, but <code>AlreadySorted</code> fails with a comparison count of 0."],
         ["why", "Strictly <code>&gt;</code>, never <code>&gt;=</code>. With <code>&gt;=</code> equal neighbours would swap &mdash; pointless writes, and it would destroy stability."],
         ["syntax", "<code>data[j+1]</code> is the reason the loop bound carries its <code>-1</code>."]
       ] },
@@ -485,11 +485,10 @@ var LINE_INFO = {
         ["why", "<strong>Order matters.</strong> The bounds test has to come first. C++ guarantees <code>&amp;&amp;</code> evaluates left to right and <strong>short-circuits</strong> &mdash; if <code>shift_pos &gt;= 0</code> is false, the right side is never evaluated, so <code>data[shift_pos]</code> is never read at index -1."],
         ["trap", "Swap the two halves round and the program reads <code>data[-1]</code> before it checks whether that is legal. It will often appear to work, which is the worst kind of bug."]
       ] },
-    cmp2: { src: "counted_gt(data[shift_pos], key))",
+    cmp2: { src: "data[shift_pos] > key)",
       what: "The second half: is this element bigger than the key, so it has to move right?",
       items: [
         ["why", "Strictly <code>&gt;</code>, never <code>&gt;=</code>. On an equal value the loop <em>stops</em>, so the key lands <strong>after</strong> its equal and the original order of equal elements survives. That one character is the whole of insertion sort&rsquo;s stability."],
-        ["idiom", "<code>counted_gt</code> is the course helper: exactly <code>a &gt; b</code>, plus a tick on the counter the tests read."],
         ["why", "On already-sorted input this is false immediately on every pass &mdash; one comparison per element, no shifts, O(n). That is insertion sort&rsquo;s best case."]
       ] },
     shift: { src: "data[shift_pos+1] = data[shift_pos];",
@@ -557,10 +556,10 @@ var LINE_INFO = {
         ["why", "Goes to <code>n</code> <strong>every single pass</strong>. There is no <code>-i</code> here and no early exit anywhere in this function. That is the whole reason selection sort has no O(n) best case: feed it a sorted array and it still performs all n(n-1)/2 comparisons."],
         ["idiom", "Compare this bound with bubble sort&rsquo;s <code>n-1-i</code>, which shrinks. Here the scanned region shrinks from the <em>front</em> as <code>i</code> advances, but it always runs to the end."]
       ] },
-    cmp: { src: "if (counted_lt(data[j], data[min_idx]))",
+    cmp: { src: "if (data[j] < data[min_idx])",
       what: "Asks whether this element beats the current best.",
       items: [
-        ["syntax", "<code>counted_lt</code> is <code>&lt;</code> &mdash; note it is <em>less than</em> here, where bubble and insertion sort used <code>counted_gt</code>. Selection sort is hunting for a minimum."],
+        ["syntax", "This is <code>&lt;</code> &mdash; note it is <em>less than</em> here, where bubble and insertion sort used <code>&gt;</code>. Selection sort is hunting for a minimum."],
         ["trap", "Flip it to <code>&gt;</code> and you select the maximum each pass, which sorts the array perfectly into <strong>descending</strong> order. Every test fails and nothing looks wrong with the code."],
         ["why", "Note that <code>data[min_idx]</code> is re-read each time, so this always compares against the best found <em>so far</em>, not against <code>data[i]</code>."]
       ] },

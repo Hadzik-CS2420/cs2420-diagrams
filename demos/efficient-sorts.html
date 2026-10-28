@@ -268,7 +268,7 @@ var CODE = {
     {k:'copy',  t:'  '+C+'// 1. copy both halves out BEFORE overwriting'+E},
     {k:'copy2', t:'  vector&lt;'+K+'int'+E+'&gt; L(..left..mid), R(..mid+1..right);'},
     {k:'cmp',   t:'  '+K+'while'+E+' (i &lt; L.size() &amp;&amp; j &lt; R.size())'},
-    {k:'take',  t:'    data[k++] = '+F+'counted_le'+E+'(L[i], R[j]) ? L[i++] : R[j++];'},
+    {k:'take',  t:'    data[k++] = (L[i] &lt;= R[j]) ? L[i++] : R[j++];'},
     {k:'drain', t:'  '+C+'// 3. drain whichever half still has elements'+E},
     {k:'mend',  t:'}'}
   ],
@@ -281,12 +281,12 @@ var CODE = {
     {k:'rend',  t:'}'},
     {k:'psig',  t:K+'static int'+E+' '+F+'partition'+E+'(v&amp; data, '+K+'int'+E+' low, '+K+'int'+E+' high) {'},
     {k:'med',   t:'  '+C+'// 1. median-of-three -> the median ends up at data[high]'+E},
-    {k:'med2',  t:'  '+K+'if'+E+' ('+F+'counted_lt'+E+'(data[mid], data[low]))  '+F+'swap'+E+'(low, mid);'},
-    {k:'med3',  t:'  '+K+'if'+E+' ('+F+'counted_lt'+E+'(data[high], data[low])) '+F+'swap'+E+'(low, high);'},
-    {k:'med4',  t:'  '+K+'if'+E+' ('+F+'counted_lt'+E+'(data[mid], data[high])) '+F+'swap'+E+'(mid, high);'},
+    {k:'med2',  t:'  '+K+'if'+E+' (data[mid] &lt; data[low])  '+F+'swap'+E+'(low, mid);'},
+    {k:'med3',  t:'  '+K+'if'+E+' (data[high] &lt; data[low]) '+F+'swap'+E+'(low, high);'},
+    {k:'med4',  t:'  '+K+'if'+E+' (data[mid] &lt; data[high]) '+F+'swap'+E+'(mid, high);'},
     {k:'pivot', t:'  '+K+'int'+E+' pivot = data[high];  '+K+'int'+E+' i = low - '+N+'1'+E+';'},
     {k:'scan',  t:'  '+K+'for'+E+' ('+K+'int'+E+' j = low; j &lt; high; ++j)'},
-    {k:'cmp',   t:'    '+K+'if'+E+' ('+F+'counted_le'+E+'(data[j], pivot)) '+F+'swap'+E+'(++i, j);'},
+    {k:'cmp',   t:'    '+K+'if'+E+' (data[j] &lt;= pivot) '+F+'swap'+E+'(++i, j);'},
     {k:'place', t:'  '+F+'swap'+E+'(data[i+'+N+'1'+E+'], data[high]);  '+K+'return'+E+' i + '+N+'1'+E+';'},
     {k:'pend',  t:'}'}
   ],
@@ -294,9 +294,9 @@ var CODE = {
     {k:'hsig',  t:K+'static void'+E+' '+F+'heapify_down'+E+'(v&amp; data, '+K+'int'+E+' heap_size, '+K+'int'+E+' index) {'},
     {k:'init',  t:'  '+K+'int'+E+' largest = index, left = '+N+'2'+E+'*index+'+N+'1'+E+', right = '+N+'2'+E+'*index+'+N+'2'+E+';'},
     {k:'cmpL',  t:'  '+K+'if'+E+' (left &lt; heap_size &amp;&amp;'},
-    {k:'cmpL',  c:1, t:'      '+F+'counted_gt'+E+'(data[left], data[largest]))  largest = left;'},
+    {k:'cmpL',  c:1, t:'      data[left] &gt; data[largest])  largest = left;'},
     {k:'cmpR',  t:'  '+K+'if'+E+' (right &lt; heap_size &amp;&amp;'},
-    {k:'cmpR',  c:1, t:'      '+F+'counted_gt'+E+'(data[right], data[largest])) largest = right;'},
+    {k:'cmpR',  c:1, t:'      data[right] &gt; data[largest]) largest = right;'},
     {k:'sink',  t:'  '+K+'if'+E+' (largest != index) { '+F+'swap'+E+'(data[index], data[largest]);'},
     {k:'rec',   t:'    '+F+'heapify_down'+E+'(data, heap_size, largest); }   '+C+'// follow it down'+E},
     {k:'hend',  t:'}'},
@@ -427,12 +427,11 @@ var LINE_INFO = {
         ["why", "The loop ends as soon as one half empties, which is exactly why the two drain loops below are needed. Forgetting them is the classic merge bug."],
         ["syntax", "<code>size()</code> returns unsigned, so comparing against an <code>int</code> index draws a warning on some compilers; the starter casts to keep it quiet."]
       ] },
-    take: { src: "data[k++] = counted_le(L[i], R[j]) ? L[i++] : R[j++];",
+    take: { src: "data[k++] = L[i] <= R[j] ? L[i++] : R[j++];",
       what: "Takes the smaller of the two front elements and writes it into the output.",
       items: [
         ["why", "<code>&lt;=</code> and not <code>&lt;</code>. On a tie this takes from the <strong>left</strong> half, which is the half that came earlier in the original array &mdash; and that is the entire reason merge sort is stable. Change one character and it stops being."],
         ["syntax", "Three indices advance independently: <code>i</code> through L, <code>j</code> through R, <code>k</code> through the real array. Each <code>++</code> is a post-increment, so the old value is used as the index and then the counter moves on."],
-        ["idiom", "<code>counted_le</code> is the course helper: exactly <code>a &lt;= b</code>, plus a tick on the comparison counter the tests read."]
       ] },
     drain: { src: "// 3. drain whichever half still has elements",
       what: "Copies across everything left over once the other half has emptied.",
@@ -492,17 +491,17 @@ var LINE_INFO = {
         ["why", "Taking <code>data[high]</code> straight off would make <strong>already-sorted input the worst case</strong> &mdash; the pivot would be the largest element every time, giving n levels of recursion. Sorted input is the most common real-world input, so that matters."],
         ["idiom", "Three comparisons up front buy away the pathological case. Step the sorted preset and the reverse preset and compare the totals: both cost the same."]
       ] },
-    med2: { src: "if (counted_lt(data[mid], data[low])) swap(low, mid);",
+    med2: { src: "if (data[mid] < data[low]) swap(low, mid);",
       what: "First of three conditional swaps. After it, <code>data[low]</code> &le; <code>data[mid]</code>.",
       items: [
         ["idiom", "The three swaps together are a hand-written sorting network for three elements. Each one enforces one ordering, and the combination leaves the median in the middle slot."]
       ] },
-    med3: { src: "if (counted_lt(data[high], data[low])) swap(low, high);",
+    med3: { src: "if (data[high] < data[low]) swap(low, high);",
       what: "Second swap. After it, <code>data[low]</code> is the smallest of the three.",
       items: [
         ["why", "Order matters: these three lines only produce a median if they run in this sequence. Rearranging them gives a different &mdash; and wrong &mdash; answer."]
       ] },
-    med4: { src: "if (counted_lt(data[mid], data[high])) swap(mid, high);",
+    med4: { src: "if (data[mid] < data[high]) swap(mid, high);",
       what: "Third swap. The median of the three now sits at <code>data[high]</code>, ready to be used as the pivot.",
       items: [
         ["why", "Parking the pivot at <code>high</code> is what lets the scan below run from <code>low</code> to <code>high-1</code> without having to step over it."]
@@ -519,7 +518,7 @@ var LINE_INFO = {
         ["syntax", "<code>j &lt; high</code>, not <code>&lt;= high</code>: <code>data[high]</code> is the pivot and is handled separately at the end."],
         ["why", "This is the Lomuto partition scheme &mdash; one forward pass with two indices. Hoare's version walks inward from both ends and does fewer swaps, but is harder to get right."]
       ] },
-    cmp: { src: "if (counted_le(data[j], pivot)) swap(++i, j);",
+    cmp: { src: "if (data[j] <= pivot) swap(++i, j);",
       what: "If this element belongs on the left, grow the &le;-region by one and move it in.",
       items: [
         ["syntax", "<code>++i</code> is a <strong>pre</strong>-increment used as an argument: <code>i</code> advances first, then the new value is passed. Writing <code>i++</code> here would swap into the wrong slot."],
@@ -552,14 +551,14 @@ var LINE_INFO = {
         ["idiom", "Going the other way, the parent of <code>i</code> is <code>(i-1)/2</code>. That is how the last parent in the array is found: <code>n/2 - 1</code>."],
         ["syntax", "<code>largest</code> starts as <code>index</code>, so if neither child beats it the node is already correct."]
       ] },
-    cmpL: { src: "if (left < heap_size && counted_gt(data[left], data[largest]))",
+    cmpL: { src: "if (left < heap_size && data[left] > data[largest])",
       what: "Checks the left child, if there is one inside the heap.",
       items: [
         ["why", "<strong>Order matters.</strong> The bounds test is the left operand of <code>&amp;&amp;</code>, and C++ guarantees short-circuit evaluation &mdash; so when <code>left</code> is past the end, <code>data[left]</code> is never read at all."],
         ["trap", "Swap the two halves round and the program reads past the heap before checking whether that is legal. In phase 2 that means reading the sorted tail, which silently drags finished elements back into the heap."],
         ["syntax", "<code>&lt; heap_size</code>, not <code>&lt; data.size()</code>. Those are the same thing in phase 1 and very different in phase 2."]
       ] },
-    cmpR: { src: "if (right < heap_size && counted_gt(data[right], data[largest]))",
+    cmpR: { src: "if (right < heap_size && data[right] > data[largest])",
       what: "Checks the right child against whichever is currently the largest.",
       items: [
         ["why", "It compares against <code>data[largest]</code>, not <code>data[index]</code>. If the left child already won, this has to beat <em>that</em> &mdash; otherwise a node could sink the wrong way."],
