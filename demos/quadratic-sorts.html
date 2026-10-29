@@ -408,7 +408,7 @@ var LINE_INFO = {
     cmp: { src: "if (data[j] > data[j+1])",
       what: "Asks whether this adjacent pair is out of order.",
       items: [
-        ["idiom", "<code>a > b</code> is the course helper. It returns exactly what <code>a &gt; b</code> returns and also ticks a counter the tests read. Write a bare <code>&gt;</code> and the sort still works, but <code>AlreadySorted</code> fails with a comparison count of 0."],
+        ["idiom", "This comparison is the work bubble sort is measured by. On already-sorted input it is false every time, nothing swaps, and the early exit stops the sort after one pass &mdash; n&minus;1 comparisons, the O(n) best case. Press <em>already sorted</em> and watch the counter."],
         ["why", "Strictly <code>&gt;</code>, never <code>&gt;=</code>. With <code>&gt;=</code> equal neighbours would swap &mdash; pointless writes, and it would destroy stability."],
         ["syntax", "<code>data[j+1]</code> is the reason the loop bound carries its <code>-1</code>."]
       ] },
