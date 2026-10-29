@@ -86,6 +86,8 @@
   .cell.pivot   { border-color:var(--orange); background:var(--tint-orange); }
   .cell.bound   { border-color:var(--teal);   background:var(--tint-teal); }
   .cell.node    { border-color:var(--purple); background:var(--tint-purple); }
+  .cell.largest { border-color:var(--orange); background:var(--tint-orange); }
+  .cell .rel { display:block; font-size:.6rem; font-weight:400; color:var(--muted); white-space:nowrap; }
 
   .temps { margin-top:.6rem; font-size:.78rem; }
   .temps .trow { display:flex; align-items:center; gap:.3rem; margin-bottom:.3rem; }
@@ -173,7 +175,34 @@
   .verdict { margin-top:1.15rem; }
   svg.tree { width:100%; height:auto; display:block; }
   svg.tree text { font-family:"Segoe UI",system-ui,sans-serif; font-size:13px; font-weight:600; }
-  svg.tree text.ix { font-size:9px; font-weight:400; fill:#aab2bd; }
+  svg.tree text { font-size:15px; }
+  svg.tree text.ix { font-size:10px; font-weight:400; fill:#6e6e6e; }
+  .treecap { margin:.3rem 0 0; font-size:.74rem; color:var(--muted); }
+
+  /* ---- heap tab: phase banner, before row, history strip, live values ---- */
+  .banner { display:flex; flex-wrap:wrap; align-items:baseline; gap:.2rem .8rem; margin:0 0 .8rem;
+            padding:.5rem .85rem; border-radius:7px; color:#fff; background:var(--deep); }
+  .banner strong { font-size:1.02rem; }
+  .banner span { font-size:.85rem; }
+  .banner.build   { background:var(--blue); }
+  .banner.built   { background:var(--teal); }
+  .banner.extract { background:var(--orange); }
+  .banner.done    { background:var(--green); }
+  .rowlbl { font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); min-width:3.3rem; }
+  .beforerow { display:flex; align-items:center; gap:.5rem; margin:0 0 .5rem; }
+  .beforerow .cells, .hist .cells { min-height:0; gap:.2rem; }
+  .beforerow .cell, .hist .cell { min-width:2.1rem; font-size:.86rem; padding:.22rem .1rem; }
+  .hist .hrow { display:flex; align-items:center; gap:.5rem; padding:.18rem .35rem; border-radius:6px; }
+  .hist .hrow.now { background:#fff8e1; }
+  .hist .hname { min-width:6.6rem; font-family:Consolas,monospace; font-size:.76rem; color:var(--muted); }
+  .hist .hrow.now .hname { color:var(--ink); font-weight:600; }
+  .hist .hphase { font-size:.7rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em;
+                  margin:.55rem 0 .15rem; color:var(--muted); }
+  .hist .hphase.build   { color:var(--blue); }
+  .hist .hphase.extract { color:var(--orange); }
+  .code div.calc { color:#f9e2af; font-size:.88rem; white-space:pre-wrap; cursor:default; padding-left:2.6rem; }
+  .code div.calc::before { content:"\21B3  "; }
+  .code div.calc:hover { background:transparent; }
 </style>
 </head>
 <body>
@@ -185,7 +214,8 @@
     line that is executing, and the structure that algorithm actually works on —
     the temporary halves for merge sort, the pivot boundary for quick sort, and the
     binary tree hiding in the array for heap sort. <strong>Click any line of code</strong>
-    for a breakdown of it. The last tab races all three.
+    for a breakdown of it. Heap sort opens in an <strong>overview</strong>, one whole call per
+    step; switch to <strong>detail</strong> to watch every comparison. The last tab races all three.
   </p>
 
   <div class="tabs" id="tabs">
@@ -204,7 +234,13 @@
       <button class="ctl" data-preset="sorted">already sorted</button>
       <button class="ctl" data-preset="reverse">reverse sorted</button>
       <button class="ctl" data-preset="dupes">[3a, 1, 3b, 2] — stability</button>
+      <button class="ctl" data-preset="heap7">[38, 55, 32, 95, 62, 27, 43] — full tree</button>
       <span class="count" id="frameCount"></span>
+    </div>
+    <div class="row" id="viewRow">
+      <span class="lbl">Heap view</span>
+      <button class="ctl" data-view="overview">Overview &mdash; one call per step</button>
+      <button class="ctl" data-view="detail">Detail &mdash; every comparison</button>
     </div>
     <div class="row">
       <span class="lbl">Step</span>
@@ -222,7 +258,7 @@
   <div class="legend">
     <span><i class="sw" style="border-color:#2573a7;background:#eaf2f8"></i>being compared</span>
     <span><i class="sw" style="border-color:#c0392b;background:#fce4ec"></i>just written</span>
-    <span><i class="sw" style="border-color:#a95c19;background:#fff3e0"></i>pivot</span>
+    <span><i class="sw" style="border-color:#a95c19;background:#fff3e0"></i>pivot &middot; heap: largest so far</span>
     <span><i class="sw" style="border-color:#00695c;background:#e0f2f1"></i>the i boundary</span>
     <span><i class="sw" style="border-color:#8e44ad;background:#ede7f6"></i>heap node in play</span>
     <span><i class="sw" style="border-color:#1c7e45;background:#f2fbf4"></i>final position</span>
@@ -239,7 +275,8 @@ var PRESETS = {
   random:  [5, 3, 8, 1, 9, 2],
   sorted:  [1, 2, 3, 4, 5],
   reverse: [5, 4, 3, 2, 1],
-  dupes:   [3, 1, 3, 2]
+  dupes:   [3, 1, 3, 2],
+  heap7:   [38, 55, 32, 95, 62, 27, 43]   // 7 values fill a three-level tree exactly
 };
 
 function build(values) {
@@ -637,7 +674,7 @@ var LINE_INFO = {
 // tab can draw the thing the old step-by-step diagrams drew.
 // ---------------------------------------------------------------------------
 function Recorder(items) {
-  this.frames = []; this.log = [];
+  this.frames = []; this.log = []; this.hist = [];
   this.a = items.map(function (e) { return { v: e.v, tag: e.tag, id: e.id }; });
   this.comparisons = 0; this.writes = 0;
 }
@@ -645,7 +682,8 @@ Recorder.prototype.snap = function (line, note, marks) {
   this.frames.push({
     a: this.a.map(function (e) { return { v: e.v, tag: e.tag, id: e.id }; }),
     line: line, note: note, marks: marks || {},
-    comparisons: this.comparisons, writes: this.writes, logLen: this.log.length
+    comparisons: this.comparisons, writes: this.writes, logLen: this.log.length,
+    histLen: this.hist.length
   });
 };
 Recorder.prototype.event = function (depth, label, detail) {
@@ -802,77 +840,171 @@ function quickSort(items) {
 }
 
 // ---- heap sort ------------------------------------------------------------
+// One run, recorded at two zoom levels. r.frames is the detail view: one frame
+// per comparison. r.ov is the overview: one frame per heapify_down call in
+// phase 1 and per extraction in phase 2, each carrying the array as it was
+// before. r.hist is the history strip: one row per finished call, so a swap
+// stays on screen after it happens.
 function heapSort(items) {
   var r = new Recorder(items), a = r.a, n = a.length;
+  var lastParent = Math.floor(n / 2) - 1, banner = null, trail = [];
+  r.ov = [];
   function sw(x, y) { var t = a[x]; a[x] = a[y]; a[y] = t; r.writes += 2; }
+  function copy() { return a.map(function (e) { return { v: e.v, tag: e.tag, id: e.id }; }); }
+  function snap(line, note, marks) { marks.banner = banner; r.snap(line, note, marks); }
+  function ov(line, note, marks) {
+    marks.banner = banner;
+    r.ov.push({ a: copy(), line: line, note: note, marks: marks, comparisons: r.comparisons,
+                writes: r.writes, logLen: r.log.length, histLen: r.hist.length,
+                detail: r.frames.length - 1 });
+  }
+  function hist(label, phase, marks) {
+    r.hist.push({ label: label, phase: phase, a: copy(), marks: marks });
+  }
+  // The indices the sinking value passed through during this call.
+  function pathOf() {
+    return trail.length ? [trail[0].from].concat(trail.map(function (t) { return t.to; })) : [];
+  }
+  function sinkText(v) {
+    if (!trail.length) return v + " is already at least as big as its children, so nothing moves.";
+    return v + " swaps with its larger child " +
+           trail.map(function (t) { return t.with; }).join(", then with ") +
+           " &mdash; it sinks from index " + trail[0].from + " to index " + trail[trail.length - 1].to + ".";
+  }
 
   function heapify(heapSize, index, phase, depth) {
-    var largest = index, left = 2 * index + 1, right = 2 * index + 2;
-    r.snap('init', "heapify_down at index " + index + ". Children are " + left + " and " + right +
-           " (2i+1 and 2i+2). heap_size is " + heapSize + ".",
-           { heapSize: heapSize, phase: phase, node: index, kids: [left, right], depth: depth });
+    var largest = index, left = 2 * index + 1, right = 2 * index + 2, was;
+    function mk(extra) {
+      var m = { heapSize: heapSize, phase: phase, node: index, depth: depth,
+                parents: phase === 'build' ? lastParent : undefined,
+                kids: [left, right].filter(function (c) { return c < heapSize; }) };
+      for (var key in extra) m[key] = extra[key];
+      return m;
+    }
+    snap('init', "heapify_down at index " + index + ", which holds " + a[index].v +
+         ". Its children sit at 2i+1 and 2i+2 &mdash; the boxed family in the tree.",
+         mk({ calc: "index = " + index + "   →   left = 2·" + index + "+1 = " + left +
+                    ",  right = 2·" + index + "+2 = " + right }));
     if (left < heapSize) {
-      r.comparisons++;
-      if (a[left].v > a[largest].v) {
-        largest = left;
-        r.snap('cmpL', "Left child " + a[left].v + " > " + a[index].v + " — largest is now " + left + ".",
-               { heapSize: heapSize, phase: phase, node: index, compare: [left], largest: largest, depth: depth });
-      } else {
-        r.snap('cmpL', "Left child " + a[left].v + " is not bigger than " + a[largest].v + ".",
-               { heapSize: heapSize, phase: phase, node: index, compare: [left], largest: largest, depth: depth });
-      }
+      r.comparisons++; was = largest;
+      if (a[left].v > a[was].v) largest = left;
+      snap('cmpL', largest === left
+             ? "Left child " + a[left].v + " is bigger than " + a[was].v + " &mdash; it is the largest so far (orange)."
+             : "Left child " + a[left].v + " is not bigger than " + a[was].v + " &mdash; the parent is still the largest.",
+           mk({ compare: [left, was], largest: largest,
+                calc: left + " < " + heapSize + " ✔   data[" + left + "]=" + a[left].v + " > data[" + was + "]=" +
+                      a[was].v + "?   " + (largest === left ? "yes → largest = " + left : "no → largest stays " + was) }));
     } else {
-      r.snap('cmpL', "No left child inside the heap — index " + left + " is past heap_size " +
-             heapSize + ", so the comparison is short-circuited and never reads data[" + left + "].",
-             { heapSize: heapSize, phase: phase, node: index, largest: largest, depth: depth });
+      snap('cmpL', "No left child inside the heap &mdash; index " + left + " is not below heap_size " + heapSize +
+           ", so && stops before data[" + left + "] is ever read. This node has no children here.",
+           mk({ largest: largest,
+                calc: left + " < " + heapSize + "?   no → && short-circuits, data[" + left + "] is never read" }));
     }
     if (right < heapSize) {
-      r.comparisons++;
-      if (a[right].v > a[largest].v) {
-        largest = right;
-        r.snap('cmpR', "Right child " + a[right].v + " > " + a[largest === right ? index : largest].v +
-               " — largest is now " + right + ".",
-               { heapSize: heapSize, phase: phase, node: index, compare: [right], largest: largest, depth: depth });
-      } else {
-        r.snap('cmpR', "Right child " + a[right].v + " is not bigger than " + a[largest].v + ".",
-               { heapSize: heapSize, phase: phase, node: index, compare: [right], largest: largest, depth: depth });
-      }
+      r.comparisons++; was = largest;
+      if (a[right].v > a[was].v) largest = right;
+      // Compared against the CURRENT largest, which may be the left child, not the parent.
+      snap('cmpR', largest === right
+             ? "Right child " + a[right].v + " is bigger than " + a[was].v + " &mdash; it is the largest now."
+             : "Right child " + a[right].v + " is not bigger than " + a[was].v +
+               " &mdash; largest stays at index " + was + ".",
+           mk({ compare: [right, was], largest: largest,
+                calc: right + " < " + heapSize + " ✔   data[" + right + "]=" + a[right].v + " > data[" + was + "]=" +
+                      a[was].v + "?   " + (largest === right ? "yes → largest = " + right : "no → largest stays " + was) }));
     }
     if (largest !== index) {
+      var pv = a[index].v, cv = a[largest].v;
       sw(index, largest);
-      r.snap('sink', "The parent was not the largest, so swap it down with " + largest +
-             " and follow the problem to that child.",
-             { heapSize: heapSize, phase: phase, moved: [index, largest], node: largest, depth: depth });
+      trail.push({ from: index, to: largest, with: cv });
+      snap('sink', pv + " was smaller than its child " + cv + ", so they swap. " + pv + " is now at index " +
+           largest + ", where it may still be smaller than its new children &mdash; follow it down.",
+           mk({ moved: [index, largest], path: [index, largest], kids: [],
+                calc: "largest = " + largest + " ≠ index = " + index + "   →   swap data[" + index + "] ↔ data[" +
+                      largest + "]   (" + pv + " ↔ " + cv + ")" }));
       heapify(heapSize, largest, phase, depth + 1);
     } else {
-      r.snap('sink', "The parent is already the largest of the three — the heap property holds here.",
-             { heapSize: heapSize, phase: phase, node: index, depth: depth });
+      snap('sink', a[index].v + " is at least as big as its children &mdash; the heap property holds here, " +
+           "so the sinking stops.",
+           mk({ calc: "largest == index == " + index + "   →   no swap, return" }));
     }
   }
 
-  r.snap('ssig', "Start. The array is about to be read as a complete binary tree: children of i " +
-         "are 2i+1 and 2i+2.", { heapSize: n, phase: 'build' });
-  r.snap('bloop', "Phase 1: build the max-heap. Start at the LAST PARENT, n/2-1 = " +
-         (Math.floor(n / 2) - 1) + ", and work backwards — leaves are already valid one-element heaps.",
-         { heapSize: n, phase: 'build' });
-  for (var i = Math.floor(n / 2) - 1; i >= 0; i--) {
+  banner = { phase: 'start', text: 'The array is a tree', sub: 'children of index i sit at 2i+1 and 2i+2' };
+  hist('input', 'start', {});
+  snap('ssig', "Start. The array is about to be read as a complete binary tree: the children of index i " +
+       "are 2i+1 and 2i+2. No nodes, no pointers &mdash; just arithmetic.",
+       { heapSize: n, phase: 'build', parents: lastParent });
+  ov('ssig', "Read the array as a tree: index 0 is the root, and the children of index i sit at 2i+1 and " +
+     "2i+2. The labels under the array say whose child each slot is. Nothing has moved yet.",
+     { heapSize: n, phase: 'build', parents: lastParent });
+
+  banner = { phase: 'build', text: 'Phase 1 · Build the max-heap',
+             sub: 'parents 0..' + lastParent + ', last parent first' };
+  snap('bloop', "Phase 1 builds the max-heap. Only indices 0.." + lastParent + " have children (solid " +
+       "nodes); the rest are leaves (dashed), and a single node is already a valid heap. So start at the " +
+       "LAST parent, " + lastParent + ", and work backwards to the root.",
+       { heapSize: n, phase: 'build', parents: lastParent,
+         calc: "n/2 − 1 = " + n + "/2 − 1 = " + lastParent + "   →   0.." + lastParent + " are parents, " +
+               (lastParent + 1) + ".." + (n - 1) + " are leaves" });
+  for (var i = lastParent, call = 1; i >= 0; i--, call++) {
+    banner = { phase: 'build', text: 'Phase 1 · Build the max-heap',
+               sub: 'fixing node ' + i + ' &mdash; call ' + call + ' of ' + (lastParent + 1) };
+    var before = copy(), top = a[i].v;
+    var kidsV = [2 * i + 1, 2 * i + 2].filter(function (c) { return c < n; })
+                                      .map(function (c) { return a[c].v; });
+    trail = [];
     r.event(0, "build: heapify " + i, "heap_size = " + n);
+    snap('bloop', "i = " + i + ": fix the subtree rooted at index " + i + ". Everything below it is " +
+         "already a heap, because those nodes were fixed first.",
+         { heapSize: n, phase: 'build', parents: lastParent, node: i,
+           calc: "i = " + i + "   →   heapify_down(data, " + n + ", " + i + ")" });
     heapify(n, i, 'build', 0);
+    hist('heapify(' + i + ')', 'build', { changed: pathOf() });
+    ov('bloop', "Fix node " + i + " (" + top + "), whose children are " + kidsV.join(" and ") + ". " +
+       sinkText(top),
+       { heapSize: n, phase: 'build', parents: lastParent, node: i, before: before,
+         beforeLit: pathOf().length ? pathOf() : [i], path: pathOf(), moved: pathOf(),
+         calc: "i = " + i + "   →   heapify_down(data, " + n + ", " + i + ")" });
   }
-  r.snap('extr', "The heap is built: data[0] is now the largest element in the array. Phase 2 " +
-         "repeatedly moves it to the end.", { heapSize: n, phase: 'build', node: 0 });
-  for (var e = n - 1; e > 0; e--) {
+
+  banner = { phase: 'built', text: 'Heap built', sub: 'data[0] = ' + a[0].v + ', the largest value' };
+  var builtNote = "The heap is built: every parent is ≥ its children, so data[0] = " + a[0].v + " is the " +
+                  "largest value. The array is NOT sorted yet &mdash; a heap only promises parent ≥ child. " +
+                  "Phase 2 does the sorting.";
+  snap('extr', builtNote, { heapSize: n, phase: 'built', node: 0 });
+  ov('extr', builtNote, { heapSize: n, phase: 'built', node: 0 });
+
+  for (var e = n - 1, k = 1; e > 0; e--, k++) {
+    var mx = a[0].v;
+    banner = { phase: 'extract', text: 'Phase 2 · Extract the max',
+               sub: 'placing ' + mx + ' at index ' + e + ' &mdash; ' + k + ' of ' + (n - 1) };
+    before = copy(); trail = [];
     r.event(0, "extract to " + e, "heap_size shrinks to " + e);
     sw(0, e);
-    r.snap('eswap', "Swap the maximum " + a[e].v + " out to index " + e +
-           " — its final position. The heap now covers only 0.." + (e - 1) + ".",
-           { heapSize: e, phase: 'extract', moved: [0, e], sortedFrom: e });
-    r.snap('erep', "Repair from the root with heap_size = " + e + ", NOT n. Passing n would drag " +
-           "the sorted tail back into the heap.",
-           { heapSize: e, phase: 'extract', node: 0, sortedFrom: e });
+    var root = a[0].v;
+    snap('eswap', "Swap the max, " + mx + ", out to index " + e + " &mdash; its final position. " + root +
+         " lands on the root, where it almost certainly does not belong.",
+         { heapSize: e, phase: 'extract', moved: [0, e], sortedFrom: e,
+           calc: "i = " + e + "   →   swap data[0]=" + mx + " ↔ data[" + e + "]=" + root });
+    snap('erep', "Repair from the root with heap_size = " + e + ", NOT n. Index " + e + " is now outside " +
+         "the heap, so heapify_down cannot pull " + mx + " back in.",
+         { heapSize: e, phase: 'extract', node: 0, sortedFrom: e,
+           calc: "heapify_down(data, " + e + ", 0)   —   the heap is 0.." + (e - 1) + ", index " + e +
+                 " is off-limits" });
     heapify(e, 0, 'extract', 0);
+    hist('place ' + mx, 'extract', { changed: pathOf(), sortedFrom: e });
+    ov('eloop', "Swap the max, " + mx + ", out to index " + e + " &mdash; its final spot (green). " + root +
+       " lands on the root. " + sinkText(root) + " heap_size is now " + e + ".",
+       { heapSize: e, phase: 'extract', sortedFrom: e, node: 0, before: before, beforeLit: [0, e],
+         beforeSorted: e + 1, path: pathOf(), moved: pathOf(),
+         calc: "i = " + e + "   →   swap data[0] ↔ data[" + e + "],  heapify_down(data, " + e + ", 0)" });
   }
-  r.snap('send', "Sorted.", { heapSize: 0, phase: 'extract', sortedFrom: 0 });
+
+  banner = { phase: 'done', text: 'Sorted', sub: 'a max-heap gives ascending order' };
+  var doneNote = "Sorted. The largest value went to the back first, then the next largest in front of " +
+                 "it &mdash; which is why a MAX-heap produces ascending order.";
+  snap('send', doneNote, { heapSize: 0, phase: 'extract', sortedFrom: 0 });
+  ov('send', doneNote, { heapSize: 0, phase: 'extract', sortedFrom: 0 });
   return r;
 }
 
@@ -899,38 +1031,72 @@ var LANES = [
   { key: "heap",  title: "Heap Sort" }
 ];
 var state = { mode: "merge", preset: "random", step: 0, runs: null,
-              timer: null, pinned: null };
+              timer: null, pinned: null, heapView: "overview" };
 
 function compute() {
   var items = build(PRESETS[state.preset]);
   state.runs = { merge: mergeSort(items), quick: quickSort(items), heap: heapSort(items) };
   state.maxFrames = state.mode === "compare"
     ? Math.max.apply(null, LANES.map(function (l) { return state.runs[l.key].frames.length; }))
-    : state.runs[state.mode].frames.length;
+    : framesFor(state.mode).length;
   state.step = 0;
+}
+
+// Switching zoom keeps your place: overview -> detail lands on the end of the
+// same call, detail -> overview on the last call that has finished.
+function setView(v) {
+  if (v === state.heapView) return;
+  stop();
+  var run = state.runs.heap, target = 0, i;
+  if (v === "detail") {
+    target = run.ov[Math.min(state.step, run.ov.length - 1)].detail;
+  } else {
+    for (i = 0; i < run.ov.length; i++) if (run.ov[i].detail <= state.step) target = i;
+  }
+  state.heapView = v;
+  state.maxFrames = framesFor("heap").length;
+  state.step = target;
+  render();
+}
+
+// The heap tab has two zoom levels; every other tab has one.
+function framesFor(key) {
+  return key === "heap" && state.heapView === "overview" ? state.runs.heap.ov : state.runs[key].frames;
 }
 
 function cellClass(idx, f) {
   var m = f.marks, c = ["cell"];
   function has(l) { return l && l.indexOf(idx) !== -1; }
   if (m.range && (idx < m.range[0] || idx > m.range[1])) c.push("outside");
-  if (m.sortedRange && idx >= m.sortedRange[0] && idx <= m.sortedRange[1]) c.push("sorted");
-  if (m.sortedFrom !== undefined && idx >= m.sortedFrom) c.push("sorted");
-  if (has(m.sortedIdx)) c.push("sorted");
-  if (has(m.kids)) c.push("node");
-  if (m.node === idx) c.push("node");
-  if (m.bound === idx) c.push("bound");
-  if (m.pivot === idx) c.push("pivot");
-  if (has(m.compare)) c.push("compare");
-  if (has(m.moved)) c.push("moved");
+  // One state per cell, most specific first, so two colours never fight in the CSS.
+  var sorted = (m.sortedRange && idx >= m.sortedRange[0] && idx <= m.sortedRange[1]) ||
+               (m.sortedFrom !== undefined && idx >= m.sortedFrom) || has(m.sortedIdx);
+  var st = m.bound === idx ? "bound" : m.pivot === idx ? "pivot" : has(m.moved) ? "moved" :
+           m.largest === idx ? "largest" : has(m.compare) ? "compare" :
+           (m.node === idx || has(m.kids)) ? "node" : sorted ? "sorted" : "";
+  if (st) c.push(st);
   return c.join(" ");
 }
 
-function cellsHtml(f, big) {
+// Whose child each slot is: the array-to-tree mapping, written under the cell.
+function relOf(i) { return i === 0 ? "root" : (i % 2 ? "L" : "R") + " of " + ((i - 1) >> 1); }
+
+function cellsHtml(f, big, rel) {
   return f.a.map(function (e, i) {
     return '<div class="' + cellClass(i, f) + '">' + e.v +
            '<span class="tag">' + (e.tag || "&nbsp;") + '</span>' +
-           (big ? '<span class="ix">' + i + '</span>' : '') + '</div>';
+           (big ? '<span class="ix">' + i + '</span>' : '') +
+           (rel ? '<span class="rel">' + relOf(i) + '</span>' : '') + '</div>';
+  }).join("");
+}
+
+// A small row of cells for the before row and the history strip.
+function miniCells(arr, lit, litCls, sortedFrom) {
+  return arr.map(function (e, i) {
+    var c = "cell";
+    if (lit && lit.indexOf(i) !== -1) c += " " + litCls;
+    else if (sortedFrom !== undefined && i >= sortedFrom) c += " sorted";
+    return '<div class="' + c + '">' + e.v + (e.tag || "") + '</div>';
   }).join("");
 }
 
@@ -951,51 +1117,105 @@ function tempsHtml(m) {
 }
 
 // The binary tree hiding in the array. Heap sort is the one algorithm here that
-// is unreadable as a flat row, so it gets drawn properly.
+// is unreadable as a flat row, so it gets drawn properly: the family under
+// examination is boxed, the sink is an arrow, and in phase 1 the leaves are
+// dashed because heapify_down is never called on them.
 function treeHtml(f) {
   var m = f.marks, a = f.a, n = a.length;
   if (m.heapSize === undefined) return "";
   var levels = Math.floor(Math.log2(n)) + 1;
-  var W = 560, rowH = 62, H = levels * rowH + 16, nodes = [];
-  for (var i = 0; i < n; i++) {
+  var W = 560, rowH = 74, R = 20, H = levels * rowH + 4, nodes = [], i, out = [];
+  for (i = 0; i < n; i++) {
     var lvl = Math.floor(Math.log2(i + 1));
     var first = Math.pow(2, lvl) - 1, count = Math.pow(2, lvl);
-    var slot = i - first;
-    nodes.push({ i: i, x: W * (slot + 0.5) / count, y: 24 + lvl * rowH });
+    nodes.push({ i: i, x: W * (i - first + 0.5) / count, y: 28 + lvl * rowH });
   }
-  var edges = "";
+  function has(l, x) { return l && l.indexOf(x) !== -1; }
+  var building = m.phase === "build" && m.parents !== undefined;
+  var kids = m.kids || [];
+
+  if (m.node !== undefined && kids.length) {
+    var fam = [m.node].concat(kids).map(function (k) { return nodes[k]; });
+    var xs = fam.map(function (p) { return p.x; });
+    var x0 = Math.min.apply(null, xs) - R - 12, x1 = Math.max.apply(null, xs) + R + 12;
+    var y0 = nodes[m.node].y - R - 7, y1 = fam[1].y + R + 18;
+    out.push('<rect x="' + x0 + '" y="' + y0 + '" width="' + (x1 - x0) + '" height="' + (y1 - y0) +
+             '" rx="14" fill="#f6f2fb" stroke="#8e44ad" stroke-width="1.5" stroke-dasharray="5 4"/>');
+  }
   for (i = 0; i < n; i++) {
     [2 * i + 1, 2 * i + 2].forEach(function (c) {
       if (c < n) {
         var dim = (c >= m.heapSize || i >= m.heapSize);
-        edges += '<line x1="' + nodes[i].x + '" y1="' + nodes[i].y + '" x2="' + nodes[c].x +
-                 '" y2="' + nodes[c].y + '" stroke="' + (dim ? "#e6e9ed" : "#b9c2cc") +
-                 '" stroke-width="2"/>';
+        out.push('<line x1="' + nodes[i].x + '" y1="' + nodes[i].y + '" x2="' + nodes[c].x +
+                 '" y2="' + nodes[c].y + '" stroke="' + (dim ? "#e6e9ed" : "#b9c2cc") + '" stroke-width="2"/>');
       }
     });
   }
-  function fill(i) {
-    if (m.moved && m.moved.indexOf(i) !== -1) return ["#fce4ec", "#c0392b"];
-    if (m.compare && m.compare.indexOf(i) !== -1) return ["#eaf2f8", "#2573a7"];
-    if (m.largest === i) return ["#f2fbf4", "#1c7e45"];
-    if (m.node === i) return ["#ede7f6", "#8e44ad"];
-    if (i >= m.heapSize) return ["#f2fbf4", "#1c7e45"];
-    return ["#ffffff", "#b9c2cc"];
+  // The sink: one red arrow per swap, parent to child.
+  var path = m.path || [];
+  for (i = 1; i < path.length; i++) {
+    var p = nodes[path[i - 1]], q = nodes[path[i]];
+    var dx = q.x - p.x, dy = q.y - p.y, len = Math.sqrt(dx * dx + dy * dy);
+    var ux = dx / len, uy = dy / len;
+    out.push('<line x1="' + (p.x + ux * (R + 3)) + '" y1="' + (p.y + uy * (R + 3)) + '" x2="' +
+             (q.x - ux * (R + 5)) + '" y2="' + (q.y - uy * (R + 5)) +
+             '" stroke="#c0392b" stroke-width="3.5" marker-end="url(#sinkArrow)"/>');
   }
-  var circles = nodes.map(function (nd) {
-    var c = fill(nd.i), out = nd.i >= m.heapSize;
-    return '<circle cx="' + nd.x + '" cy="' + nd.y + '" r="17" fill="' + c[0] + '" stroke="' +
-           c[1] + '" stroke-width="2.5"' + (out ? ' opacity="0.75"' : '') + '/>' +
-           '<text x="' + nd.x + '" y="' + (nd.y + 4) + '" text-anchor="middle" fill="#2c3e50">' +
-           a[nd.i].v + (a[nd.i].tag || "") + '</text>' +
-           '<text class="ix" x="' + nd.x + '" y="' + (nd.y + 28) + '" text-anchor="middle">' + nd.i + '</text>';
-  }).join("");
+  function look(i) {
+    if (has(m.moved, i))   return ["#fce4ec", "#c0392b", ""];
+    if (m.largest === i)   return ["#fff3e0", "#a95c19", ""];
+    if (has(m.compare, i)) return ["#eaf2f8", "#2573a7", ""];
+    if (m.node === i)      return ["#ede7f6", "#8e44ad", ""];
+    if (has(kids, i))      return ["#ffffff", "#8e44ad", ""];
+    if (i >= m.heapSize)   return ["#f2fbf4", "#1c7e45", ""];
+    if (building && i > m.parents) return ["#f7f9fb", "#8a96a3", "4 3"];
+    return ["#ffffff", "#7f8c99", ""];
+  }
+  nodes.forEach(function (nd) {
+    var c = look(nd.i);
+    out.push('<circle cx="' + nd.x + '" cy="' + nd.y + '" r="' + R + '" fill="' + c[0] + '" stroke="' + c[1] +
+             '" stroke-width="2.5"' + (c[2] ? ' stroke-dasharray="' + c[2] + '"' : '') + '/>' +
+             '<text x="' + nd.x + '" y="' + (nd.y + 5) + '" text-anchor="middle" fill="#2c3e50">' +
+             a[nd.i].v + (a[nd.i].tag || "") + '</text>' +
+             '<text class="ix" x="' + nd.x + '" y="' + (nd.y + R + 13) + '" text-anchor="middle">[' + nd.i + ']</text>');
+  });
+
+  var caption = building
+    ? 'Solid nodes are parents (0..' + m.parents + '); dashed nodes are leaves &mdash; they have no ' +
+      'children, so phase 1 never calls heapify_down on them.'
+    : m.phase === "extract"
+      ? 'Green nodes have left the heap and sit in their final sorted position. heap_size = ' + m.heapSize +
+        ': only indices 0..' + (m.heapSize - 1) + ' are still the heap.'
+      : 'Every parent is now &ge; its children. heap_size = ' + m.heapSize + '.';
   return '<svg class="tree" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="the array drawn as a binary heap">' +
-         edges + circles + '</svg>' +
-         '<p style="margin:.3rem 0 0;font-size:.74rem;color:#6e6e6e">' +
-         'Green nodes are outside the heap — already in their final sorted position. ' +
-         'heap_size = ' + m.heapSize + '.</p>';
+         '<defs><marker id="sinkArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" ' +
+         'orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/></marker></defs>' +
+         out.join("") + '</svg>' +
+         '<p class="treecap">' + caption + '<br>Purple box: the node and its children &middot; ' +
+         'orange: largest so far &middot; red arrow: the value sinking.</p>';
 }
+
+// The history strip: one row per finished heapify_down call or extraction,
+// stacked the way the old static phase diagrams were.
+function historyHtml(run, len) {
+  var out = [], phase = null;
+  var names = { start: "Start", build: "Phase 1 &middot; build the max-heap",
+                extract: "Phase 2 &middot; extract the max" };
+  run.hist.slice(0, len).forEach(function (h, i) {
+    if (h.phase !== phase) {
+      phase = h.phase;
+      out.push('<div class="hphase ' + phase + '">' + names[phase] + '</div>');
+    }
+    out.push('<div class="hrow' + (i === len - 1 ? ' now' : '') + '"><span class="hname">' + h.label +
+             '</span><div class="cells">' + miniCells(h.a, h.marks.changed, "moved", h.marks.sortedFrom) +
+             '</div></div>');
+  });
+  return '<div class="hist">' + out.join("") + '</div>' +
+         '<p class="treecap">Red cells moved during that call; green cells are in their final place. ' +
+         'The highlighted row is the last call that finished.</p>';
+}
+
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
 function boundsHtml(key, f, n) {
   var m = f.marks, out = [];
@@ -1048,17 +1268,26 @@ function lineInfoHtml(key, executing) {
 }
 
 function renderSolo() {
-  var key = state.mode, run = state.runs[key], f = FACTS[key];
-  var idx = Math.min(state.step, run.frames.length - 1);
-  var fr = run.frames[idx], last = run.frames[run.frames.length - 1];
-  var done = idx === run.frames.length - 1;
-  var extra = key === "heap" ? treeHtml(fr) : tempsHtml(fr.marks);
+  var key = state.mode, run = state.runs[key], f = FACTS[key], frames = framesFor(key);
+  var idx = Math.min(state.step, frames.length - 1);
+  var fr = frames[idx], last = run.frames[run.frames.length - 1];
+  var done = idx === frames.length - 1, heap = key === "heap", m = fr.marks;
+  var extra = heap ? treeHtml(fr) : tempsHtml(m);
+  var banner = heap && m.banner
+    ? '<div class="banner ' + m.banner.phase + '"><strong>' + m.banner.text + '</strong><span>' +
+      m.banner.sub + '</span></div>' : '';
+  var before = heap && m.before
+    ? '<div class="beforerow"><span class="rowlbl">before</span><div class="cells">' +
+      miniCells(m.before, m.beforeLit, "node", m.beforeSorted) + '</div></div>' +
+      '<div class="rowlbl" style="margin-bottom:.25rem">after</div>' : '';
 
   document.getElementById("stage").innerHTML =
     '<div class="solo"><div>' +
-      '<div class="card"><h2>' + f.title + (done ? ' <span class="done-badge">done</span>' : '') +
-        '</h2><div class="card-body">' +
-        '<div class="cells big">' + cellsHtml(fr, true) + '</div>' +
+      '<div class="card"><h2>' + f.title +
+        (heap ? ' &middot; ' + (state.heapView === "overview" ? "overview" : "detail") : '') +
+        (done ? ' <span class="done-badge">done</span>' : '') +
+        '</h2><div class="card-body">' + banner + before +
+        '<div class="cells big">' + cellsHtml(fr, true, heap) + '</div>' +
         '<div class="bounds">' + boundsHtml(key, fr, fr.a.length) + '</div>' +
         extra +
         '<p class="note">' + fr.note + '</p>' +
@@ -1077,8 +1306,8 @@ function renderSolo() {
         '</ol><div class="callout warn">' + f.watch + '</div>' +
       '</div></div>' +
       '<div class="card" style="margin-top:1rem"><h2>' +
-        (key === "heap" ? "Phases and repairs" : "Call trace") + '</h2><div class="card-body">' +
-        logTable(run, idx) + '</div></div>' +
+        (heap ? "History &mdash; one row per call" : "Call trace") + '</h2><div class="card-body">' +
+        (heap ? historyHtml(run, fr.histLen) : logTable(run, idx)) + '</div></div>' +
       '<div class="card" style="margin-top:1rem"><h2>For the record</h2><div class="card-body">' +
         '<dl class="facts"><dt>Best case</dt><dd>' + f.best + '</dd>' +
         '<dt>Average/worst</dt><dd>' + f.avg + '</dd>' +
@@ -1090,15 +1319,20 @@ function renderSolo() {
 
   var code = document.getElementById("code-solo");
   var clickable = !!LINE_INFO[key];
-  code.innerHTML = CODE[key].map(function (ln) {
+  // The live values go under the last line of the executing statement.
+  var calcAt = -1;
+  CODE[key].forEach(function (ln, i) { if (ln.k === fr.line) calcAt = i; });
+  code.innerHTML = CODE[key].map(function (ln, i) {
     var explained = clickable && LINE_INFO[key][ln.k];
     var cls = ln.c ? "cont" : "";
     return '<div data-k="' + ln.k + '"' + (cls ? ' class="' + cls + '"' : '') +
            (explained ? ' role="button" tabindex="0" title="Click for a breakdown of this line"' : '') +
-           '>' + ln.t + '</div>';
+           '>' + ln.t + '</div>' +
+           (i === calcAt && m.calc ? '<div class="calc">' + esc(m.calc) + '</div>' : '');
   }).join("");
   Array.prototype.forEach.call(code.children, function (d) {
     var k = d.getAttribute("data-k");
+    if (!k) return;   // a live-values row, not a line of code
     // Both halves of a split statement share a key, so both light up together.
     d.classList.toggle("active", k === fr.line);
     d.classList.toggle("pinned", state.pinned === k);
@@ -1149,6 +1383,9 @@ function renderCompare() {
       "the <strong>writes</strong> column — merge sort writes every element at every level.",
     dupes: "Only <strong>merge sort</strong> keeps 3a ahead of 3b. Quick sort's partition swap and " +
       "heap sort's sink both move elements across a distance, so both can reorder equals.",
+    heap7: "Seven values fill a three-level tree exactly, which is why the heap tab starts on them. " +
+      "Heap sort's comparison count barely depends on the order of the input; merge sort's writes " +
+      "stay the highest of the three.",
     random: "All three are O(n log n), but the costs differ. Merge sort pays O(n) memory for its " +
       "guarantee; heap sort gets the same guarantee for O(1) space but gives up stability; quick " +
       "sort is usually fastest in practice and risks O(n²)."
@@ -1178,15 +1415,19 @@ function render() {
   Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function (b) {
     b.classList.toggle("on", b.getAttribute("data-preset") === state.preset);
   });
+  document.getElementById("viewRow").style.display = state.mode === "heap" ? "" : "none";
+  Array.prototype.forEach.call(document.querySelectorAll("[data-view]"), function (b) {
+    b.classList.toggle("on", b.getAttribute("data-view") === state.heapView);
+  });
 }
 
 function go(n) { state.step = Math.max(0, Math.min(n, state.maxFrames - 1)); render(); }
 
 function nextEvent() {
-  var run = state.mode === "compare" ? state.runs.merge : state.runs[state.mode];
-  var here = run.frames[Math.min(state.step, run.frames.length - 1)].logLen, i;
+  var frames = state.mode === "compare" ? state.runs.merge.frames : framesFor(state.mode);
+  var here = frames[Math.min(state.step, frames.length - 1)].logLen, i;
   for (i = state.step + 1; i < state.maxFrames; i++) {
-    if (run.frames[Math.min(i, run.frames.length - 1)].logLen > here) { go(i); return; }
+    if (frames[Math.min(i, frames.length - 1)].logLen > here) { go(i); return; }
   }
   go(state.maxFrames - 1);
 }
@@ -1223,6 +1464,19 @@ function selfTest() {
         }
         if (!f.note || !f.note.trim()) fails.push(name + "/" + lane + " frame " + i + ": no note");
       });
+    });
+    // The heap overview: one step per call, ending on the same sorted array as
+    // the detail view, and every step pointing back at a real detail frame.
+    var h = heapSort(items), n = items.length, P = Math.floor(n / 2);
+    var ovEnd = h.ov[h.ov.length - 1].a.map(function (e) { return e.v; }).join(",");
+    var dtEnd = h.frames[h.frames.length - 1].a.map(function (e) { return e.v; }).join(",");
+    if (ovEnd !== dtEnd) fails.push(name + "/heap overview: ends on [" + ovEnd + "], detail on [" + dtEnd + "]");
+    if (h.ov.length !== P + n + 2) fails.push(name + "/heap overview: " + h.ov.length + " steps, expected " + (P + n + 2));
+    if (h.hist.length !== P + n) fails.push(name + "/heap history: " + h.hist.length + " rows, expected " + (P + n));
+    h.ov.forEach(function (f, i) {
+      if (keysOf.heap.indexOf(f.line) === -1) fails.push(name + "/heap overview " + i + ": unknown line '" + f.line + "'");
+      if (!f.note || !f.marks.banner) fails.push(name + "/heap overview " + i + ": no note or banner");
+      if (f.detail < 0 || f.detail >= h.frames.length) fails.push(name + "/heap overview " + i + ": bad detail index");
     });
   });
   // The counts the Canvas page quotes, measured from the real C++ in the
@@ -1263,12 +1517,24 @@ function selfTest() {
     el.className = "selftest pass";
     el.textContent = "Self-check passed: " + runs + " runs across " + Object.keys(PRESETS).length +
       " inputs — every result sorted, merge sort stable, every step highlights a real line and " +
-      "carries an explanation, and all six comparison counts match the C++ measured in the container.";
+      "carries an explanation, the heap overview agrees with the detail view, and all six comparison " +
+      "counts match the C++ measured in the container.";
   }
 }
 
 Array.prototype.forEach.call(document.querySelectorAll("#tabs [data-mode]"), function (b) {
-  b.addEventListener("click", function () { state.mode = b.getAttribute("data-mode"); reset(); });
+  b.addEventListener("click", function () {
+    var mode = b.getAttribute("data-mode");
+    // Arriving on the heap tab starts zoomed out, on the input that fills the tree.
+    if (mode === "heap" && state.mode !== "heap") {
+      state.heapView = "overview";
+      if (state.preset === "random") state.preset = "heap7";
+    }
+    state.mode = mode; reset();
+  });
+});
+Array.prototype.forEach.call(document.querySelectorAll("[data-view]"), function (b) {
+  b.addEventListener("click", function () { setView(b.getAttribute("data-view")); });
 });
 Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function (b) {
   b.addEventListener("click", function () { state.preset = b.getAttribute("data-preset"); reset(); });
