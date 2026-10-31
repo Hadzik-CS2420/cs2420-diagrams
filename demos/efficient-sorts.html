@@ -187,6 +187,29 @@
   td.no  { color:var(--red);   font-weight:600; }
   .mono { font-family:Consolas,monospace; }
 
+  /* Both phases visible at once, so "there is a phase 2" needs no reading. */
+  .phrail { display:flex; align-items:stretch; gap:.4rem; margin:0 0 .6rem; }
+  .phrail .ph { flex:1 1 0; min-width:0; border:1px solid var(--rule); border-radius:8px;
+                padding:.35rem .6rem; font-size:.78rem; background:#f7f9fb;
+                color:var(--muted); display:flex; align-items:center; gap:.4rem; }
+  .phrail .ph b { font-size:.74rem; width:1.15rem; height:1.15rem; flex:0 0 auto;
+                  border-radius:50%; background:var(--rule); color:#fff;
+                  display:flex; align-items:center; justify-content:center; }
+  .phrail .ph.on   { background:var(--tint-blue); border-color:var(--blue);
+                     color:var(--blue); font-weight:650; }
+  .phrail .ph.on b { background:var(--blue); }
+  .phrail .ph.done { background:var(--tint-green); border-color:rgba(28,126,69,.35);
+                     color:var(--green); }
+  .phrail .ph.done b { background:var(--green); }
+
+  /* A bare number with no account of itself is a thing to memorise, not learn. */
+  .bounds .gloss { color:var(--muted); font-weight:400; }
+
+  /* Said once, above the listing, instead of left to be inferred. */
+  .codenote { font-size:.78rem; color:var(--muted); margin:0 0 .5rem;
+              border-left:3px solid var(--rule); padding:.15rem 0 .15rem .55rem; }
+  .codenote b { color:var(--ink); }
+
   /* The fact first and loud, the explanation second and quiet. As a <dl> of
      plain text the answer carried no more weight than the clause about it. */
   .facts { display:flex; flex-direction:column; gap:.45rem; }
@@ -1301,13 +1324,32 @@ function historyHtml(run, len) {
 
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
+// Phase 1 and phase 2 side by side, current one lit. `built` is the beat
+// between them, where phase 1 is finished and phase 2 has not started.
+function phaseRail(m) {
+  if (!m.phase) return "";
+  var at = m.phase === "build" ? 0 : (m.phase === "built" ? 0.5 : 1);
+  function cls(i) { return at > i ? " done" : (at === i ? " on" : ""); }
+  return '<div class="phrail">' +
+    '<div class="ph' + (at === 0 ? " on" : " done") + '"><b>1</b>Build the max-heap</div>' +
+    '<div class="ph' + (at === 1 ? " on" : "") + '"><b>2</b>Sort by extracting the root</div>' +
+    '</div>';
+}
+
 function boundsHtml(key, f, n) {
   var m = f.marks, out = [];
   if (m.range) out.push('range <code>' + m.range[0] + '..' + m.range[1] + '</code>');
   if (m.depth !== undefined) out.push('depth <code>' + m.depth + '</code>');
   if (m.pivot !== undefined) out.push('pivot <code>data[' + m.pivot + ']</code>');
   if (m.bound !== undefined) out.push('<code>i = ' + m.bound + '</code>');
-  if (m.heapSize !== undefined) out.push('<code>heap_size = ' + m.heapSize + '</code>');
+  if (m.heapSize !== undefined) {
+    // heap_size means two different things across the run, so say which.
+    var g = m.phase === "extract" || m.phase === "built"
+      ? "how much is still a heap &mdash; shrinks by one each swap"
+      : "the whole array, until phase 2 starts shrinking it";
+    out.push('<code>heap_size = ' + m.heapSize + '</code> ' +
+             '<span class="gloss">' + g + '</span>');
+  }
   if (m.phase) out.push('phase <code>' + m.phase + '</code>');
   return out.map(function (x) { return "<span>" + x + "</span>"; }).join("");
 }
@@ -1400,7 +1442,7 @@ function renderSolo() {
       '<div class="card"><h2>' + f.title +
         (heap ? ' &middot; ' + (state.heapView === "overview" ? "overview" : "detail") : '') +
         (done ? ' <span class="done-badge">done</span>' : '') +
-        '</h2><div class="card-body">' + banner + before +
+        '</h2><div class="card-body">' + (heap ? phaseRail(m) : '') + banner + before +
         '<div class="cells big">' + cellsHtml(fr, true, heap) + '</div>' +
         '<div class="bounds">' + boundsHtml(key, fr, fr.a.length) + '</div>' +
         extra +
@@ -1415,6 +1457,16 @@ function renderSolo() {
 
       '<div class="col">' +
       '<div class="card"><h2>The code</h2><div class="card-body">' +
+        (heap ? '<p class="codenote"><b>heapify_down is listed first</b> because C++ has to ' +
+                'see it before heap_sort can call it &mdash; heap_sort is still the entry ' +
+                'point.' +
+                (state.heapView === "overview"
+                  ? ' In <b>overview</b> the highlighted line is the <b>call</b>; the ' +
+                    'comparisons and the swap happen inside heapify_down above. Switch to ' +
+                    'Detail to step through them.'
+                  : ' In <b>detail</b> you are stepping inside heapify_down, one comparison ' +
+                    'at a time.') +
+                '</p>' : '') +
         '<div class="code" id="code-solo"></div>' +
           lineInfoHtml(key, fr.line) +
         '</div></div>' +
