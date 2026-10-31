@@ -58,7 +58,11 @@
      to any width, while the code cannot reflow. Give the code the room. */
   .solo { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr);
           gap:1.1rem; align-items:start; }
-  .solo > .span { grid-column:1 / -1; }
+  /* Two independent column flows, NOT a grid of four cells. In a flat grid the
+     second row aligns to the taller card above it, so pinning a line of code
+     grew the code card and slid History down the page. Each column now stacks
+     on its own and the left side never moves. */
+  .solo > .col { display:flex; flex-direction:column; gap:1.1rem; min-width:0; }
   @media (max-width:1000px) { .solo { grid-template-columns:minmax(0,1fr); } }
 
   /* ---- How it works, as a banner across the top ---- */
@@ -183,9 +187,20 @@
   td.no  { color:var(--red);   font-weight:600; }
   .mono { font-family:Consolas,monospace; }
 
-  .facts { font-size:.8rem; }
-  .facts dt { font-weight:600; float:left; width:7.5rem; clear:left; color:var(--muted); }
-  .facts dd { margin:0 0 .3rem 7.5rem; }
+  /* The fact first and loud, the explanation second and quiet. As a <dl> of
+     plain text the answer carried no more weight than the clause about it. */
+  .facts { display:flex; flex-direction:column; gap:.45rem; }
+  .fact { display:flex; align-items:baseline; gap:.5rem; flex-wrap:wrap; }
+  .fact .fl { flex:0 0 6.8rem; font-size:.78rem; font-weight:600; color:var(--muted); }
+  .fact .fv { font-family:Consolas,monospace; font-size:.84rem; font-weight:700;
+              padding:.12rem .5rem; border-radius:999px; white-space:nowrap;
+              background:var(--tint-blue); color:var(--blue);
+              border:1px solid rgba(37,115,167,.25); }
+  .fact .fv.good { background:var(--tint-green); color:var(--green);
+                   border-color:rgba(28,126,69,.3); }
+  .fact .fv.bad  { background:var(--tint-red);   color:var(--red);
+                   border-color:rgba(192,57,43,.3); }
+  .fact .fn { font-size:.78rem; color:var(--muted); flex:1 1 9rem; min-width:0; }
 
   .callout { font-size:.82rem; padding:.6rem .8rem; border-radius:6px; margin-top:.7rem;
              background:var(--tint-purple); border:1px solid #d1c4e9; color:var(--deep); }
@@ -398,9 +413,9 @@ var FACTS = {
               b: ["on a tie, <code>&lt;=</code> takes from the <em>left</em> half",
                   "left came first in the original array",
                   "that one character is what makes merge sort stable"] }],
-    best: "O(n log n) — no best case, it always splits the same way",
-    avg: "O(n log n) guaranteed", space: "O(n) — the temporary halves",
-    stable: "Yes — <code>&lt;=</code> takes from the left on a tie",
+    best: { v: "O(n log n)", n: "no best case &mdash; it always splits the same way" },
+    avg: { v: "O(n log n)", n: "guaranteed, on every input" }, space: { v: "O(n)", n: "the temporary halves" },
+    stable: { v: "Yes", n: "<code>&lt;=</code> takes from the left on a tie" },
     watch: "<strong>Forgetting step 3</strong> is the classic bug: the array comes out partly sorted with stale values at the tail. Watch the L and R rows empty at different times."
   },
   quick: {
@@ -423,9 +438,9 @@ var FACTS = {
               b: ["<code>low..p-1</code> and <code>p+1..high</code>",
                   "the pivot itself is in neither call",
                   "nothing merges afterwards &mdash; that is the difference from merge sort"] }],
-    best: "O(n log n) — pivot near the middle",
-    avg: "O(n log n), worst O(n²)", space: "O(1) extra, O(log n) stack",
-    stable: "No — the partition swap moves elements across a distance",
+    best: { v: "O(n log n)", n: "pivot lands near the middle" },
+    avg: { v: "O(n log n)", n: "worst case O(n&sup2;)" }, space: { v: "O(1)", n: "plus O(log n) of call stack" },
+    stable: { v: "No", n: "the partition swap moves elements a long way" },
     watch: "<strong>The starter returns <code>low</code></strong> as a placeholder. Write the scan but forget to return <code>i+1</code> and the range never shrinks: it runs forever. Also note median-of-three is why sorted input is <em>not</em> the worst case here."
   },
   heap: {
@@ -449,9 +464,9 @@ var FACTS = {
                   "<strong>sort:</strong> swap <code>data[0]</code> to the last unsorted slot",
                   "shrink the heap by one, sink the new root",
                   "the parked element was the biggest left, so it never moves again"] }],
-    best: "O(n log n) — no best case either",
-    avg: "O(n log n) guaranteed", space: "O(1) — the heap IS the array",
-    stable: "No — a sink can reorder equals",
+    best: { v: "O(n log n)", n: "no best case either" },
+    avg: { v: "O(n log n)", n: "guaranteed, on every input" }, space: { v: "O(1)", n: "the heap IS the array" },
+    stable: { v: "No", n: "a sink can reorder equals" },
     watch: "<strong>Pass <code>i</code>, not <code>n</code></strong>, as <code>heap_size</code> in phase 2. Passing <code>n</code> drags the already-sorted tail back into the heap. And check <code>left &lt; heap_size</code> <em>before</em> reading <code>data[left]</code> — <code>&amp;&amp;</code> short-circuits, which is what makes it safe."
   }
 };
@@ -1337,6 +1352,15 @@ function lineInfoHtml(key, executing) {
     '</p></div>';
 }
 
+// One fact: the answer as a pill, the reason beside it in muted text. Stable
+// is the only one worth colouring, because it is the only yes/no.
+function factRow(label, fact) {
+  var tone = /^Yes/.test(fact.v) ? " good" : (/^No/.test(fact.v) ? " bad" : "");
+  return '<div class="fact"><span class="fl">' + label + '</span>' +
+         '<span class="fv' + tone + '">' + fact.v + '</span>' +
+         (fact.n ? '<span class="fn">' + fact.n + '</span>' : '') + '</div>';
+}
+
 function renderSolo() {
   var key = state.mode, run = state.runs[key], f = FACTS[key], frames = framesFor(key);
   var idx = Math.min(state.step, frames.length - 1);
@@ -1369,8 +1393,10 @@ function renderSolo() {
 
     document.getElementById("stage").innerHTML =
     '<div class="solo">' +
-      // Left: the data and the tree. Right: the code acting on it. Same row, so
-      // the executing line and the node it moves are visible at once.
+      // Left column: the data, then History under it. Right column: the code,
+      // then For the record. Separate flows, so growing the code never shifts
+      // anything on the left.
+      '<div class="col">' +
       '<div class="card"><h2>' + f.title +
         (heap ? ' &middot; ' + (state.heapView === "overview" ? "overview" : "detail") : '') +
         (done ? ' <span class="done-badge">done</span>' : '') +
@@ -1382,21 +1408,27 @@ function renderSolo() {
         '<div class="stats"><span>compares <b>' + fr.comparisons + '</b></span>' +
           '<span>writes <b>' + fr.writes + '</b></span></div>' +
       '</div></div>' +
+      '<div class="card"><h2>' +
+        (heap ? "History &mdash; one row per call" : "Call trace") + '</h2><div class="card-body">' +
+        (heap ? historyHtml(run, fr.histLen) : logTable(run, idx)) + '</div></div>' +
+      '</div>' +
+
+      '<div class="col">' +
       '<div class="card"><h2>The code</h2><div class="card-body">' +
         '<div class="code" id="code-solo"></div>' +
           lineInfoHtml(key, fr.line) +
         '</div></div>' +
-
-      '<div class="card"><h2>' +
-        (heap ? "History &mdash; one row per call" : "Call trace") + '</h2><div class="card-body">' +
-        (heap ? historyHtml(run, fr.histLen) : logTable(run, idx)) + '</div></div>' +
       '<div class="card"><h2>For the record</h2><div class="card-body">' +
-        '<dl class="facts"><dt>Best case</dt><dd>' + f.best + '</dd>' +
-        '<dt>Average/worst</dt><dd>' + f.avg + '</dd>' +
-        '<dt>Extra space</dt><dd>' + f.space + '</dd>' +
-        '<dt>Stable</dt><dd>' + f.stable + '</dd>' +
-        '<dt>This run</dt><dd>' + last.comparisons + ' comparisons, ' + last.writes + ' writes</dd>' +
-        '</dl></div></div>' +
+        '<div class="facts">' +
+          factRow("Best case", f.best) +
+          factRow("Average/worst", f.avg) +
+          factRow("Extra space", f.space) +
+          factRow("Stable", f.stable) +
+          '<div class="fact"><span class="fl">This run</span>' +
+            '<span class="fv">' + last.comparisons + ' compares</span>' +
+            '<span class="fv">' + last.writes + ' writes</span></div>' +
+        '</div></div></div>' +
+      '</div>' +
     '</div>';
 
   var code = document.getElementById("code-solo");
@@ -1458,7 +1490,7 @@ function renderCompare() {
     var v = !dupes ? '<td style="color:#6e6e6e">no equal values to reorder</td>'
                    : (isStable(run) ? '<td class="yes">yes &#x2714;</td>' : '<td class="no">NO &#x2716;</td>');
     return '<tr><td>' + l.title + '</td><td class="num">' + last.comparisons + '</td><td class="num">' +
-           last.writes + '</td>' + v + '<td>' + FACTS[l.key].space + '</td></tr>';
+           last.writes + '</td>' + v + '<td>' + FACTS[l.key].space.v + '</td></tr>';
   }).join("");
 
   var hints = {
