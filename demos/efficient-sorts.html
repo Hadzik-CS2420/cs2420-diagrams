@@ -1126,10 +1126,21 @@ function heapSort(items) {
          { heapSize: n, phase: 'build', parents: lastParent, node: i,
            calc: "i = " + i + "   →   heapify_down(data, heap_size = " + n +
                  ", index = " + i + ")" });
+    // Beat 1: standing in the loop, about to call. Nothing has moved, and the
+    // note says so -- this is the frame that used to show a finished swap.
+    ov('bloop', "The loop is at i = " + i + ", so it calls heapify_down(data, heap_size = " + n +
+       ", index = " + i + "). <strong>Nothing has moved yet.</strong> The for loop does not " +
+       "compare or swap anything itself &mdash; all of that happens inside the call. Step " +
+       "forward to go into it.",
+       { heapSize: n, phase: 'build', parents: lastParent, node: i,
+         calc: "i = " + i + "   \u2192   heapify_down(data, heap_size = " + n +
+               ", index = " + i + ")" });
+
     heapify(n, i, 'build', 0);
     hist('heapify(' + i + ')', 'build', { changed: pathOf() });
-    ov('bloop', "Fix node " + i + " (" + top + "), whose children are " + kidsV.join(" and ") + ". " +
-       sinkText(top),
+    // Beat 2: inside the helper, which is where the comparing and swapping live.
+    ov('hsig', "Inside heapify_down(data, " + n + ", " + i + "): node " + i + " is " + top +
+       ", its children are " + kidsV.join(" and ") + ". " + sinkText(top),
        { heapSize: n, phase: 'build', parents: lastParent, node: i, before: before,
          beforeLit: pathOf().length ? pathOf() : [i], path: pathOf(), moved: pathOf(),
          calc: "i = " + i + "   →   heapify_down(data, heap_size = " + n +
@@ -1160,10 +1171,21 @@ function heapSort(items) {
          { heapSize: e, phase: 'extract', node: 0, sortedFrom: e,
            calc: "heapify_down(data, " + e + ", 0)   —   the heap is 0.." + (e - 1) + ", index " + e +
                  " is off-limits" });
+    // Beat 1: the swap and the shrink, which the LOOP really does do itself.
+    ov('eloop', "The loop swaps data[0] = " + mx + " with data[" + e + "] &mdash; " + mx +
+       " is now in its final spot (green) and heap_size drops to " + e + ". " + root +
+       " is sitting on the root where it almost certainly does not belong, so the loop " +
+       "<strong>then calls</strong> heapify_down(data, heap_size = " + e + ", index = 0).",
+       { heapSize: e, phase: 'extract', sortedFrom: e, node: 0, before: before,
+         beforeLit: [0, e], beforeSorted: e + 1, moved: [0, e],
+         calc: "i = " + e + "   \u2192   swap data[0] \u2194 data[" + e +
+               "],  then heapify_down(data, heap_size = " + e + ", index = 0)" });
+
     heapify(e, 0, 'extract', 0);
     hist('place ' + mx, 'extract', { changed: pathOf(), sortedFrom: e });
-    ov('eloop', "Swap the max, " + mx + ", out to index " + e + " &mdash; its final spot (green). " + root +
-       " lands on the root. " + sinkText(root) + " heap_size is now " + e + ".",
+    // Beat 2: the repair, inside the helper.
+    ov('hsig', "Inside heapify_down(data, " + e + ", 0): " + sinkText(root) +
+       " Index " + e + " is outside the heap now, so " + mx + " cannot be pulled back in.",
        { heapSize: e, phase: 'extract', sortedFrom: e, node: 0, before: before, beforeLit: [0, e],
          beforeSorted: e + 1, path: pathOf(), moved: pathOf(),
          calc: "i = " + e + "   →   swap data[0] ↔ data[" + e + "],  heapify_down(data, heap_size = " + e + ", index = 0)" });
@@ -1614,8 +1636,9 @@ function renderSolo() {
   }).join("");
   // heapify_down's body, for the overview band below.
   var HELPER = ["hsig", "init", "cmpL", "cmpR", "sink", "rec", "hend"];
-  var calling = key === "heap" && state.heapView === "overview" &&
-                (fr.line === "bloop" || fr.line === "eloop");
+  // Band the helper on the beat where it RAN. On the call beat it has not run
+  // yet, and banding it there would say the opposite of the truth.
+  var calling = key === "heap" && state.heapView === "overview" && fr.line === "hsig";
 
   Array.prototype.forEach.call(code.children, function (d) {
     var k = d.getAttribute("data-k");
@@ -1773,7 +1796,10 @@ function selfTest() {
     var ovEnd = h.ov[h.ov.length - 1].a.map(function (e) { return e.v; }).join(",");
     var dtEnd = h.frames[h.frames.length - 1].a.map(function (e) { return e.v; }).join(",");
     if (ovEnd !== dtEnd) fails.push(name + "/heap overview: ends on [" + ovEnd + "], detail on [" + dtEnd + "]");
-    if (h.ov.length !== P + n + 2) fails.push(name + "/heap overview: " + h.ov.length + " steps, expected " + (P + n + 2));
+    // Each call is two overview beats now -- in the loop, then in the helper --
+    // so: 1 intro + 2P build + 1 built + 2(n-1) extract + 1 done = 2P + 2n + 1.
+    var wantOv = 2 * P + 2 * n + 1;
+    if (h.ov.length !== wantOv) fails.push(name + "/heap overview: " + h.ov.length + " steps, expected " + wantOv);
     if (h.hist.length !== P + n) fails.push(name + "/heap history: " + h.hist.length + " rows, expected " + (P + n));
     h.ov.forEach(function (f, i) {
       if (keysOf.heap.indexOf(f.line) === -1) fails.push(name + "/heap overview " + i + ": unknown line '" + f.line + "'");
