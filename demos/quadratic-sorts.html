@@ -129,24 +129,27 @@
   .code div:focus-visible { outline:2px solid #89dceb; outline-offset:-2px; }
 
   /* ---- per-line breakdown ---- */
-  .lineinfo { border-top:1px solid var(--rule); margin-top:.7rem; padding-top:.7rem; font-size:.82rem; }
+  .lineinfo { border-top:1px solid var(--rule); margin-top:.7rem; padding-top:.7rem; font-size:.93rem; }
   .lineinfo .li-head { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:.45rem; }
   .lineinfo .li-src-wrap { overflow-x:auto; max-width:100%; }
-  .lineinfo code.li-src { font-family:Consolas,monospace; font-size:.95rem;
+  .lineinfo code.li-src { font-family:Consolas,monospace; font-size:1rem;
     background:#1e1e2e; color:#cdd6f4; padding:.2em .5em; border-radius:4px; white-space:pre; }
-  .lineinfo .li-tag { font-size:.65rem; font-weight:600; text-transform:uppercase;
+  .lineinfo .li-tag { font-size:.72rem; font-weight:600; text-transform:uppercase;
     letter-spacing:.04em; padding:.1rem .4rem; border-radius:4px; background:#eef2f6; color:var(--muted); }
   .lineinfo .li-tag.pin { background:#fff8e1; color:#8a6d3b; }
   .lineinfo .li-what { margin:.35rem 0 .5rem; }
   .lineinfo ul.li-items { margin:0; padding-left:1.1rem; }
-  .lineinfo ul.li-items li { margin-bottom:.34rem; }
+  .lineinfo ul.li-items li { margin-bottom:.38rem; line-height:1.5; }
   .lineinfo code { font-family:Consolas,monospace; font-size:.95em; }
-  .lineinfo .li-kind { font-size:.64rem; font-weight:600; text-transform:uppercase;
+  .lineinfo .li-kind { font-size:.72rem; font-weight:600; text-transform:uppercase;
     letter-spacing:.03em; padding:.05rem .32rem; border-radius:3px; margin-right:.35rem; }
-  .li-kind.syntax { background:var(--tint-blue);   color:var(--blue); }
-  .li-kind.idiom  { background:var(--tint-green);  color:var(--green); }
-  .li-kind.trap   { background:var(--tint-red);    color:var(--red); }
-  .li-kind.why    { background:var(--tint-purple); color:var(--deep); }
+  /* Prefixed, because these steppers already use a bare .note class for the
+     frame commentary and it carries min-height:3.6rem. An unprefixed pill
+     would match it and stand 3.6rem tall. */
+  .li-kind.k-syntax { background:var(--tint-blue);   color:var(--blue); }
+  .li-kind.k-note   { background:var(--tint-green);  color:var(--green); }
+  .li-kind.k-trap   { background:var(--tint-red);    color:var(--red); }
+  .li-kind.k-why    { background:var(--tint-purple); color:var(--deep); }
   .lineinfo button.li-clear { font:inherit; font-size:.73rem; padding:.15rem .5rem;
     margin-left:auto; border:1px solid var(--rule); border-radius:5px; background:#fff;
     color:var(--muted); cursor:pointer; }
@@ -367,7 +370,7 @@ var FACTS = {
 // nothing pinned the box follows the line that is executing, so stepping
 // gives a running commentary.
 //
-// kind: syntax = what the C++ actually means | idiom = why it is written so
+// kind: syntax = what the C++ actually means | note = worth noticing
 //       trap   = the mistake this line invites | why = the design reason
 // ---------------------------------------------------------------------------
 var LINE_INFO = {
@@ -383,13 +386,13 @@ var LINE_INFO = {
       what: "Caches how many elements there are, so the loop bounds can be written in terms of n.",
       items: [
         ["trap", "<code>size()</code> returns <code>size_t</code>, which is <strong>unsigned</strong>. Keeping it in an <code>int</code> is deliberate: the loop below computes <code>n-1</code>, and on an empty vector an unsigned <code>0-1</code> wraps round to a gigantic number instead of going negative."],
-        ["idiom", "Reading the size once is clearer than calling <code>data.size()</code> in every condition, even though the compiler usually hoists it anyway."]
+        ["note", "Reading the size once is clearer than calling <code>data.size()</code> in every condition, even though the compiler usually hoists it anyway."]
       ] },
     outer: { src: "for (int i = 0; i < n-1; ++i)",
       what: "One iteration per pass. After pass i finishes, the last i+1 elements are in their final places.",
       items: [
         ["why", "<code>i &lt; n-1</code>, not <code>i &lt; n</code>. After n-1 passes the one element left over must already be correct by elimination, so a final pass would be wasted work."],
-        ["idiom", "<code>++i</code> rather than <code>i++</code>. Identical for an <code>int</code>, but the habit matters for iterators, where post-increment has to copy the old value before advancing."],
+        ["note", "<code>++i</code> rather than <code>i++</code>. Identical for an <code>int</code>, but the habit matters for iterators, where post-increment has to copy the old value before advancing."],
         ["syntax", "<code>i</code> is scoped to the loop &mdash; it does not exist after the closing brace."]
       ] },
     flag: { src: "bool swapped = false;",
@@ -403,19 +406,19 @@ var LINE_INFO = {
       items: [
         ["why", "The <code>-1</code> is there because the body reads <code>data[j+1]</code>. Without it the last iteration reads one past the end &mdash; undefined behaviour, which may or may not crash."],
         ["why", "The <code>-i</code> skips the settled tail. Leave it off and the sort is still <em>correct</em>, just slower: it keeps re-comparing elements that are already final."],
-        ["idiom", "This shrinking bound is why bubble sort does about n&sup2;/2 comparisons rather than n&sup2;."]
+        ["note", "This shrinking bound is why bubble sort does about n&sup2;/2 comparisons rather than n&sup2;."]
       ] },
     cmp: { src: "if (data[j] > data[j+1])",
       what: "Asks whether this adjacent pair is out of order.",
       items: [
-        ["idiom", "This comparison is the work bubble sort is measured by. On already-sorted input it is false every time, nothing swaps, and the early exit stops the sort after one pass &mdash; n&minus;1 comparisons, the O(n) best case. Press <em>already sorted</em> and watch the counter."],
+        ["note", "This comparison is the work bubble sort is measured by. On already-sorted input it is false every time, nothing swaps, and the early exit stops the sort after one pass &mdash; n&minus;1 comparisons, the O(n) best case. Press <em>already sorted</em> and watch the counter."],
         ["why", "Strictly <code>&gt;</code>, never <code>&gt;=</code>. With <code>&gt;=</code> equal neighbours would swap &mdash; pointless writes, and it would destroy stability."],
         ["syntax", "<code>data[j+1]</code> is the reason the loop bound carries its <code>-1</code>."]
       ] },
     swap: { src: "swap(data[j], data[j+1]);",
       what: "Exchanges the two neighbours, moving the larger one one step to the right.",
       items: [
-        ["idiom", "<code>std::swap</code> from <code>&lt;algorithm&gt;</code>. It handles the temporary for you; hand-rolling <code>tmp = a; a = b; b = tmp;</code> is the same thing with more places to get it wrong."],
+        ["note", "<code>std::swap</code> from <code>&lt;algorithm&gt;</code>. It handles the temporary for you; hand-rolling <code>tmp = a; a = b; b = tmp;</code> is the same thing with more places to get it wrong."],
         ["why", "Bubble sort only ever swaps <strong>adjacent</strong> elements. That single fact is why it is stable: two equal values can never jump over each other."]
       ] },
     set: { src: "swapped = true;",
@@ -471,7 +474,7 @@ var LINE_INFO = {
       what: "Saves the value being inserted, before anything moves.",
       items: [
         ["trap", "This copy must happen <strong>first</strong>. The shifting below writes into <code>data[shift_pos+1]</code>, and on the very first shift that slot <em>is</em> <code>data[i]</code>. Skip the save and the value you are trying to place is overwritten by its own neighbour, so it appears twice and something else vanishes."],
-        ["idiom", "Hold the value, not the index. The index <code>i</code> stops meaning anything useful the moment elements start sliding."]
+        ["note", "Hold the value, not the index. The index <code>i</code> stops meaning anything useful the moment elements start sliding."]
       ] },
     pos: { src: "int shift_pos = i - 1;",
       what: "Starts a walk leftward from the last element of the sorted region.",
@@ -494,7 +497,7 @@ var LINE_INFO = {
     shift: { src: "data[shift_pos+1] = data[shift_pos];",
       what: "Copies one element one place to the right, opening a gap for the key.",
       items: [
-        ["idiom", "This is a <strong>copy, not a swap</strong>. A swap would be two writes; this is one. Over a whole sort that is why insertion sort usually does fewer writes than bubble sort, which swaps for every out-of-order pair."],
+        ["note", "This is a <strong>copy, not a swap</strong>. A swap would be two writes; this is one. Over a whole sort that is why insertion sort usually does fewer writes than bubble sort, which swaps for every out-of-order pair."],
         ["why", "Nothing is lost by overwriting <code>data[shift_pos+1]</code>: either it is the slot the key came from (and the key is safe in its own variable) or it is a value that was already copied rightwards on the previous iteration."],
         ["syntax", "The gap is not a real hole in memory &mdash; the old value is still sitting there. It is only a gap in the sense that nothing we still need lives in it."]
       ] },
@@ -515,7 +518,7 @@ var LINE_INFO = {
       items: [
         ["why", "The <code>+1</code> is there because the loop always steps one too far before it stops. If it ended because <code>shift_pos</code> hit <code>-1</code>, this writes to <code>data[0]</code> &mdash; the front, which is correct."],
         ["trap", "Writing to <code>data[shift_pos]</code> instead loses the key and duplicates a neighbour. If your output has one value twice and another missing, this is the line."],
-        ["idiom", "One write per pass, no matter how far the key travelled."]
+        ["note", "One write per pass, no matter how far the key travelled."]
       ] },
     end: { src: "}   // closes the function",
       what: "Done. Nothing is returned; the caller&rsquo;s vector has been reordered in place.",
@@ -534,7 +537,7 @@ var LINE_INFO = {
       what: "Caches the element count for the loop bounds.",
       items: [
         ["trap", "<code>size()</code> is unsigned; kept in an <code>int</code> so <code>n-1</code> on an empty vector goes to -1 and the loop simply does not run, rather than wrapping to a huge number."],
-        ["idiom", "No index here ever needs to go negative, unlike insertion sort &mdash; but the same habit avoids the same trap."]
+        ["note", "No index here ever needs to go negative, unlike insertion sort &mdash; but the same habit avoids the same trap."]
       ] },
     outer: { src: "for (int i = 0; i < n-1; ++i)",
       what: "One pass per position, filling the sorted region from the front.",
@@ -545,7 +548,7 @@ var LINE_INFO = {
     min: { src: "int min_idx = i;",
       what: "Assumes the first unsorted element is the smallest, until the scan proves otherwise.",
       items: [
-        ["idiom", "Track the <strong>index</strong>, not the value. You need to know <em>where</em> the minimum is in order to swap it; a saved value tells you nothing about where it came from."],
+        ["note", "Track the <strong>index</strong>, not the value. You need to know <em>where</em> the minimum is in order to swap it; a saved value tells you nothing about where it came from."],
         ["trap", "Writing <code>int min_val = data[i];</code> instead is the classic wrong turn. It compiles, it finds the right minimum, and then there is no way to put it anywhere."],
         ["why", "Starting at <code>i</code> rather than 0 is what confines the search to the unsorted region."]
       ] },
@@ -554,7 +557,7 @@ var LINE_INFO = {
       items: [
         ["why", "Starts at <code>i+1</code> &mdash; comparing <code>data[i]</code> with itself would be wasted work, and it is already the assumed minimum."],
         ["why", "Goes to <code>n</code> <strong>every single pass</strong>. There is no <code>-i</code> here and no early exit anywhere in this function. That is the whole reason selection sort has no O(n) best case: feed it a sorted array and it still performs all n(n-1)/2 comparisons."],
-        ["idiom", "Compare this bound with bubble sort&rsquo;s <code>n-1-i</code>, which shrinks. Here the scanned region shrinks from the <em>front</em> as <code>i</code> advances, but it always runs to the end."]
+        ["note", "Compare this bound with bubble sort&rsquo;s <code>n-1-i</code>, which shrinks. Here the scanned region shrinks from the <em>front</em> as <code>i</code> advances, but it always runs to the end."]
       ] },
     cmp: { src: "if (data[j] < data[min_idx])",
       what: "Asks whether this element beats the current best.",
@@ -566,7 +569,7 @@ var LINE_INFO = {
     newmin: { src: "min_idx = j;",
       what: "Remembers the new best position. No array data is touched.",
       items: [
-        ["idiom", "The entire scan moves nothing but this one integer. That is why selection sort does so few writes &mdash; all the work is reading."],
+        ["note", "The entire scan moves nothing but this one integer. That is why selection sort does so few writes &mdash; all the work is reading."],
         ["why", "Because only the index changes, the comparison on the line above stays correct without any bookkeeping."]
       ] },
     close: { src: "}   // closes the inner for",
@@ -578,7 +581,7 @@ var LINE_INFO = {
     check: { src: "if (min_idx != i)",
       what: "Skips the swap when the minimum is already in the right place.",
       items: [
-        ["idiom", "Swapping an element with itself is harmless, so this guard is an optimisation rather than a correctness fix."],
+        ["note", "Swapping an element with itself is harmless, so this guard is an optimisation rather than a correctness fix."],
         ["why", "It keeps the write count honest. On already-sorted input this condition is false every pass, so selection sort does <strong>zero</strong> writes &mdash; while still doing every comparison. Step the sorted input and watch exactly that."]
       ] },
     swap: { src: "swap(data[i], data[min_idx]);",
@@ -839,9 +842,10 @@ function lineInfoHtml(key, executing) {
     '</div>' +
     '<p class="li-what">' + e.what + '</p>' +
     '<ul class="li-items">' + e.items.map(function (it) {
-      return '<li><span class="li-kind ' + it[0] + '">' + it[0] + '</span>' + it[1] + '</li>';
+      return '<li><span class="li-kind k-' + it[0] + '">' + it[0] + '</span>' +
+             it[1] + '</li>';
     }).join("") + '</ul>' +
-    '<p style="margin:.55rem 0 0;font-size:.74rem;color:#6e6e6e">' +
+    '<p style="margin:.55rem 0 0;font-size:.8rem;color:#6e6e6e">' +
       (pinned ? 'Showing the line you clicked. Unpin to follow execution again.'
               : 'Click any line above to pin its breakdown while you step.') +
     '</p></div>';
@@ -1066,7 +1070,7 @@ function selfTest() {
           failures.push(k + "/" + ln.k + ": breakdown incomplete");
         } else {
           e.items.forEach(function (it) {
-            if (["syntax", "idiom", "trap", "why"].indexOf(it[0]) === -1) {
+            if (["syntax", "note", "trap", "why"].indexOf(it[0]) === -1) {
               failures.push(k + "/" + ln.k + ": unknown kind '" + it[0] + "'");
             }
           });

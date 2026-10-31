@@ -141,24 +141,27 @@
   .code div:focus-visible { outline:2px solid #89dceb; outline-offset:-2px; }
 
   /* ---- per-line breakdown ---- */
-  .lineinfo { border-top:1px solid var(--rule); margin-top:.7rem; padding-top:.7rem; font-size:.82rem; }
+  .lineinfo { border-top:1px solid var(--rule); margin-top:.7rem; padding-top:.7rem; font-size:.93rem; }
   .lineinfo .li-head { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:.45rem; }
   .lineinfo .li-src-wrap { overflow-x:auto; max-width:100%; }
-  .lineinfo code.li-src { font-family:Consolas,monospace; font-size:.95rem;
+  .lineinfo code.li-src { font-family:Consolas,monospace; font-size:1rem;
     background:#1e1e2e; color:#cdd6f4; padding:.2em .5em; border-radius:4px; white-space:pre; }
-  .lineinfo .li-tag { font-size:.65rem; font-weight:600; text-transform:uppercase;
+  .lineinfo .li-tag { font-size:.72rem; font-weight:600; text-transform:uppercase;
     letter-spacing:.04em; padding:.1rem .4rem; border-radius:4px; background:#eef2f6; color:var(--muted); }
   .lineinfo .li-tag.pin { background:#fff8e1; color:#8a6d3b; }
   .lineinfo .li-what { margin:.35rem 0 .5rem; }
   .lineinfo ul.li-items { margin:0; padding-left:1.1rem; }
-  .lineinfo ul.li-items li { margin-bottom:.34rem; }
+  .lineinfo ul.li-items li { margin-bottom:.38rem; line-height:1.5; }
   .lineinfo code { font-family:Consolas,monospace; font-size:.95em; }
-  .lineinfo .li-kind { font-size:.64rem; font-weight:600; text-transform:uppercase;
+  .lineinfo .li-kind { font-size:.72rem; font-weight:600; text-transform:uppercase;
     letter-spacing:.03em; padding:.05rem .32rem; border-radius:3px; margin-right:.35rem; }
-  .li-kind.syntax { background:var(--tint-blue);   color:var(--blue); }
-  .li-kind.idiom  { background:var(--tint-green);  color:var(--green); }
-  .li-kind.trap   { background:var(--tint-red);    color:var(--red); }
-  .li-kind.why    { background:var(--tint-purple); color:var(--deep); }
+  /* Prefixed, because these steppers already use a bare .note class for the
+     frame commentary and it carries min-height:3.6rem. An unprefixed pill
+     would match it and stand 3.6rem tall. */
+  .li-kind.k-syntax { background:var(--tint-blue);   color:var(--blue); }
+  .li-kind.k-note   { background:var(--tint-green);  color:var(--green); }
+  .li-kind.k-trap   { background:var(--tint-red);    color:var(--red); }
+  .li-kind.k-why    { background:var(--tint-purple); color:var(--deep); }
   .lineinfo button.li-clear { font:inherit; font-size:.73rem; padding:.15rem .5rem;
     margin-left:auto; border:1px solid var(--rule); border-radius:5px; background:#fff;
     color:var(--muted); cursor:pointer; }
@@ -458,7 +461,7 @@ var FACTS = {
 // nothing pinned the box follows the line that is executing, so stepping
 // gives a running commentary.
 //
-// kind: syntax = what the C++ actually means | idiom = why it is written so
+// kind: syntax = what the C++ actually means | note = worth noticing
 //       trap   = the mistake this line invites | why = the design reason
 // ---------------------------------------------------------------------------
 var LINE_INFO = {
@@ -466,7 +469,7 @@ var LINE_INFO = {
     rsig: { src: "static void merge_sort_recursive(v& data, int left, int right)",
       what: "The recursive worker. It sorts the slice of <code>data</code> from <code>left</code> to <code>right</code>, inclusive.",
       items: [
-        ["idiom", "<code>static</code> here means <em>internal to this file</em>, not the class-member sense. It keeps the helper out of other translation units, which is why only <code>merge_sort()</code> is declared in the header."],
+        ["note", "<code>static</code> here means <em>internal to this file</em>, not the class-member sense. It keeps the helper out of other translation units, which is why only <code>merge_sort()</code> is declared in the header."],
         ["why", "Taking <code>left</code> and <code>right</code> rather than a sub-vector is what makes this O(1) extra space <em>per call</em> &mdash; the slice is described, not copied."],
         ["syntax", "Both bounds are <strong>inclusive</strong>. Every <code>+1</code> and <code>-1</code> below follows from that one choice."]
       ] },
@@ -498,7 +501,7 @@ var LINE_INFO = {
       what: "Both halves are sorted, so combine them into one sorted run.",
       items: [
         ["why", "This is the only line in the recursion that does real work. Everything above it just divides; all the sorting effort is here, on the way back <em>up</em>."],
-        ["idiom", "Quick sort is the mirror image: it does its work before recursing, and needs no combine step at all."]
+        ["note", "Quick sort is the mirror image: it does its work before recursing, and needs no combine step at all."]
       ] },
     rend: { src: "}   // closes merge_sort_recursive",
       what: "This slice is sorted. Control returns to whichever call asked for it.",
@@ -520,7 +523,7 @@ var LINE_INFO = {
     copy2: { src: "vector<int> L(..left..mid), R(..mid+1..right);",
       what: "Allocates the two temporary halves and fills them from the array.",
       items: [
-        ["idiom", "Constructing from a pair of iterators &mdash; <code>vector&lt;int&gt; L(data.begin()+left, data.begin()+mid+1)</code> &mdash; copies the range in one expression, with no loop to get wrong."],
+        ["note", "Constructing from a pair of iterators &mdash; <code>vector&lt;int&gt; L(data.begin()+left, data.begin()+mid+1)</code> &mdash; copies the range in one expression, with no loop to get wrong."],
         ["syntax", "The end iterator is <strong>one past</strong> the last element you want, so an inclusive bound of <code>mid</code> becomes <code>begin()+mid+1</code>."],
         ["why", "These two vectors are merge sort's <strong>O(n) extra space</strong>. Heap sort and quick sort allocate nothing comparable, which is the trade you are being asked to notice."]
       ] },
@@ -541,7 +544,7 @@ var LINE_INFO = {
       items: [
         ["trap", "<strong>Skip this and the array ends up partly sorted with stale values at the tail.</strong> It is the single most common merge sort bug, and it only shows up when the two halves empty at different times."],
         ["why", "Only one of the two drain loops ever does anything on a given call &mdash; the other's condition is already false. Both still have to be written."],
-        ["idiom", "No comparisons happen here. Whatever is left in a sorted half is already in order, so it can be copied straight across."]
+        ["note", "No comparisons happen here. Whatever is left in a sorted half is already in order, so it can be copied straight across."]
       ] },
     mend: { src: "}   // closes merge",
       what: "The whole range <code>left..right</code> is now one sorted run.",
@@ -576,7 +579,7 @@ var LINE_INFO = {
       what: "Sorts everything right of the pivot.",
       items: [
         ["why", "The pivot appears in neither call, so the two sides never interact. No combine step is needed, which is why quick sort allocates no second array."],
-        ["idiom", "The recursion depth is what costs memory here: O(log n) stack frames when the pivots are good, O(n) in the worst case."]
+        ["note", "The recursion depth is what costs memory here: O(log n) stack frames when the pivots are good, O(n) in the worst case."]
       ] },
     rend: { src: "}   // closes quick_sort_recursive",
       what: "This slice is sorted.",
@@ -592,12 +595,12 @@ var LINE_INFO = {
       what: "Chooses a pivot by looking at three candidates instead of blindly taking one.",
       items: [
         ["why", "Taking <code>data[high]</code> straight off would make <strong>already-sorted input the worst case</strong> &mdash; the pivot would be the largest element every time, giving n levels of recursion. Sorted input is the most common real-world input, so that matters."],
-        ["idiom", "Three comparisons up front buy away the pathological case. Step the sorted preset and the reverse preset and compare the totals: both cost the same."]
+        ["note", "Three comparisons up front buy away the pathological case. Step the sorted preset and the reverse preset and compare the totals: both cost the same."]
       ] },
     med2: { src: "if (data[mid] < data[low]) swap(low, mid);",
       what: "First of three conditional swaps. After it, <code>data[low]</code> &le; <code>data[mid]</code>.",
       items: [
-        ["idiom", "The three swaps together are a hand-written sorting network for three elements. Each one enforces one ordering, and the combination leaves the median in the middle slot."]
+        ["note", "The three swaps together are a hand-written sorting network for three elements. Each one enforces one ordering, and the combination leaves the median in the middle slot."]
       ] },
     med3: { src: "if (data[high] < data[low]) swap(low, high);",
       what: "Second swap. After it, <code>data[low]</code> is the smallest of the three.",
@@ -613,7 +616,7 @@ var LINE_INFO = {
       what: "Copies the pivot value out and sets up the boundary marker.",
       items: [
         ["why", "<code>i</code> marks the <strong>last index known to hold a value &le; pivot</strong>. Starting at <code>low - 1</code> says that region is empty so far."],
-        ["idiom", "The pivot is copied by value. Holding a reference or an index would break the moment the scan swaps that slot."]
+        ["note", "The pivot is copied by value. Holding a reference or an index would break the moment the scan swaps that slot."]
       ] },
     scan: { src: "for (int j = low; j < high; ++j)",
       what: "Walks every element of the slice except the pivot itself.",
@@ -645,13 +648,13 @@ var LINE_INFO = {
       what: "Repairs the heap property at one node by letting it sink to where it belongs.",
       items: [
         ["why", "<code>heap_size</code> is a separate parameter from the array's actual length, and that is the whole point: phase 2 shrinks the heap while the array stays the same size."],
-        ["idiom", "Known as sift-down or percolate-down. It assumes both subtrees below <code>index</code> are already valid heaps &mdash; only the node itself may be out of place."]
+        ["note", "Known as sift-down or percolate-down. It assumes both subtrees below <code>index</code> are already valid heaps &mdash; only the node itself may be out of place."]
       ] },
     init: { src: "int largest = index, left = 2*index+1, right = 2*index+2;",
       what: "Works out where this node's children live, using nothing but arithmetic.",
       items: [
         ["why", "<code>2i+1</code> and <code>2i+2</code> are the whole data structure. There are no node objects and no pointers &mdash; the tree is <em>implied</em> by the indices, which is why a heap costs no extra memory."],
-        ["idiom", "Going the other way, the parent of <code>i</code> is <code>(i-1)/2</code>. That is how the last parent in the array is found: <code>n/2 - 1</code>."],
+        ["note", "Going the other way, the parent of <code>i</code> is <code>(i-1)/2</code>. That is how the last parent in the array is found: <code>n/2 - 1</code>."],
         ["syntax", "<code>largest</code> starts as <code>index</code>, so if neither child beats it the node is already correct."]
       ] },
     cmpL: { src: "if (left < heap_size && data[left] > data[largest])",
@@ -665,7 +668,7 @@ var LINE_INFO = {
       what: "Checks the right child against whichever is currently the largest.",
       items: [
         ["why", "It compares against <code>data[largest]</code>, not <code>data[index]</code>. If the left child already won, this has to beat <em>that</em> &mdash; otherwise a node could sink the wrong way."],
-        ["idiom", "A complete binary tree can have a left child and no right child, but never the reverse. That is why the left test comes first and why this one can simply be skipped."]
+        ["note", "A complete binary tree can have a left child and no right child, but never the reverse. That is why the left test comes first and why this one can simply be skipped."]
       ] },
     sink: { src: "if (largest != index) { swap(data[index], data[largest]);",
       what: "If a child was bigger, exchange them so the larger value moves up.",
@@ -677,7 +680,7 @@ var LINE_INFO = {
       what: "Follows the problem down to the child that was just swapped into.",
       items: [
         ["why", "Only the subtree that received the smaller value can now be broken, so one recursive call is enough &mdash; not both children."],
-        ["idiom", "The recursion is at most the height of the tree, log&#8322;n levels, which is why one <code>heapify_down</code> costs O(log n) rather than O(n)."],
+        ["note", "The recursion is at most the height of the tree, log&#8322;n levels, which is why one <code>heapify_down</code> costs O(log n) rather than O(n)."],
         ["syntax", "<code>largest</code> is passed, not <code>index</code>. Passing <code>index</code> again would recurse on the node that is now correct &mdash; an infinite loop."]
       ] },
     hend: { src: "}   // closes heapify_down",
@@ -694,7 +697,7 @@ var LINE_INFO = {
       what: "Turns an arbitrary array into a valid max-heap, in place.",
       items: [
         ["why", "Surprisingly this is O(n), not O(n log n). Most nodes are near the bottom and can only sink a short way, and the sum works out linear."],
-        ["idiom", "After this phase <code>data[0]</code> is the largest element in the array &mdash; which is the fact phase 2 exploits n times over."]
+        ["note", "After this phase <code>data[0]</code> is the largest element in the array &mdash; which is the fact phase 2 exploits n times over."]
       ] },
     bloop: { src: "for (int i = n/2-1; i >= 0; --i) heapify_down(data, n, i);",
       what: "Heapifies every parent node, starting at the last one and working back to the root.",
@@ -718,7 +721,7 @@ var LINE_INFO = {
       what: "Moves the root &mdash; the maximum &mdash; out to its final position.",
       items: [
         ["why", "The element displaced from <code>data[i]</code> goes to the root, where it is almost certainly in the wrong place. That is exactly the one-node violation <code>heapify_down</code> is built to fix."],
-        ["idiom", "Two writes per extraction, n-1 extractions &mdash; which is why heap sort writes more than selection sort but far less than merge sort."]
+        ["note", "Two writes per extraction, n-1 extractions &mdash; which is why heap sort writes more than selection sort but far less than merge sort."]
       ] },
     erep: { src: "heapify_down(data, i, 0);   // i, not n",
       what: "Repairs the heap from the root, over the shrunken region only.",
@@ -730,7 +733,7 @@ var LINE_INFO = {
       what: "The array is sorted ascending, in place.",
       items: [
         ["why", "A <em>max</em>-heap produces <em>ascending</em> order, which catches people out. The largest goes to the back first, then the next largest just in front of it, and so on."],
-        ["idiom", "Guaranteed O(n log n) like merge sort, O(1) extra space like quick sort &mdash; and unstable, which merge sort is not. That combination of two strengths and one sacrifice is the whole reason it exists."]
+        ["note", "Guaranteed O(n log n) like merge sort, O(1) extra space like quick sort &mdash; and unstable, which merge sort is not. That combination of two strengths and one sacrifice is the whole reason it exists."]
       ] }
   }
 };
@@ -1325,9 +1328,10 @@ function lineInfoHtml(key, executing) {
     '</div>' +
     '<p class="li-what">' + e.what + '</p>' +
     '<ul class="li-items">' + e.items.map(function (it) {
-      return '<li><span class="li-kind ' + it[0] + '">' + it[0] + '</span>' + it[1] + '</li>';
+      return '<li><span class="li-kind k-' + it[0] + '">' + it[0] + '</span>' +
+             it[1] + '</li>';
     }).join("") + '</ul>' +
-    '<p style="margin:.55rem 0 0;font-size:.74rem;color:#6e6e6e">' +
+    '<p style="margin:.55rem 0 0;font-size:.8rem;color:#6e6e6e">' +
       (pinned ? 'Showing the line you clicked. Unpin to follow execution again.'
               : 'Click any line above to pin its breakdown while you step.') +
     '</p></div>';
@@ -1583,7 +1587,7 @@ function selfTest() {
           fails.push(k + "/" + ln.k + ": breakdown incomplete");
         } else {
           e.items.forEach(function (it) {
-            if (["syntax", "idiom", "trap", "why"].indexOf(it[0]) === -1) {
+            if (["syntax", "note", "trap", "why"].indexOf(it[0]) === -1) {
               fails.push(k + "/" + ln.k + ": unknown kind '" + it[0] + "'");
             }
           });

@@ -118,24 +118,27 @@
   .code div:focus-visible { outline:2px solid #89dceb; outline-offset:-2px; }
 
   /* ---- per-line breakdown ---- */
-  .lineinfo { border-top:1px solid var(--rule); margin-top:.7rem; padding-top:.7rem; font-size:.82rem; }
+  .lineinfo { border-top:1px solid var(--rule); margin-top:.7rem; padding-top:.7rem; font-size:.93rem; }
   .lineinfo .li-head { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:.45rem; }
   .lineinfo .li-src-wrap { overflow-x:auto; max-width:100%; }
-  .lineinfo code.li-src { font-family:Consolas,monospace; font-size:.95rem;
+  .lineinfo code.li-src { font-family:Consolas,monospace; font-size:1rem;
     background:#1e1e2e; color:#cdd6f4; padding:.2em .5em; border-radius:4px; white-space:pre; }
-  .lineinfo .li-tag { font-size:.65rem; font-weight:600; text-transform:uppercase;
+  .lineinfo .li-tag { font-size:.72rem; font-weight:600; text-transform:uppercase;
     letter-spacing:.04em; padding:.1rem .4rem; border-radius:4px; background:#eef2f6; color:var(--muted); }
   .lineinfo .li-tag.pin { background:#fff8e1; color:#8a6d3b; }
   .lineinfo .li-what { margin:.35rem 0 .5rem; }
   .lineinfo ul.li-items { margin:0; padding-left:1.1rem; }
-  .lineinfo ul.li-items li { margin-bottom:.34rem; }
+  .lineinfo ul.li-items li { margin-bottom:.38rem; line-height:1.5; }
   .lineinfo code { font-family:Consolas,monospace; font-size:.95em; }
-  .lineinfo .li-kind { font-size:.64rem; font-weight:600; text-transform:uppercase;
+  .lineinfo .li-kind { font-size:.72rem; font-weight:600; text-transform:uppercase;
     letter-spacing:.03em; padding:.05rem .32rem; border-radius:3px; margin-right:.35rem; }
-  .li-kind.syntax { background:var(--tint-blue);   color:var(--blue); }
-  .li-kind.idiom  { background:var(--tint-green);  color:var(--green); }
-  .li-kind.trap   { background:var(--tint-red);    color:var(--red); }
-  .li-kind.why    { background:var(--tint-purple); color:var(--deep); }
+  /* Prefixed, because these steppers already use a bare .note class for the
+     frame commentary and it carries min-height:3.6rem. An unprefixed pill
+     would match it and stand 3.6rem tall. */
+  .li-kind.k-syntax { background:var(--tint-blue);   color:var(--blue); }
+  .li-kind.k-note   { background:var(--tint-green);  color:var(--green); }
+  .li-kind.k-trap   { background:var(--tint-red);    color:var(--red); }
+  .li-kind.k-why    { background:var(--tint-purple); color:var(--deep); }
   .lineinfo button.li-clear { font:inherit; font-size:.73rem; padding:.15rem .5rem;
     margin-left:auto; border:1px solid var(--rule); border-radius:5px; background:#fff;
     color:var(--muted); cursor:pointer; }
@@ -353,7 +356,7 @@ var FACTS = {
 // nothing pinned the box follows the line that is executing, so stepping
 // gives a running commentary.
 //
-// kind: syntax = what the C++ actually means | idiom = why it is written so
+// kind: syntax = what the C++ actually means | note = worth noticing
 //       trap   = the mistake this line invites | why = the design reason
 // ---------------------------------------------------------------------------
 var LINE_INFO = {
@@ -370,13 +373,13 @@ var LINE_INFO = {
       items: [
         ["why", "Not just an optimisation. The next line calls <code>min_element</code> and dereferences the result; on an empty range that iterator <em>is</em> <code>end()</code>, and dereferencing it is undefined behaviour. This guard is what makes <code>EmptyVector</code> pass."],
         ["syntax", "<code>size()</code> returns an unsigned <code>size_t</code>. Comparing it to <code>1</code> is fine, but never write <code>data.size() - 1</code> without checking first &mdash; on an empty vector that wraps around to about 18 quintillion."],
-        ["idiom", "A guard clause at the top, rather than wrapping the whole body in an <code>if</code>. It keeps the real work at one indent level."]
+        ["note", "A guard clause at the top, rather than wrapping the whole body in an <code>if</code>. It keeps the real work at one indent level."]
       ] },
     minmax: { src: "int min_val = *min_element(..), max_val = *max_element(..);",
       what: "Two passes over the data to find the extremes, because the size of the count array depends on them.",
       items: [
         ["syntax", "<code>min_element</code> returns an <strong>iterator</strong>, not a value. The leading <code>*</code> dereferences it. Leaving it off is a compile error, which is the kind of mistake you want."],
-        ["idiom", "Both live in <code>&lt;algorithm&gt;</code>. Two declarations share one <code>int</code> here only to keep the stepper's line short; splitting them across two lines is better style."],
+        ["note", "Both live in <code>&lt;algorithm&gt;</code>. Two declarations share one <code>int</code> here only to keep the stepper's line short; splitting them across two lines is better style."],
         ["why", "Counting sort cannot allocate anything until it knows the range, so it reads the whole array twice before it starts sorting. Those passes are part of the <code>n</code> in O(n + k)."]
       ] },
     kline: { src: "int k = max_val - min_val + 1;",
@@ -396,7 +399,7 @@ var LINE_INFO = {
     tally: { src: "for (int val : data)",
       what: "One pass over the input, counting what is there.",
       items: [
-        ["idiom", "A range-for taking <code>int</code> by value, which is free to copy. For a vector of strings or structs you would write <code>const auto&amp; val</code> instead to avoid copying each element."],
+        ["note", "A range-for taking <code>int</code> by value, which is free to copy. For a vector of strings or structs you would write <code>const auto&amp; val</code> instead to avoid copying each element."],
         ["why", "Look at what is missing from this loop: there is no comparison between two elements, here or anywhere else in the function. That is what <em>non-comparison sort</em> means, and it is why the O(n log n) lower bound for comparison sorts does not apply."]
       ] },
     tally2: { src: "count[val - min_val]++;",
@@ -410,7 +413,7 @@ var LINE_INFO = {
       what: "A write cursor into <code>data</code>, separate from the loop counter below.",
       items: [
         ["why", "The emit loop walks the <em>counters</em>, not the array, so the position being written to advances at a different rate from <code>i</code>. One counter holding 3 produces three writes."],
-        ["idiom", "Declared outside both loops because it has to survive across counters. Declaring it inside would reset it and overwrite <code>data[0]</code> every time."]
+        ["note", "Declared outside both loops because it has to survive across counters. Declaring it inside would reset it and overwrite <code>data[0]</code> every time."]
       ] },
     emit: { src: "for (int i = 0; i &lt; k; ++i)",
       what: "Walks the counters from the lowest value to the highest.",
@@ -435,7 +438,7 @@ var LINE_INFO = {
     end: { src: "}",
       what: "Returns nothing. <code>data</code> was already changed through the reference.",
       items: [
-        ["idiom", "<code>count</code> is destroyed here, automatically. The O(k) cost is temporary &mdash; peak memory, not permanent memory, which is what the comparison tab measures."],
+        ["note", "<code>count</code> is destroyed here, automatically. The O(k) cost is temporary &mdash; peak memory, not permanent memory, which is what the comparison tab measures."],
         ["why", "Nothing was ever <em>moved</em>: the output was rebuilt from tallies. That is why stability is not a meaningful question for this version &mdash; two equal <code>int</code>s are indistinguishable, so there is no original order left to preserve. Attach a name to each number and you would need a different implementation."]
       ] }
   },
@@ -450,7 +453,7 @@ var LINE_INFO = {
       what: "The same guard as counting sort, for the same reason.",
       items: [
         ["why", "<code>min_element</code> on an empty range is undefined behaviour, so this has to come first."],
-        ["idiom", "All three sorts in this activity open with this line. When the same guard appears three times it is worth noticing <em>why</em> rather than copying it: each one is about to index something derived from the data."]
+        ["note", "All three sorts in this activity open with this line. When the same guard appears three times it is worth noticing <em>why</em> rather than copying it: each one is about to index something derived from the data."]
       ] },
     minmax: { src: "int min_val = *min_element(..), max_val = *max_element(..);",
       what: "The span that gets divided into buckets.",
@@ -463,7 +466,7 @@ var LINE_INFO = {
       items: [
         ["trap", "Write the bucket width as plain integer division, <code>range / num_buckets</code>, and on an all-identical array <code>per</code> becomes <strong>0</strong>. Then <code>(val - min_val) / per</code> divides by zero and the program dies rather than misbehaving."],
         ["why", "<code>BucketSortTest.Duplicates</code> leans on exactly this case. An all-identical array is the degenerate input for any algorithm that divides by a span."],
-        ["idiom", "Returning early is cleaner than special-casing <code>per</code> later. The array genuinely is sorted, so there is nothing being deferred."]
+        ["note", "Returning early is cleaner than special-casing <code>per</code> later. The array genuinely is sorted, so there is nothing being deferred."]
       ] },
     range: { src: "int range = max_val - min_val + 1;",
       what: "How many distinct values the span covers &mdash; the same <code>k</code> counting sort allocated an entire array for.",
@@ -476,13 +479,13 @@ var LINE_INFO = {
       items: [
         ["syntax", "The <code>(double)</code> cast is doing real work. Without it, <code>range / num_buckets</code> is integer division and truncates, so <code>ceil</code> receives an already-rounded-down number and has nothing left to round up."],
         ["why", "Rounding <em>up</em> is deliberate. 41 values over 10 buckets at 4 each covers only 40, and the 41st value has nowhere to go. Rounding up gives 5 each, covering 50 &mdash; a little slack is harmless, a shortfall is not."],
-        ["idiom", "<code>ceil</code> needs <code>&lt;cmath&gt;</code>, and it returns a <code>double</code> being assigned back into an <code>int</code>. The narrowing is intentional here; some compilers will warn about it."]
+        ["note", "<code>ceil</code> needs <code>&lt;cmath&gt;</code>, and it returns a <code>double</code> being assigned back into an <code>int</code>. The narrowing is intentional here; some compilers will warn about it."]
       ] },
     alloc: { src: "vector&lt;vector&lt;int&gt;&gt; buckets(num_buckets);",
       what: "A vector of vectors: <code>num_buckets</code> buckets, each one starting empty.",
       items: [
         ["syntax", "In C++11 and later, <code>&gt;&gt;</code> closing nested template arguments is fine. In C++98 it had to be written with a space between them, or the parser read it as the right-shift operator."],
-        ["idiom", "One constructor argument gives <code>num_buckets</code> default-constructed inner vectors. Each is a real, empty, usable vector &mdash; no second loop needed to initialise them."],
+        ["note", "One constructor argument gives <code>num_buckets</code> default-constructed inner vectors. Each is a real, empty, usable vector &mdash; no second loop needed to initialise them."],
         ["why", "This is where bucket sort's memory goes, and it is a different shape from counting sort's: O(n + num_buckets), because every element gets <em>copied into</em> a bucket. Counting sort never stores the elements at all, only tallies."]
       ] },
     dloop: { src: "for (int val : data) {",
@@ -509,7 +512,7 @@ var LINE_INFO = {
       items: [
         ["syntax", "<code>buckets[b]</code> is itself a vector, so this is a method call on an element of the outer vector. <code>push_back</code> grows it as needed."],
         ["why", "Appending preserves the order values arrived in, so after this pass each bucket holds its elements in original order. If the per-bucket sort is a stable one, the whole algorithm is stable &mdash; <code>std::sort</code> is what throws that away."],
-        ["idiom", "No bounds check here, because the clamp on the line above is what makes <code>b</code> safe to use. A line that depends on the previous line's guard belongs directly beneath it."]
+        ["note", "No bounds check here, because the clamp on the line above is what makes <code>b</code> safe to use. A line that depends on the previous line's guard belongs directly beneath it."]
       ] },
     idx: { src: "int idx = 0;",
       what: "The write cursor for the gather pass.",
@@ -522,14 +525,14 @@ var LINE_INFO = {
       items: [
         ["syntax", "<code>auto&amp;</code>, not <code>auto</code>. Without the <code>&amp;</code> each bucket is <strong>copied</strong>, the sort on the next line sorts the copy, and the original bucket is gathered unsorted. It compiles silently and the output is almost sorted, which is the worst of both worlds."],
         ["why", "Bucket order <em>is</em> the sorted order between buckets. Nothing compares one bucket against another; the mapping already arranged that, the same way counting sort's ascending walk did."],
-        ["idiom", "Not <code>const auto&amp;</code> here, because the next line modifies the bucket. If you add <code>const</code> out of habit, <code>sort</code> will not compile."]
+        ["note", "Not <code>const auto&amp;</code> here, because the next line modifies the bucket. If you add <code>const</code> out of habit, <code>sort</code> will not compile."]
       ] },
     sortb: { src: "sort(bucket.begin(), bucket.end());",
       what: "Sorts one bucket's contents with an ordinary comparison sort.",
       items: [
         ["why", "This is the line that makes bucket sort only <em>half</em> a non-comparison sort. The scatter is comparison-free; this is <code>std::sort</code>, which compares. Bucket sort is a divide-and-delegate strategy, not an escape from comparison."],
         ["why", "It is also where the performance assumption lives. If the data spreads evenly each bucket is tiny and this is nearly free; pile everything into one bucket and this single call does the entire sort, at O(n log n)."],
-        ["idiom", "<code>std::sort</code> is <strong>not</strong> stable. <code>std::stable_sort</code> is, and swapping one for the other is the single-word change that makes the whole algorithm stable."]
+        ["note", "<code>std::sort</code> is <strong>not</strong> stable. <code>std::stable_sort</code> is, and swapping one for the other is the single-word change that makes the whole algorithm stable."]
       ] },
     cloop: { src: "for (int val : bucket) data[idx++] = val;",
       what: "The gather: copies this bucket's sorted contents back into <code>data</code>, continuing from wherever the last bucket stopped.",
@@ -541,7 +544,7 @@ var LINE_INFO = {
     end: { src: "}",
       what: "Done. <code>data</code> holds the sorted result and the buckets are released.",
       items: [
-        ["idiom", "Every inner vector is destroyed along with <code>buckets</code>, no manual cleanup. That is the payoff for using <code>vector</code> rather than <code>new</code>."],
+        ["note", "Every inner vector is destroyed along with <code>buckets</code>, no manual cleanup. That is the payoff for using <code>vector</code> rather than <code>new</code>."],
         ["why", "Peak memory was roughly <em>two copies</em> of the data &mdash; the original plus the buckets. That is the trade the comparison tab plots: bucket sort pays O(n) space to avoid counting sort's O(k)."]
       ] }
   },
@@ -549,7 +552,7 @@ var LINE_INFO = {
     dsig: { src: "static void counting_sort_by_digit(v&amp; data, int exp)",
       what: "One stable counting sort on a single digit position. <code>exp</code> selects which: 1 for ones, 10 for tens, 100 for hundreds.",
       items: [
-        ["idiom", "<code>static</code> at file scope means <em>internal to this translation unit</em> &mdash; nothing to do with the class-member meaning of the keyword. It is why only <code>radix_sort</code> appears in the header."],
+        ["note", "<code>static</code> at file scope means <em>internal to this translation unit</em> &mdash; nothing to do with the class-member meaning of the keyword. It is why only <code>radix_sort</code> appears in the header."],
         ["why", "Passing <code>exp</code> rather than a digit number keeps the extraction a single division. It also means this helper has no idea how many digits exist, which is the caller's problem."],
         ["why", "This function must be <strong>stable</strong>. Not as a nice property &mdash; as a requirement. Radix sort works only because each pass preserves the order the previous pass established."]
       ] },
@@ -563,7 +566,7 @@ var LINE_INFO = {
     t1: { src: "// 1. tally this digit",
       what: "Three numbered phases follow. They are worth keeping as comments in your own code.",
       items: [
-        ["idiom", "Tally, accumulate, place. Nearly every bug in radix sort is one of these three phases being merged into another or run in the wrong order."]
+        ["note", "Tally, accumulate, place. Nearly every bug in radix sort is one of these three phases being merged into another or run in the wrong order."]
       ] },
     t2: { src: "for (int i = 0; i &lt; n; ++i) count[(data[i]/exp) % 10]++;",
       what: "Counts how many elements have each digit at this position.",
@@ -599,7 +602,7 @@ var LINE_INFO = {
     p3: { src: "int digit = (data[i] / exp) % 10;",
       what: "Extracts the same digit the tally used, for the element now being placed.",
       items: [
-        ["idiom", "An identical expression to the tally loop. Change one and not the other and the counts describe a different digit than the placement uses &mdash; which is why it is worth factoring into a small helper, or at least writing it the same way both times."],
+        ["note", "An identical expression to the tally loop. Change one and not the other and the counts describe a different digit than the placement uses &mdash; which is why it is worth factoring into a small helper, or at least writing it the same way both times."],
         ["why", "Pulled into a named variable because the next line uses it twice. Recomputing it would work; naming it makes that line readable."]
       ] },
     p4: { src: "output[count[digit] - 1] = data[i];  count[digit]--;",
@@ -630,12 +633,12 @@ var LINE_INFO = {
       what: "The largest value, which determines how many digit positions there are.",
       items: [
         ["why", "Only the maximum matters. Shorter numbers are handled by the fact that their missing digits extract as 0, so there is no need to count digits per element."],
-        ["idiom", "No <code>min_element</code> here, unlike the other two sorts. Radix sort never allocates anything proportional to the value range &mdash; that is the entire point of it."]
+        ["note", "No <code>min_element</code> here, unlike the other two sorts. Radix sort never allocates anything proportional to the value range &mdash; that is the entire point of it."]
       ] },
     rloop: { src: "for (int exp = 1; max_val / exp &gt; 0; exp *= 10)",
       what: "One iteration per digit position, from least significant upwards: 1, 10, 100, and so on.",
       items: [
-        ["idiom", "A neat way to say &ldquo;while there are digits left&rdquo; without computing a digit count. For <code>max_val</code> 802: <code>802/1</code>, <code>802/10</code> and <code>802/100</code> are all positive, <code>802/1000</code> is 0, so it runs exactly three times."],
+        ["note", "A neat way to say &ldquo;while there are digits left&rdquo; without computing a digit count. For <code>max_val</code> 802: <code>802/1</code>, <code>802/10</code> and <code>802/100</code> are all positive, <code>802/1000</code> is 0, so it runs exactly three times."],
         ["why", "Least significant digit <strong>first</strong>. LSD radix sort relies on each later pass being stable so the earlier passes' work survives underneath it. Starting from the most significant digit is a different algorithm with a different structure."],
         ["trap", "<code>exp *= 10</code> can overflow <code>int</code> for very large maxima &mdash; past about two billion the next multiplication wraps and the loop condition goes strange. Declaring <code>exp</code> as <code>long long</code> is the cheap fix."]
       ] },
@@ -649,7 +652,7 @@ var LINE_INFO = {
       what: "Sorted, with no two elements ever having been compared.",
       items: [
         ["why", "Count the comparisons in this whole algorithm: there are none. The ordering came from digit values indexing into counters, d times over. That is how radix sort gets underneath the O(n log n) lower bound &mdash; the bound applies to sorts that <em>compare</em>, and this one does not."],
-        ["idiom", "Worth setting against the other two tabs. Counting sort allocates by value range, bucket sort allocates by element count and delegates to a comparison sort, and radix sort allocates ten counters and pays with repeated passes instead."]
+        ["note", "Worth setting against the other two tabs. Counting sort allocates by value range, bucket sort allocates by element count and delegates to a comparison sort, and radix sort allocates ten counters and pays with repeated passes instead."]
       ] }
   }
 };
@@ -996,9 +999,10 @@ function lineInfoHtml(key, executing) {
     '</div>' +
     '<p class="li-what">' + e.what + '</p>' +
     '<ul class="li-items">' + e.items.map(function (it) {
-      return '<li><span class="li-kind ' + it[0] + '">' + it[0] + '</span>' + it[1] + '</li>';
+      return '<li><span class="li-kind k-' + it[0] + '">' + it[0] + '</span>' +
+             it[1] + '</li>';
     }).join("") + '</ul>' +
-    '<p style="margin:.55rem 0 0;font-size:.74rem;color:#6e6e6e">' +
+    '<p style="margin:.55rem 0 0;font-size:.8rem;color:#6e6e6e">' +
       (pinned ? 'Showing the line you clicked. Unpin to follow execution again.'
               : 'Click any line above to pin its breakdown while you step.') +
     '</p></div>';
@@ -1201,7 +1205,7 @@ function selfTest() {
           fails.push(k + "/" + ln.k + ": breakdown incomplete");
         } else {
           e.items.forEach(function (it) {
-            if (["syntax", "idiom", "trap", "why"].indexOf(it[0]) === -1) {
+            if (["syntax", "note", "trap", "why"].indexOf(it[0]) === -1) {
               fails.push(k + "/" + ln.k + ": unknown kind '" + it[0] + "'");
             }
           });
