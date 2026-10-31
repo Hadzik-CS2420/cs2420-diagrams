@@ -258,6 +258,8 @@
   .beforerow { display:flex; align-items:center; gap:.5rem; margin:0 0 .5rem; }
   .beforerow .cells, .hist .cells { min-height:0; gap:.2rem; }
   .beforerow .cell, .hist .cell { min-width:2.1rem; font-size:.86rem; padding:.22rem .1rem; }
+  /* Small enough that the before row stays a strip, not a second big row. */
+  .beforerow .cell .ix { font-size:.55rem; line-height:1.1; margin-top:.05rem; }
   .hist .hrow { display:flex; align-items:center; gap:.5rem; padding:.18rem .35rem; border-radius:6px; }
   .hist .hrow.now { background:#fff8e1; }
   .hist .hname { min-width:6.6rem; font-family:Consolas,monospace; font-size:.76rem; color:var(--muted); }
@@ -266,9 +268,21 @@
                   margin:.55rem 0 .15rem; color:var(--muted); }
   .hist .hphase.build   { color:var(--blue); }
   .hist .hphase.extract { color:var(--orange); }
-  .code div.calc { color:#f9e2af; font-size:.88rem; white-space:pre-wrap; cursor:default; padding-left:2.6rem; }
-  .code div.calc::before { content:"\21B3  "; }
-  .code div.calc:hover { background:transparent; }
+  /* NOT source. This is the executing line with its real values substituted in,
+     so it gets a highlighter band and dark text. Nothing else in the code panel
+     has a light background, which is what makes it unmistakable. */
+  .code div.calc { background:#f9e2af; color:#1e1e2e; font-size:.88rem;
+                   font-weight:600; white-space:pre-wrap; cursor:default;
+                   padding:.22rem .8rem; margin:.12rem 0;
+                   border-left:4px solid #b8860b; }
+  .code div.calc::before { content:"THIS STEP"; font-size:.62rem; font-weight:800;
+                           letter-spacing:.06em; color:#6b4f04;
+                           background:rgba(0,0,0,.09); border-radius:3px;
+                           padding:.08em .32em; margin-right:.55rem;
+                           vertical-align:.1em; }
+  /* .code div:hover paints a dark grey; on a light band that would flash it
+     back to looking like code. */
+  .code div.calc:hover { background:#f9e2af; }
 </style>
 </head>
 <body>
@@ -507,6 +521,7 @@ var LINE_INFO = {
     rsig: { src: "static void merge_sort_recursive(v& data, int left, int right)",
       what: "The recursive worker. It sorts the slice of <code>data</code> from <code>left</code> to <code>right</code>, inclusive.",
       items: [
+        ["syntax", "<code>v&amp;</code> is this panel's shorthand for <code>std::vector&lt;int&gt;&amp;</code>, kept short so the line fits. The <code>&amp;</code> means a reference: the function works on the caller's vector itself, never a copy."],
         ["note", "<code>static</code> here means <em>internal to this file</em>, not the class-member sense. It keeps the helper out of other translation units, which is why only <code>merge_sort()</code> is declared in the header."],
         ["why", "Taking <code>left</code> and <code>right</code> rather than a sub-vector is what makes this O(1) extra space <em>per call</em> &mdash; the slice is described, not copied."],
         ["syntax", "Both bounds are <strong>inclusive</strong>. Every <code>+1</code> and <code>-1</code> below follows from that one choice."]
@@ -549,6 +564,7 @@ var LINE_INFO = {
     msig: { src: "static void merge(v& data, int left, int mid, int right)",
       what: "Merges two adjacent sorted runs, <code>left..mid</code> and <code>mid+1..right</code>, into one.",
       items: [
+        ["syntax", "<code>v&amp;</code> is this panel's shorthand for <code>std::vector&lt;int&gt;&amp;</code>, kept short so the line fits. The <code>&amp;</code> means a reference: the function works on the caller's vector itself, never a copy."],
         ["why", "It relies on both halves <em>already</em> being sorted. Called on unsorted input it produces nonsense, which is why the two recursive calls must come first."],
         ["syntax", "Three bounds, not two, because the function needs to know where one run ends and the next begins."]
       ] },
@@ -594,6 +610,7 @@ var LINE_INFO = {
     rsig: { src: "static void quick_sort_recursive(v& data, int low, int high)",
       what: "The recursive worker, sorting the inclusive slice <code>low..high</code>.",
       items: [
+        ["syntax", "<code>v&amp;</code> is this panel's shorthand for <code>std::vector&lt;int&gt;&amp;</code>, kept short so the line fits. The <code>&amp;</code> means a reference: the function works on the caller's vector itself, never a copy."],
         ["why", "Same shape as merge sort's worker, but the body is the reverse order: partition first, recurse second."],
         ["syntax", "Inclusive bounds again, which is why the recursive calls below use <code>p-1</code> and <code>p+1</code>."]
       ] },
@@ -627,6 +644,7 @@ var LINE_INFO = {
     psig: { src: "static int partition(v& data, int low, int high)",
       what: "Does the real work: picks a pivot, splits the slice around it, and returns the pivot's final index.",
       items: [
+        ["syntax", "<code>v&amp;</code> is this panel's shorthand for <code>std::vector&lt;int&gt;&amp;</code>, kept short so the line fits. The <code>&amp;</code> means a reference: the function works on the caller's vector itself, never a copy."],
         ["why", "It returns an <code>int</code>, not <code>void</code>, because the caller cannot know where the pivot landed &mdash; and the recursion is built entirely on that index."]
       ] },
     med: { src: "// 1. median-of-three -> the median ends up at data[high]",
@@ -685,6 +703,7 @@ var LINE_INFO = {
     hsig: { src: "static void heapify_down(v& data, int heap_size, int index)",
       what: "Repairs the heap property at one node by letting it sink to where it belongs.",
       items: [
+        ["syntax", "<code>v&amp;</code> is this panel's shorthand for <code>std::vector&lt;int&gt;&amp;</code>, kept short so the line fits. The <code>&amp;</code> means a reference: the function works on the caller's vector itself, never a copy."],
         ["why", "<code>heap_size</code> is a separate parameter from the array's actual length, and that is the whole point: phase 2 shrinks the heap while the array stays the same size."],
         ["note", "Known as sift-down or percolate-down. It assumes both subtrees below <code>index</code> are already valid heaps &mdash; only the node itself may be out of place."]
       ] },
@@ -729,6 +748,11 @@ var LINE_INFO = {
     ssig: { src: "void heap_sort(v& data)",
       what: "The public entry point. Two phases, both built on <code>heapify_down</code>.",
       items: [
+        ["syntax", "<code>v</code> is shorthand <em>in this panel only</em>, so the line fits without scrolling. What you actually write is <code>void heap_sort(std::vector&lt;int&gt;&amp; data)</code>, and that is what the header declares."],
+        ["syntax", "The <code>&amp;</code> makes <code>data</code> a <strong>reference</strong> &mdash; not a copy, and not a pointer. Inside the function <code>data</code> <em>is</em> the caller's vector under a second name, so writing <code>data[0]</code> writes to theirs."],
+        ["why", "That is why it can return <code>void</code>. The sort happens in the caller's array, so there is nothing to hand back. Every sort in this module has that shape."],
+        ["trap", "Drop the <code>&amp;</code> and the parameter becomes <code>std::vector&lt;int&gt; data</code> &mdash; a copy. It compiles, it runs, your algorithm is perfectly correct, and the caller's vector comes back untouched, so every test fails. This is the most common way a correct sort scores zero."],
+        ["note", "A reference also costs nothing to pass. By value, a million ints is 4 MB copied in before the first line of the body runs; by reference it is one address."],
         ["why", "The only function declared in the header. <code>heapify_down</code> is <code>static</code> and invisible outside the .cpp, because students call neither of them directly."]
       ] },
     build: { src: "// phase 1: build the max-heap, last parent upward",
@@ -1198,12 +1222,16 @@ function cellsHtml(f, big, rel) {
 }
 
 // A small row of cells for the before row and the history strip.
-function miniCells(arr, lit, litCls, sortedFrom) {
+// showIx is opt-in: the before row wants indices so it can be read against the
+// after row, but the history strip is many rows of these and numbering every
+// cell of every row there is noise.
+function miniCells(arr, lit, litCls, sortedFrom, showIx) {
   return arr.map(function (e, i) {
     var c = "cell";
     if (lit && lit.indexOf(i) !== -1) c += " " + litCls;
     else if (sortedFrom !== undefined && i >= sortedFrom) c += " sorted";
-    return '<div class="' + c + '">' + e.v + (e.tag || "") + '</div>';
+    return '<div class="' + c + '">' + e.v + (e.tag || "") +
+           (showIx ? '<span class="ix">' + i + '</span>' : '') + '</div>';
   }).join("");
 }
 
@@ -1414,7 +1442,7 @@ function renderSolo() {
       m.banner.sub + '</span></div>' : '';
   var before = heap && m.before
     ? '<div class="beforerow"><span class="rowlbl">before</span><div class="cells">' +
-      miniCells(m.before, m.beforeLit, "node", m.beforeSorted) + '</div></div>' +
+      miniCells(m.before, m.beforeLit, "node", m.beforeSorted, true) + '</div></div>' +
       '<div class="rowlbl" style="margin-bottom:.25rem">after</div>' : '';
 
   // How it works goes in its own container ABOVE the controls, so Play and
