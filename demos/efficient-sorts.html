@@ -194,9 +194,20 @@
   .phhelp.extract { border-left-color:var(--orange); }
   .phhelp h4 { margin:0 0 .35rem; font-size:.82rem; color:var(--ink); }
   .phhelp ul { margin:0; padding:0; list-style:none; }
-  .phhelp li { position:relative; padding-left:.85rem; margin-bottom:.25rem;
-               font-size:.81rem; line-height:1.5; }
+  .phhelp li { position:relative; padding-left:.85rem; margin-bottom:.3rem;
+               font-size:.84rem; line-height:1.45; }
   .phhelp li:last-child { margin-bottom:0; }
+  /* The headline is the point; the sentence is for whoever wants it. */
+  .phhelp .more { display:block; margin-top:.15rem; font-size:.78rem;
+                  line-height:1.45; color:var(--muted); font-weight:400; }
+  .phhelp .hhead { display:flex; align-items:center; gap:.5rem; margin:0 0 .4rem; }
+  .phhelp .hhead h4 { margin:0; }
+  .phhelp button.hmore { font:inherit; font-size:.72rem; font-weight:600;
+                         margin-left:auto; padding:.12rem .5rem; cursor:pointer;
+                         border:1px solid var(--rule); border-radius:999px;
+                         background:#fff; color:var(--muted); }
+  .phhelp button.hmore:hover { color:var(--blue); border-color:var(--blue); }
+  .phhelp button.hmore:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
   .phhelp li::before { content:""; position:absolute; left:.2rem; top:.55em;
                        width:.3rem; height:.3rem; border-radius:50%;
                        background:var(--blue); }
@@ -1179,7 +1190,7 @@ var LANES = [
   { key: "heap",  title: "Heap Sort" }
 ];
 var state = { mode: "merge", preset: "random", step: 0, runs: null,
-              timer: null, pinned: null, heapView: "overview" };
+              timer: null, pinned: null, heapView: "overview", helpOpen: false };
 
 function compute() {
   var items = build(PRESETS[state.preset]);
@@ -1371,35 +1382,52 @@ function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").
 
 // Phase 1 and phase 2 side by side, current one lit. `built` is the beat
 // between them, where phase 1 is finished and phase 2 has not started.
-// What the jargon on screen actually means, in the phase it belongs to.
+// What the jargon on screen actually means. Headline first -- a few words, the
+// kind of thing that reads from the back of a room -- and the full sentence
+// only if someone asks for it.
+var PHASE_HELP = {
+  build: { title: "What &ldquo;fix&rdquo; means here", points: [
+    ["<span class=\"rule\">The rule: every parent &ge; both its children.</span>",
+     "That is the entire definition of a max-heap. Nothing else."],
+    ["<strong>Fix a node</strong> = make that one node obey it.",
+     "If a child is bigger, swap: the bigger value moves up one level, the smaller " +
+     "moves down. Only that node and its own two children are compared, never the " +
+     "whole tree."],
+    ["Then <strong>follow the demoted value down</strong>.",
+     "It may break the rule where it landed, so you fix that node too. That is the " +
+     "red arrow &mdash; it sinks until it is bigger than its children or runs out of tree."],
+    ["<strong>Start right, work backwards.</strong>",
+     "Node <code>n/2&minus;1</code> is the rightmost node that has children; everything " +
+     "after it is a leaf, and a leaf cannot break the rule. Going backwards, everything " +
+     "below a node is already fixed when you reach it, so one sink finishes it. From the " +
+     "top you would need repeated passes."],
+    ["<strong>Result:</strong> the largest value ends up at the root.",
+     "Once every parent obeys the rule it has nowhere higher to go &mdash; which is " +
+     "exactly what phase 2 consumes."]
+  ] },
+  extract: { title: "What this phase is doing", points: [
+    ["<strong>Root is the largest</strong> &mdash; swap it to the end.",
+     "That slot is finished and never moves again, which is why it turns green."],
+    ["<strong>Shrink the heap by one.</strong>",
+     "That is <code>heap_size</code> going down. The sorted tail is no longer part of " +
+     "the heap, so nothing drags it back in."],
+    ["<strong>Sink the new root once.</strong>",
+     "The value swapped up is usually small and breaks the rule, and one sink brings " +
+     "the next largest to the top."]
+  ] }
+};
+
 function phaseHelp(m) {
   if (!m.phase) return "";
-  if (m.phase === "extract") {
-    return '<div class="phhelp extract"><h4>What this phase is doing</h4><ul>' +
-      '<li>The root is the largest value left, so <strong>swap it to the end</strong>. ' +
-        'That slot is finished and never moves again (green).</li>' +
-      '<li>The heap is now one smaller &mdash; that is <code>heap_size</code> shrinking.</li>' +
-      '<li>The value swapped up to the root is probably small and breaks the rule, ' +
-        'so sink it once and the next largest surfaces.</li>' +
-      '</ul></div>';
-  }
-  return '<div class="phhelp"><h4>What &ldquo;fix&rdquo; means here</h4><ul>' +
-    '<li><span class="rule">The one rule: every parent is at least as big as both ' +
-      'its children.</span> That is all a max-heap is.</li>' +
-    '<li><strong>Fixing a node</strong> means making that one node obey the rule. If a ' +
-      'child is bigger, swap them &mdash; the bigger value moves <em>up</em> one level, ' +
-      'the smaller moves <em>down</em>. Only that node and its own two children are ' +
-      'compared, never the whole tree.</li>' +
-    '<li>The value that moved down may now break the rule where it landed, so you ' +
-      'follow it and fix that node too. That is the red arrow &mdash; it <em>sinks</em> ' +
-      'until it is bigger than its children or runs out of tree.</li>' +
-    '<li><strong>Why start on the right?</strong> Node ' +
-      '<code>n/2&minus;1</code> is the rightmost node that <em>has</em> children; ' +
-      'everything after it is a leaf, and a leaf cannot break the rule. Working ' +
-      'backwards from there, everything below a node is already fixed by the time you ' +
-      'reach it, so one sink finishes it. From the top you would need repeated passes.</li>' +
-    '<li>Once every parent obeys the rule, the largest value has nowhere higher to go. ' +
-      'It is at the root, which is exactly what phase 2 needs.</li>' +
+  var h = m.phase === "extract" ? PHASE_HELP.extract : PHASE_HELP.build;
+  var open = state.helpOpen;
+  return '<div class="phhelp' + (m.phase === "extract" ? " extract" : "") + '">' +
+    '<div class="hhead"><h4>' + h.title + '</h4>' +
+    '<button class="hmore" id="help-toggle" aria-expanded="' + open + '">' +
+      (open ? "Less &#9652;" : "More detail &#9662;") + '</button></div><ul>' +
+    h.points.map(function (p) {
+      return '<li>' + p[0] + (open ? '<span class="more">' + p[1] + '</span>' : '') + '</li>';
+    }).join("") +
     '</ul></div>';
 }
 
@@ -1588,6 +1616,13 @@ function renderSolo() {
   });
   var clear = document.getElementById("li-clear");
   if (clear) clear.addEventListener("click", function () { pinLine(null); });
+  // Kept in state rather than a <details>: the panel re-renders every step, and
+  // a native toggle would snap shut the moment anyone pressed Next.
+  var more = document.getElementById("help-toggle");
+  if (more) more.addEventListener("click", function () {
+    state.helpOpen = !state.helpOpen;
+    render();
+  });
 }
 
 // Clicking the already-pinned line unpins it, so one control does both.
