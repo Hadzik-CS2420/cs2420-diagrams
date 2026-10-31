@@ -187,6 +187,23 @@
   td.no  { color:var(--red);   font-weight:600; }
   .mono { font-family:Consolas,monospace; }
 
+  /* Plain language, under the step that uses the jargon. */
+  .phhelp { border:1px solid var(--rule); border-left:4px solid var(--blue);
+            background:#f7f9fb; border-radius:0 8px 8px 0;
+            padding:.6rem .8rem; margin:.6rem 0 0; }
+  .phhelp.extract { border-left-color:var(--orange); }
+  .phhelp h4 { margin:0 0 .35rem; font-size:.82rem; color:var(--ink); }
+  .phhelp ul { margin:0; padding:0; list-style:none; }
+  .phhelp li { position:relative; padding-left:.85rem; margin-bottom:.25rem;
+               font-size:.81rem; line-height:1.5; }
+  .phhelp li:last-child { margin-bottom:0; }
+  .phhelp li::before { content:""; position:absolute; left:.2rem; top:.55em;
+                       width:.3rem; height:.3rem; border-radius:50%;
+                       background:var(--blue); }
+  .phhelp.extract li::before { background:var(--orange); }
+  .phhelp .rule { background:var(--tint-blue); color:var(--blue); font-weight:650;
+                  padding:.05em .35em; border-radius:4px; }
+
   /* Both phases visible at once, so "there is a phase 2" needs no reading. */
   .phrail { display:flex; align-items:stretch; gap:.4rem; margin:0 0 .6rem; }
   .phrail .ph { flex:1 1 0; min-width:0; border:1px solid var(--rule); border-radius:8px;
@@ -1354,6 +1371,38 @@ function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").
 
 // Phase 1 and phase 2 side by side, current one lit. `built` is the beat
 // between them, where phase 1 is finished and phase 2 has not started.
+// What the jargon on screen actually means, in the phase it belongs to.
+function phaseHelp(m) {
+  if (!m.phase) return "";
+  if (m.phase === "extract") {
+    return '<div class="phhelp extract"><h4>What this phase is doing</h4><ul>' +
+      '<li>The root is the largest value left, so <strong>swap it to the end</strong>. ' +
+        'That slot is finished and never moves again (green).</li>' +
+      '<li>The heap is now one smaller &mdash; that is <code>heap_size</code> shrinking.</li>' +
+      '<li>The value swapped up to the root is probably small and breaks the rule, ' +
+        'so sink it once and the next largest surfaces.</li>' +
+      '</ul></div>';
+  }
+  return '<div class="phhelp"><h4>What &ldquo;fix&rdquo; means here</h4><ul>' +
+    '<li><span class="rule">The one rule: every parent is at least as big as both ' +
+      'its children.</span> That is all a max-heap is.</li>' +
+    '<li><strong>Fixing a node</strong> means making that one node obey the rule. If a ' +
+      'child is bigger, swap them &mdash; the bigger value moves <em>up</em> one level, ' +
+      'the smaller moves <em>down</em>. Only that node and its own two children are ' +
+      'compared, never the whole tree.</li>' +
+    '<li>The value that moved down may now break the rule where it landed, so you ' +
+      'follow it and fix that node too. That is the red arrow &mdash; it <em>sinks</em> ' +
+      'until it is bigger than its children or runs out of tree.</li>' +
+    '<li><strong>Why start on the right?</strong> Node ' +
+      '<code>n/2&minus;1</code> is the rightmost node that <em>has</em> children; ' +
+      'everything after it is a leaf, and a leaf cannot break the rule. Working ' +
+      'backwards from there, everything below a node is already fixed by the time you ' +
+      'reach it, so one sink finishes it. From the top you would need repeated passes.</li>' +
+    '<li>Once every parent obeys the rule, the largest value has nowhere higher to go. ' +
+      'It is at the root, which is exactly what phase 2 needs.</li>' +
+    '</ul></div>';
+}
+
 function phaseRail(m) {
   if (!m.phase) return "";
   var at = m.phase === "build" ? 0 : (m.phase === "built" ? 0.5 : 1);
@@ -1475,6 +1524,7 @@ function renderSolo() {
         '<div class="bounds">' + boundsHtml(key, fr, fr.a.length) + '</div>' +
         extra +
         '<p class="note">' + fr.note + '</p>' +
+        (heap ? phaseHelp(m) : '') +
         '<div class="stats"><span>compares <b>' + fr.comparisons + '</b></span>' +
           '<span>writes <b>' + fr.writes + '</b></span></div>' +
       '</div></div>' +
