@@ -54,8 +54,24 @@
   button.ctl.primary { background:var(--deep); border-color:var(--deep); color:#fff; }
   .count { font-variant-numeric:tabular-nums; font-size:.84rem; color:var(--muted); margin-left:auto; }
 
-  .solo { display:grid; grid-template-columns:1.1fr .9fr; gap:1.1rem; align-items:start; }
-  @media (max-width:1000px) { .solo { grid-template-columns:1fr; } }
+  /* An even split, not 1.1/0.9: the tree is an SVG with a viewBox and scales
+     to any width, while the code cannot reflow. Give the code the room. */
+  .solo { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+          gap:1.1rem; align-items:start; }
+  .solo > .span { grid-column:1 / -1; }
+  @media (max-width:1000px) { .solo { grid-template-columns:minmax(0,1fr); } }
+
+  /* ---- How it works, as a banner across the top ---- */
+  .howto .lead { margin:0 0 .75rem; font-size:.93rem; }
+  .howto-steps { display:grid; gap:.7rem; margin:0 0 .75rem;
+                 grid-template-columns:repeat(auto-fit,minmax(17rem,1fr)); }
+  .hstep { display:flex; gap:.55rem; align-items:flex-start;
+           background:#f7f9fb; border:1px solid var(--rule); border-radius:8px;
+           padding:.6rem .7rem; font-size:.84rem; line-height:1.55; }
+  .hnum { flex:0 0 auto; width:1.4rem; height:1.4rem; border-radius:50%;
+          background:var(--deep); color:#fff; font-size:.73rem; font-weight:700;
+          display:flex; align-items:center; justify-content:center; margin-top:.1rem; }
+  .howto .callout { margin-bottom:0; }
   .card { border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
   .card > h2 { font-size:.92rem; margin:0; padding:.5rem .85rem;
                border-bottom:1px solid var(--rule); background:#f7f9fb; }
@@ -375,11 +391,10 @@ var FACTS = {
   },
   heap: {
     title: "Heap Sort",
-    idea: "Read the flat array as a complete binary tree — no nodes, no pointers, just index arithmetic. A max-heap is that tree with one property: every parent ≥ both children, which makes <code>data[0]</code> the largest element.",
-    steps: ["<code>left = 2i+1</code>, <code>right = 2i+2</code>, and the last parent is at <code>n/2-1</code>. Everything after it is a leaf.",
-            "<strong>heapify_down:</strong> find the largest of a node and its two children; if the node is not it, swap and <em>recurse on the child you swapped into</em> — the problem moved down a level.",
-            "<strong>Phase 1, build:</strong> walk <code>i</code> from the last parent down to 0. Backwards, so each call's children are already heaps.",
-            "<strong>Phase 2, extract:</strong> swap <code>data[0]</code> to the end, shrink the heap by one, repair from the root. The tail grows sorted."],
+    idea: "A max-heap guarantees exactly one thing: <strong>the largest element is at <code>data[0]</code></strong>. Heap sort is that one fact spent over and over — turn the array into a heap, then repeatedly take whatever is at <code>data[0]</code>, park it at the end where it belongs, and repair the heap you just broke. Nothing is allocated: the heap and the sorted output share the same array, with the boundary between them moving left one slot at a time.",
+    steps: ["<strong>The tree is the array.</strong> There are no node objects and no pointers — the shape is pure arithmetic. Node <code>i</code>'s children are <code>2i+1</code> and <code>2i+2</code>, and its parent is <code>(i-1)/2</code>. In a seven-element array that makes 0 the root, 1 and 2 the level beneath it, and 3 through 6 the leaves. The last node that <em>has</em> a child is <code>n/2-1</code>; everything past it is a leaf, already a perfectly good heap of one, which is why the build loop never visits them.",
+            "<strong>heapify_down sinks one bad node.</strong> Look at a node together with its two children and pick the largest of the three. If the node already is the largest, stop — this subtree is a heap. Otherwise swap it with that child and <em>start over from the child's index</em>. That is the part worth sitting with: the swap did not fix the problem, it <em>moved it down one level</em>, so you go fix it there. One swap per level at most, and a complete tree is only log n levels deep — that is where O(log n) per call comes from.",
+            "<strong>Two phases, one helper.</strong> <em>Build</em> calls heapify_down on every parent from <code>n/2-1</code> down to <code>0</code>. Going <strong>backwards is the whole trick</strong>: by the time you reach node <code>i</code>, both subtrees beneath it are already heaps, so one sink is enough to fix it. Forwards you would have to repeat passes. <em>Sort</em> then swaps <code>data[0]</code> with the last unsorted slot, shrinks the heap by one, and sinks the new root. The element just parked was the largest still in play, so it never moves again, and the green sorted tail grows leftward until nothing is left."],
     best: "O(n log n) — no best case either",
     avg: "O(n log n) guaranteed", space: "O(1) — the heap IS the array",
     stable: "No — a sink can reorder equals",
@@ -1282,7 +1297,21 @@ function renderSolo() {
       '<div class="rowlbl" style="margin-bottom:.25rem">after</div>' : '';
 
   document.getElementById("stage").innerHTML =
-    '<div class="solo"><div>' +
+    '<div class="solo">' +
+      // How it works spans both columns, so the explanation is read once at the
+      // top rather than sitting in a side column level with the code.
+      '<div class="card span"><h2>How it works</h2><div class="card-body howto">' +
+        '<p class="lead">' + f.idea + '</p>' +
+        '<div class="howto-steps">' +
+          f.steps.map(function (s, i) {
+            return '<div class="hstep"><span class="hnum">' + (i + 1) + '</span>' +
+                   '<div>' + s + '</div></div>';
+          }).join("") +
+        '</div><div class="callout warn">' + f.watch + '</div>' +
+      '</div></div>' +
+
+      // Left: the data and the tree. Right: the code acting on it. Same row, so
+      // the executing line and the node it moves are visible at once.
       '<div class="card"><h2>' + f.title +
         (heap ? ' &middot; ' + (state.heapView === "overview" ? "overview" : "detail") : '') +
         (done ? ' <span class="done-badge">done</span>' : '') +
@@ -1294,28 +1323,22 @@ function renderSolo() {
         '<div class="stats"><span>compares <b>' + fr.comparisons + '</b></span>' +
           '<span>writes <b>' + fr.writes + '</b></span></div>' +
       '</div></div>' +
-      '<div class="card" style="margin-top:1rem"><h2>The code</h2><div class="card-body">' +
+      '<div class="card"><h2>The code</h2><div class="card-body">' +
         '<div class="code" id="code-solo"></div>' +
           lineInfoHtml(key, fr.line) +
         '</div></div>' +
-    '</div><div>' +
-      '<div class="card"><h2>How it works</h2><div class="card-body">' +
-        '<p style="margin:0 0 .6rem;font-size:.85rem">' + f.idea + '</p>' +
-        '<ol style="margin:0;padding-left:1.2rem;font-size:.83rem">' +
-          f.steps.map(function (s) { return '<li style="margin-bottom:.3rem">' + s + '</li>'; }).join("") +
-        '</ol><div class="callout warn">' + f.watch + '</div>' +
-      '</div></div>' +
-      '<div class="card" style="margin-top:1rem"><h2>' +
+
+      '<div class="card"><h2>' +
         (heap ? "History &mdash; one row per call" : "Call trace") + '</h2><div class="card-body">' +
         (heap ? historyHtml(run, fr.histLen) : logTable(run, idx)) + '</div></div>' +
-      '<div class="card" style="margin-top:1rem"><h2>For the record</h2><div class="card-body">' +
+      '<div class="card"><h2>For the record</h2><div class="card-body">' +
         '<dl class="facts"><dt>Best case</dt><dd>' + f.best + '</dd>' +
         '<dt>Average/worst</dt><dd>' + f.avg + '</dd>' +
         '<dt>Extra space</dt><dd>' + f.space + '</dd>' +
         '<dt>Stable</dt><dd>' + f.stable + '</dd>' +
         '<dt>This run</dt><dd>' + last.comparisons + ' comparisons, ' + last.writes + ' writes</dd>' +
         '</dl></div></div>' +
-    '</div></div>';
+    '</div>';
 
   var code = document.getElementById("code-solo");
   var clickable = !!LINE_INFO[key];
