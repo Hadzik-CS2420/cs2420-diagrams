@@ -357,7 +357,7 @@
     <div class="row" id="viewRow">
       <span class="lbl">Heap view</span>
       <button class="ctl" data-view="overview">Overview &mdash; one call per step</button>
-      <button class="ctl" data-view="detail">Detail &mdash; every comparison</button>
+      <button class="ctl" data-view="detail">Detail &mdash; every line, like a debugger</button>
     </div>
     <div class="row">
       <span class="lbl">Step</span>
@@ -1048,6 +1048,15 @@ function heapSort(items) {
       for (var key in extra) m[key] = extra[key];
       return m;
     }
+    // Entering the call. A debugger stops here first, with the arguments bound
+    // to the parameters, and that was the one frame Detail never showed.
+    snap('hsig', "<strong>Entering heapify_down.</strong> The arguments bind to the " +
+         "parameters: <code>heap_size = " + heapSize + "</code>, <code>index = " + index +
+         "</code>" + (depth ? ", and this is a <strong>nested call</strong> at depth " + depth +
+         " &mdash; the one the line above made." : ", called from the loop in heap_sort.") +
+         " <code>data</code> is a reference, so this is the same array, not a copy.",
+         mk({ calc: "heapify_down(data, heap_size = " + heapSize + ", index = " + index + ")" +
+                    (depth ? "   \u2190  depth " + depth : "") }));
     snap('init', "heapify_down at index " + index + ", which holds " + a[index].v +
          ". Its children sit at 2i+1 and 2i+2 &mdash; the boxed family in the tree.",
          mk({ calc: "index = " + index + "   →   left = 2·" + index + "+1 = " + left +
@@ -1088,7 +1097,23 @@ function heapSort(items) {
            mk({ moved: [index, largest], path: [index, largest], kids: [],
                 calc: "largest = " + largest + " ≠ index = " + index + "   →   swap data[" + index + "] ↔ data[" +
                       largest + "]   (" + pv + " ↔ " + cv + ")" }));
+      // The call itself, before it is made. Without this frame the next thing on
+      // screen is already inside the deeper call, with nothing saying how it got
+      // there.
+      snap('rec', "<strong>The recursive call.</strong> " + pv + " moved down to index " +
+           largest + ", and it may still be smaller than its new children, so " +
+           "heapify_down calls itself on index " + largest + " to carry on sinking. " +
+           "Same array, same heap_size &mdash; only the index changes.",
+           mk({ moved: [index, largest], path: [index, largest], node: largest, kids: [],
+                calc: "heapify_down(data, heap_size = " + heapSize + ", index = " + largest +
+                      ")   \u2192  about to enter depth " + (depth + 1) }));
       heapify(heapSize, largest, phase, depth + 1);
+      snap('hend', "<strong>Back from the nested call</strong> at depth " + (depth + 1) +
+           ". Everything below index " + largest + " is a heap now, so this call is " +
+           "finished too and returns" + (depth ? " into depth " + (depth - 1) + "." :
+           " to the loop in heap_sort."),
+           mk({ node: index, kids: [],
+                calc: "return   \u2190  depth " + (depth + 1) + " done, back in depth " + depth }));
     } else {
       snap('sink', a[index].v + " is at least as big as its children &mdash; the heap property holds here, " +
            "so the sinking stops.",
@@ -1162,6 +1187,14 @@ function heapSort(items) {
     r.event(0, "extract to " + e, "heap_size shrinks to " + e);
     sw(0, e);
     var root = a[0].v;
+    // The loop line itself. `build` is a comment and never executes, but this is a
+    // real statement and detail was stepping straight past it into the swap.
+    snap('eloop', "<strong>Top of the phase 2 loop.</strong> i = " + e + ", so this pass " +
+         "puts the current largest value into index " + e + " and then shrinks the heap to " +
+         e + ". The loop runs down to i = 1, never 0 &mdash; one element left is already " +
+         "in place.",
+         { heapSize: e + 1, phase: 'extract', node: 0, sortedFrom: e + 1,
+           calc: "i = " + e + "   →   this pass fills index " + e });
     snap('eswap', "Swap the max, " + mx + ", out to index " + e + " &mdash; its final position. " + root +
          " lands on the root, where it almost certainly does not belong.",
          { heapSize: e, phase: 'extract', moved: [0, e], sortedFrom: e,
@@ -1602,8 +1635,9 @@ function renderSolo() {
                   ? ' In <b>overview</b> the highlighted line is the <b>call</b>; the ' +
                     'comparisons and the swap happen inside heapify_down above. Switch to ' +
                     'Detail to step through them.'
-                  : ' In <b>detail</b> you are stepping inside heapify_down, one comparison ' +
-                    'at a time.') +
+                  : ' In <b>detail</b> you step every line the way a debugger would: ' +
+                    'entering the call, reading the children, each comparison, the ' +
+                    'swap, the recursive call, and the return.') +
                 '</p>' : '') +
         '<div class="code" id="code-solo"></div>' +
           lineInfoHtml(key, fr.line) +
