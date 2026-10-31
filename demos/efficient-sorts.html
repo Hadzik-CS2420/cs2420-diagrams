@@ -311,6 +311,13 @@
   /* .code div:hover paints a dark grey; on a light band that would flash it
      back to looking like code. */
   .code div.calc:hover { background:#f9e2af; }
+  /* In overview the whole of heapify_down ran for this one step. Banding the
+     body says that; highlighting one line inside it would be a lie. */
+  .code div.ranblock { background:rgba(137,220,235,.08);
+                       box-shadow:inset 3px 0 0 #89dceb; }
+  .code div.ranblock.ranhead::after {
+      content:"   \2190  this whole call ran, top to bottom";
+      color:#89dceb; font-style:italic; font-size:.8rem; }
 </style>
 </head>
 <body>
@@ -794,7 +801,8 @@ var LINE_INFO = {
       items: [
         ["why", "<code>n/2 - 1</code> is the last node that <em>has</em> a child. Everything after it is a leaf, and a single element is already a valid heap, so there is nothing to do there."],
         ["trap", "It must run <strong>backwards</strong>. <code>heapify_down</code> assumes the subtrees below a node are already heaps, and only going from the bottom up guarantees that. Loop forwards and you get an array that is not a heap, with no error anywhere."],
-        ["syntax", "<code>heap_size</code> is <code>n</code> throughout this phase &mdash; the whole array is the heap."]
+        ["syntax", "<code>heap_size</code> is <code>n</code> throughout this phase &mdash; the whole array is the heap."],
+        ["trap", "<code>heap_size</code> is a <strong>count</strong>; <code>index</code> is a <strong>position</strong>. Seven elements means <code>heap_size = 7</code> and indices <code>0..6</code>, which is why the call reads <code>(data, 7, 2)</code> and not <code>(data, 6, 2)</code>. Pass the last <em>index</em> instead of the count and <code>left &lt; heap_size</code> turns false for the final element &mdash; it becomes invisible to every comparison, and the array comes out wrong with no error anywhere."]
       ] },
     extr: { src: "// phase 2: swap the max out, shrink, repair",
       what: "Repeatedly moves the largest remaining element to the end of the unsorted region.",
@@ -1116,14 +1124,16 @@ function heapSort(items) {
     snap('bloop', "i = " + i + ": fix the subtree rooted at index " + i + ". Everything below it is " +
          "already a heap, because those nodes were fixed first.",
          { heapSize: n, phase: 'build', parents: lastParent, node: i,
-           calc: "i = " + i + "   →   heapify_down(data, " + n + ", " + i + ")" });
+           calc: "i = " + i + "   →   heapify_down(data, heap_size = " + n +
+                 ", index = " + i + ")" });
     heapify(n, i, 'build', 0);
     hist('heapify(' + i + ')', 'build', { changed: pathOf() });
     ov('bloop', "Fix node " + i + " (" + top + "), whose children are " + kidsV.join(" and ") + ". " +
        sinkText(top),
        { heapSize: n, phase: 'build', parents: lastParent, node: i, before: before,
          beforeLit: pathOf().length ? pathOf() : [i], path: pathOf(), moved: pathOf(),
-         calc: "i = " + i + "   →   heapify_down(data, " + n + ", " + i + ")" });
+         calc: "i = " + i + "   →   heapify_down(data, heap_size = " + n +
+                 ", index = " + i + ")" });
   }
 
   banner = { phase: 'built', text: 'Heap built', sub: 'data[0] = ' + a[0].v + ', the largest value' };
@@ -1156,7 +1166,7 @@ function heapSort(items) {
        " lands on the root. " + sinkText(root) + " heap_size is now " + e + ".",
        { heapSize: e, phase: 'extract', sortedFrom: e, node: 0, before: before, beforeLit: [0, e],
          beforeSorted: e + 1, path: pathOf(), moved: pathOf(),
-         calc: "i = " + e + "   →   swap data[0] ↔ data[" + e + "],  heapify_down(data, " + e + ", 0)" });
+         calc: "i = " + e + "   →   swap data[0] ↔ data[" + e + "],  heapify_down(data, heap_size = " + e + ", index = 0)" });
   }
 
   banner = { phase: 'done', text: 'Sorted', sub: 'a max-heap gives ascending order' };
@@ -1602,9 +1612,18 @@ function renderSolo() {
            '>' + ln.t + '</div>' +
            (i === calcAt && m.calc ? '<div class="calc">' + esc(m.calc) + '</div>' : '');
   }).join("");
+  // heapify_down's body, for the overview band below.
+  var HELPER = ["hsig", "init", "cmpL", "cmpR", "sink", "rec", "hend"];
+  var calling = key === "heap" && state.heapView === "overview" &&
+                (fr.line === "bloop" || fr.line === "eloop");
+
   Array.prototype.forEach.call(code.children, function (d) {
     var k = d.getAttribute("data-k");
     if (!k) return;   // a live-values row, not a line of code
+    if (calling && HELPER.indexOf(k) !== -1) {
+      d.classList.add("ranblock");
+      if (k === "hsig") d.classList.add("ranhead");
+    }
     // Both halves of a split statement share a key, so both light up together.
     d.classList.toggle("active", k === fr.line);
     d.classList.toggle("pinned", state.pinned === k);
