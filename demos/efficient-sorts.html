@@ -62,16 +62,25 @@
   @media (max-width:1000px) { .solo { grid-template-columns:minmax(0,1fr); } }
 
   /* ---- How it works, as a banner across the top ---- */
-  .howto .lead { margin:0 0 .75rem; font-size:.93rem; }
-  .howto-steps { display:grid; gap:.7rem; margin:0 0 .75rem;
-                 grid-template-columns:repeat(auto-fit,minmax(17rem,1fr)); }
-  .hstep { display:flex; gap:.55rem; align-items:flex-start;
-           background:#f7f9fb; border:1px solid var(--rule); border-radius:8px;
-           padding:.6rem .7rem; font-size:.84rem; line-height:1.55; }
-  .hnum { flex:0 0 auto; width:1.4rem; height:1.4rem; border-radius:50%;
-          background:var(--deep); color:#fff; font-size:.73rem; font-weight:700;
-          display:flex; align-items:center; justify-content:center; margin-top:.1rem; }
-  .howto .callout { margin-bottom:0; }
+  .howto .lead { margin:0 0 .7rem; font-size:.9rem; }
+  .howto-steps { display:grid; gap:.7rem; margin:0 0 .7rem;
+                 grid-template-columns:repeat(auto-fit,minmax(16rem,1fr)); }
+  .hstep { background:#f7f9fb; border:1px solid var(--rule); border-radius:8px;
+           padding:.55rem .7rem .6rem; }
+  .hstep > h4 { margin:0 0 .4rem; font-size:.84rem; display:flex; gap:.45rem;
+                align-items:center; color:var(--ink); }
+  .hnum { flex:0 0 auto; width:1.3rem; height:1.3rem; border-radius:50%;
+          background:var(--deep); color:#fff; font-size:.7rem; font-weight:700;
+          display:flex; align-items:center; justify-content:center; }
+  /* Short lines, one idea each -- this is read off a projector, not studied. */
+  .hstep ul { margin:0; padding:0; list-style:none; }
+  .hstep li { position:relative; padding-left:.85rem; margin-bottom:.22rem;
+              font-size:.8rem; line-height:1.45; }
+  .hstep li::before { content:""; position:absolute; left:.2rem; top:.52em;
+                      width:.3rem; height:.3rem; border-radius:50%;
+                      background:var(--muted); }
+  .hstep li:last-child { margin-bottom:0; }
+  .howto .callout { margin-bottom:0; font-size:.83rem; }
   .card { border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
   .card > h2 { font-size:.92rem; margin:0; padding:.5rem .85rem;
                border-bottom:1px solid var(--rule); background:#f7f9fb; }
@@ -243,6 +252,8 @@
     <span class="step-hint">&larr; &rarr; arrow keys step &middot; space plays</span>
   </div>
 
+  <div id="howto"></div>
+
   <div class="panel">
     <div class="row">
       <span class="lbl">Input</span>
@@ -368,10 +379,22 @@ var FACTS = {
   merge: {
     title: "Merge Sort",
     idea: "Split blindly at the midpoint, sort each half by calling yourself, then do all the real work in merge() — combining two <em>already sorted</em> halves into one. The recursion is trivial; merging is the algorithm.",
-    steps: ["<strong>Copy both halves out</strong> into temporary vectors. You must copy before writing, because you are about to overwrite the region you are reading. This is merge sort's O(n) extra space.",
-            "<strong>Compare the fronts</strong> with three indices: <code>i</code> into L, <code>j</code> into R, <code>k</code> into the real array. Take the smaller front each time.",
-            "<strong>Drain the leftovers.</strong> One half runs out first; everything still in the other has to be copied across.",
-            "Use <code>&lt;=</code> on the fronts, not <code>&lt;</code> — on a tie it takes from the left half, which is what keeps merge sort stable."],
+    steps: [{ t: "Copy both halves out",
+              b: ["into two temporary vectors, <em>before</em> writing anything",
+                  "you are about to overwrite the region you are reading",
+                  "this is merge sort's O(n) extra space"] },
+            { t: "Compare the fronts",
+              b: ["<code>i</code> into L, <code>j</code> into R, <code>k</code> into the real array",
+                  "take the smaller of the two fronts",
+                  "advance that index, and <code>k</code>"] },
+            { t: "Drain the leftovers",
+              b: ["one half always runs out first",
+                  "whatever is left in the other is copied straight across",
+                  "it is already sorted, so no comparing needed"] },
+            { t: "Use <code>&lt;=</code>, not <code>&lt;</code>",
+              b: ["on a tie, <code>&lt;=</code> takes from the <em>left</em> half",
+                  "left came first in the original array",
+                  "that one character is what makes merge sort stable"] }],
     best: "O(n log n) — no best case, it always splits the same way",
     avg: "O(n log n) guaranteed", space: "O(n) — the temporary halves",
     stable: "Yes — <code>&lt;=</code> takes from the left on a tie",
@@ -380,10 +403,23 @@ var FACTS = {
   quick: {
     title: "Quick Sort",
     idea: "The inverse of merge sort: do the work <em>before</em> recursing. partition() picks a pivot and rearranges so everything ≤ pivot is left of it. The pivot is then in its final position forever, and the two sides are sorted independently — no merge step, so no extra array.",
-    steps: ["<strong>Median-of-three:</strong> three conditional swaps leave the median of <code>low</code>, <code>mid</code> and <code>high</code> at <code>data[high]</code>. That becomes the pivot.",
-            "<strong>The Lomuto scan:</strong> <code>i</code> marks the end of the ≤-pivot region, starting at <code>low-1</code>. Walk <code>j</code>; whenever <code>data[j] &lt;= pivot</code>, advance <code>i</code> and swap.",
-            "<strong>Drop the pivot in</strong> at <code>i+1</code> and return that index — its final home.",
-            "Recurse on <code>low..p-1</code> and <code>p+1..high</code>. The pivot is in neither call."],
+    steps: [{ t: "Median-of-three picks the pivot",
+              b: ["three conditional swaps on <code>low</code>, <code>mid</code>, <code>high</code>",
+                  "leaves the median of those three at <code>data[high]</code>",
+                  "this is what stops sorted input being the worst case"] },
+            { t: "The Lomuto scan",
+              b: ["<code>i</code> marks the end of the &le;-pivot region",
+                  "it starts at <code>low-1</code> &mdash; the region is empty",
+                  "walk <code>j</code> from <code>low</code>",
+                  "when <code>data[j] &lt;= pivot</code>: advance <code>i</code>, then swap"] },
+            { t: "Drop the pivot in",
+              b: ["swap it into <code>i+1</code>, just past the &le; region",
+                  "return that index",
+                  "the pivot is now in its <strong>final</strong> position, for good"] },
+            { t: "Recurse on both sides",
+              b: ["<code>low..p-1</code> and <code>p+1..high</code>",
+                  "the pivot itself is in neither call",
+                  "nothing merges afterwards &mdash; that is the difference from merge sort"] }],
     best: "O(n log n) — pivot near the middle",
     avg: "O(n log n), worst O(n²)", space: "O(1) extra, O(log n) stack",
     stable: "No — the partition swap moves elements across a distance",
@@ -391,10 +427,25 @@ var FACTS = {
   },
   heap: {
     title: "Heap Sort",
-    idea: "A max-heap guarantees exactly one thing: <strong>the largest element is at <code>data[0]</code></strong>. Heap sort is that one fact spent over and over — turn the array into a heap, then repeatedly take whatever is at <code>data[0]</code>, park it at the end where it belongs, and repair the heap you just broke. Nothing is allocated: the heap and the sorted output share the same array, with the boundary between them moving left one slot at a time.",
-    steps: ["<strong>The tree is the array.</strong> There are no node objects and no pointers — the shape is pure arithmetic. Node <code>i</code>'s children are <code>2i+1</code> and <code>2i+2</code>, and its parent is <code>(i-1)/2</code>. In a seven-element array that makes 0 the root, 1 and 2 the level beneath it, and 3 through 6 the leaves. The last node that <em>has</em> a child is <code>n/2-1</code>; everything past it is a leaf, already a perfectly good heap of one, which is why the build loop never visits them.",
-            "<strong>heapify_down sinks one bad node.</strong> Look at a node together with its two children and pick the largest of the three. If the node already is the largest, stop — this subtree is a heap. Otherwise swap it with that child and <em>start over from the child's index</em>. That is the part worth sitting with: the swap did not fix the problem, it <em>moved it down one level</em>, so you go fix it there. One swap per level at most, and a complete tree is only log n levels deep — that is where O(log n) per call comes from.",
-            "<strong>Two phases, one helper.</strong> <em>Build</em> calls heapify_down on every parent from <code>n/2-1</code> down to <code>0</code>. Going <strong>backwards is the whole trick</strong>: by the time you reach node <code>i</code>, both subtrees beneath it are already heaps, so one sink is enough to fix it. Forwards you would have to repeat passes. <em>Sort</em> then swaps <code>data[0]</code> with the last unsorted slot, shrinks the heap by one, and sinks the new root. The element just parked was the largest still in play, so it never moves again, and the green sorted tail grows leftward until nothing is left."],
+    idea: "A max-heap guarantees one thing: <strong>the largest element is at <code>data[0]</code></strong>. Heap sort spends that fact over and over — build the heap, move <code>data[0]</code> to the end, repair, repeat. Nothing is allocated: the heap and the sorted tail share one array.",
+    steps: [{ t: "The tree is the array",
+              b: ["children of <code>i</code>: <code>2i+1</code> and <code>2i+2</code>",
+                  "parent of <code>i</code>: <code>(i-1)/2</code>",
+                  "no node objects, no pointers &mdash; just arithmetic",
+                  "last node with a child: <code>n/2-1</code>",
+                  "everything past it is a leaf, already a heap of one"] },
+            { t: "heapify_down sinks one bad node",
+              b: ["take the largest of a node and its two children",
+                  "node already the largest? stop &mdash; subtree is a heap",
+                  "otherwise swap, then <strong>repeat from the child's index</strong>",
+                  "the swap <em>moved</em> the problem down, it did not fix it",
+                  "one swap per level, log n levels &rarr; O(log n) a call"] },
+            { t: "Two phases, one helper",
+              b: ["<strong>build:</strong> heapify_down each parent, <code>n/2-1</code> down to <code>0</code>",
+                  "backwards, so both subtrees are already heaps &mdash; one sink each",
+                  "<strong>sort:</strong> swap <code>data[0]</code> to the last unsorted slot",
+                  "shrink the heap by one, sink the new root",
+                  "the parked element was the biggest left, so it never moves again"] }],
     best: "O(n log n) — no best case either",
     avg: "O(n log n) guaranteed", space: "O(1) — the heap IS the array",
     stable: "No — a sink can reorder equals",
@@ -1296,20 +1347,24 @@ function renderSolo() {
       miniCells(m.before, m.beforeLit, "node", m.beforeSorted) + '</div></div>' +
       '<div class="rowlbl" style="margin-bottom:.25rem">after</div>' : '';
 
-  document.getElementById("stage").innerHTML =
-    '<div class="solo">' +
-      // How it works spans both columns, so the explanation is read once at the
-      // top rather than sitting in a side column level with the code.
-      '<div class="card span"><h2>How it works</h2><div class="card-body howto">' +
+  // How it works goes in its own container ABOVE the controls, so Play and
+    // the presets stay within reach of the array they drive. Inside #stage it
+    // pushed them a banner's height away.
+    document.getElementById("howto").innerHTML =
+      '<div class="card"><h2>How it works</h2><div class="card-body howto">' +
         '<p class="lead">' + f.idea + '</p>' +
         '<div class="howto-steps">' +
-          f.steps.map(function (s, i) {
-            return '<div class="hstep"><span class="hnum">' + (i + 1) + '</span>' +
-                   '<div>' + s + '</div></div>';
+          f.steps.map(function (st, i) {
+            return '<div class="hstep"><h4><span class="hnum">' + (i + 1) + '</span>' +
+                   st.t + '</h4><ul>' +
+                   st.b.map(function (b) { return '<li>' + b + '</li>'; }).join("") +
+                   '</ul></div>';
           }).join("") +
         '</div><div class="callout warn">' + f.watch + '</div>' +
-      '</div></div>' +
+      '</div></div>';
 
+    document.getElementById("stage").innerHTML =
+    '<div class="solo">' +
       // Left: the data and the tree. Right: the code acting on it. Same row, so
       // the executing line and the node it moves are visible at once.
       '<div class="card"><h2>' + f.title +
@@ -1376,6 +1431,10 @@ function pinLine(k) {
 }
 
 function renderCompare() {
+  // The compare tab explains itself in its own subtitle; an algorithm-specific
+  // How it works would be stale here.
+  document.getElementById("howto").innerHTML = "";
+
   var dupes = hasDuplicates(PRESETS[state.preset]);
   var lanes = LANES.map(function (l) {
     var run = state.runs[l.key];
