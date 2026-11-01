@@ -329,9 +329,7 @@
     line that is executing, and the structure that algorithm actually works on —
     the temporary halves for merge sort, the pivot boundary for quick sort, and the
     binary tree hiding in the array for heap sort. <strong>Click any line of code</strong>
-    for a breakdown of it. Heap sort opens in an <strong>overview</strong>, one whole call per
-    step; switch to <strong>detail</strong> to watch every comparison. The last tab races all three.
-  </p>
+    for a breakdown of it. Heap sort opens on <strong>Step every line</strong> &mdash; into <code>heapify_down</code>, through each <code>if</code>, and the swap only on the line that swaps. <strong>Summary</strong> collapses each call to a single step once the shape is familiar.</p>
 
   <div class="tabs" id="tabs">
     <button data-mode="merge">1 &middot; Merge Sort</button>
@@ -356,8 +354,8 @@
     </div>
     <div class="row" id="viewRow">
       <span class="lbl">Heap view</span>
-      <button class="ctl" data-view="overview">Overview &mdash; one call per step</button>
-      <button class="ctl" data-view="detail">Detail &mdash; every line, like a debugger</button>
+      <button class="ctl" data-view="detail">Step every line &mdash; like a debugger</button>
+      <button class="ctl" data-view="overview">Summary &mdash; one whole call per step</button>
     </div>
     <div class="row">
       <span class="lbl">Step</span>
@@ -1259,7 +1257,7 @@ var LANES = [
   { key: "heap",  title: "Heap Sort" }
 ];
 var state = { mode: "merge", preset: "random", step: 0, runs: null,
-              timer: null, pinned: null, heapView: "overview", helpOpen: false };
+              timer: null, pinned: null, heapView: "detail", helpOpen: false };
 
 function compute() {
   var items = build(PRESETS[state.preset]);
@@ -1636,12 +1634,12 @@ function renderSolo() {
                 'see it before heap_sort can call it &mdash; heap_sort is still the entry ' +
                 'point.' +
                 (state.heapView === "overview"
-                  ? ' In <b>overview</b> the highlighted line is the <b>call</b>; the ' +
-                    'comparisons and the swap happen inside heapify_down above. Switch to ' +
-                    'Detail to step through them.'
-                  : ' In <b>detail</b> you step every line the way a debugger would: ' +
-                    'entering the call, reading the children, each comparison, the ' +
-                    'swap, the recursive call, and the return.') +
+                  ? ' You are in <b>Summary</b>: one step is one whole call, so the ' +
+                    'highlighted line is the <b>call</b> and the array shows what the call ' +
+                    'did. To watch the lines run, switch to <b>Step every line</b>.'
+                  : ' You are stepping <b>every line</b>, the way a debugger would: into the ' +
+                    'call, int largest, each if, the swap on the line that swaps, the ' +
+                    'recursive call, and the return.') +
                 '</p>' : '') +
         '<div class="code" id="code-solo"></div>' +
           lineInfoHtml(key, fr.line) +
