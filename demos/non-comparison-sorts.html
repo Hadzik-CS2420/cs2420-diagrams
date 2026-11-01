@@ -881,6 +881,9 @@ Recorder.prototype.phase = function (name, detail) {
   this.log.push({ name: name, detail: detail });
 };
 function lab(e) { return e.v + (e.tag || ""); }
+// The THIS STEP band is plain text, not markup. Escaping it is why a calc
+// string must contain real characters rather than HTML entities.
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
 // ---- counting sort --------------------------------------------------------
 function countingSort(items) {
@@ -1600,14 +1603,21 @@ function renderSolo() {
 
   var code = document.getElementById("code-solo");
   var clickable = !!LINE_INFO[key];
-  code.innerHTML = CODE[key].map(function (ln) {
+  // The live values go under the LAST row of the executing statement, so a
+  // statement split across two rows gets the band beneath the whole thing.
+  var calcAt = -1;
+  CODE[key].forEach(function (ln, i) { if (ln.k === fr.line) calcAt = i; });
+  code.innerHTML = CODE[key].map(function (ln, i) {
     var explained = clickable && LINE_INFO[key][ln.k];
     return '<div data-k="' + ln.k + '"' + (ln.c ? ' class="cont"' : '') +
            (explained ? ' role="button" tabindex="0" title="Click for a breakdown of this line"' : '') +
-           '>' + ln.t + '</div>';
+           '>' + ln.t + '</div>' +
+           (i === calcAt && fr.marks.calc
+              ? '<div class="calc">' + esc(fr.marks.calc) + '</div>' : '');
   }).join("");
   Array.prototype.forEach.call(code.children, function (d) {
     var k = d.getAttribute("data-k");
+    if (!k) return;   // the THIS STEP band, not a line of code
     d.classList.toggle("active", k === fr.line);
     d.classList.toggle("pinned", state.pinned === k);
     if (!clickable || !LINE_INFO[key][k]) { d.style.cursor = "default"; return; }
