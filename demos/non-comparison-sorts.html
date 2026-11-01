@@ -50,8 +50,7 @@
   button.ctl.primary { background:var(--deep); border-color:var(--deep); color:#fff; }
   .count { font-variant-numeric:tabular-nums; font-size:.84rem; color:var(--muted); margin-left:auto; }
 
-  .solo { display:grid; grid-template-columns:1.1fr .9fr; gap:1.1rem; align-items:start; }
-  @media (max-width:1040px) { .solo { grid-template-columns:1fr; } }
+  /* .solo now comes from the ported block below. */
   .card { border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
   .card > h2 { font-size:.92rem; margin:0; padding:.5rem .85rem;
                border-bottom:1px solid var(--rule); background:#f7f9fb; }
@@ -234,6 +233,93 @@
   .hint { margin-top:.9rem; font-size:.83rem; color:var(--muted);
           border-left:3px solid var(--rule); padding-left:.75rem; }
   .verdict { margin-top:1.15rem; }
+
+  /* ---- ported verbatim from ct14's heap stepper ----------------------
+     Layout, the How-it-works cards, Variables in scope, the phase banner
+     and the THIS STEP band. Copied rather than retyped so the two
+     steppers do not drift apart on spacing. */
+  .solo { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+          gap:1.1rem; align-items:start; }
+  .solo > .col { display:flex; flex-direction:column; gap:1.1rem; min-width:0; }
+  .howto .lead { margin:0 0 .7rem; font-size:.9rem; }
+  .howto-steps { display:grid; gap:.7rem; margin:0 0 .7rem;
+                 grid-template-columns:repeat(auto-fit,minmax(16rem,1fr)); }
+  .hstep { background:#f7f9fb; border:1px solid var(--rule); border-radius:8px;
+           padding:.55rem .7rem .6rem; }
+  .hstep > h4 { margin:0 0 .4rem; font-size:.84rem; display:flex; gap:.45rem;
+                align-items:center; color:var(--ink); }
+  .hnum { flex:0 0 auto; width:1.3rem; height:1.3rem; border-radius:50%;
+          background:var(--deep); color:#fff; font-size:.7rem; font-weight:700;
+          display:flex; align-items:center; justify-content:center; }
+  .hstep ul { margin:0; padding:0; list-style:none; }
+  .hstep li { position:relative; padding-left:.85rem; margin-bottom:.22rem;
+              font-size:.8rem; line-height:1.45; }
+  .hstep li::before { content:""; position:absolute; left:.2rem; top:.52em;
+                      width:.3rem; height:.3rem; border-radius:50%;
+                      background:var(--muted); }
+  .hstep li:last-child { margin-bottom:0; }
+  .howto .callout { margin-bottom:0; font-size:.83rem; }
+  .locals { display:grid; grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));
+            gap:.5rem 1.1rem; margin:.6rem 0 0; padding:.55rem .7rem;
+            border:1px solid var(--rule); border-radius:8px; background:#fbfcfd; }
+  .locals h5 { margin:0 0 .3rem; font-size:.68rem; font-weight:700; color:var(--muted);
+               text-transform:uppercase; letter-spacing:.06em; }
+  .locals .lv { display:flex; align-items:baseline; gap:.45rem; font-size:.79rem;
+                line-height:1.5; }
+  .locals .ln { font-family:Consolas,monospace; font-weight:650; color:var(--ink);
+                min-width:4.6rem; }
+  .locals .lval { font-family:Consolas,monospace; font-weight:700;
+                  color:var(--blue); background:var(--tint-blue);
+                  border:1px solid rgba(37,115,167,.3); border-radius:999px;
+                  padding:.02rem .45rem; min-width:1.6rem; text-align:center; }
+  .locals .lval.pend { color:var(--muted); background:#f0f2f5;
+                       border-color:var(--rule); font-weight:600; }
+  .locals .lat.pend { font-style:italic; }
+  .locals .lat { color:var(--muted); font-size:.75rem; }
+  .locals .lat.out { color:var(--red); }
+  .locals .stackline .ln { font-weight:600; color:var(--teal); min-width:0; }
+  .locals .stackline.here .lat { color:var(--ink); font-weight:600; }
+  .banner { display:flex; flex-wrap:wrap; align-items:baseline; gap:.2rem .8rem; margin:0 0 .8rem;
+            padding:.5rem .85rem; border-radius:7px; color:#fff; background:var(--deep); }
+  .banner strong { font-size:1.02rem; }
+  .banner span { font-size:.85rem; }
+  .banner.build { background:var(--blue); }
+  .banner.built { background:var(--teal); }
+  .banner.extract { background:var(--orange); }
+  .banner.done { background:var(--green); }
+  .rowlbl { font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); min-width:3.3rem; }
+  .beforerow { display:flex; align-items:center; gap:.5rem; margin:0 0 .5rem; }
+  .beforerow .cells, .hist .cells { min-height:0; gap:.2rem; }
+  .beforerow .cell, .hist .cell { min-width:2.1rem; font-size:.86rem; padding:.22rem .1rem; }
+  .beforerow .cell .ix { font-size:.55rem; line-height:1.1; margin-top:.05rem; }
+  .code div.calc { background:#f9e2af; color:#1e1e2e; font-size:.88rem;
+                   font-weight:600; white-space:pre; cursor:default;
+                   display:flex; align-items:flex-start; gap:.55rem;
+                   padding:.22rem .8rem; margin:.12rem 0;
+                   border-left:4px solid #b8860b; }
+  .code div.calc::before { content:"THIS STEP"; font-size:.62rem; font-weight:800;
+                           letter-spacing:.06em; color:#6b4f04;
+                           background:rgba(0,0,0,.09); border-radius:3px;
+                           padding:.08em .32em; flex:0 0 auto;
+                           margin-top:.28em; }
+  .code div.calc:hover { background:#f9e2af; }
+
+  @media (max-width:1000px) { .solo { grid-template-columns:minmax(0,1fr); } }
+
+  /* the phase rail, also from ct14 */
+  .phrail { display:flex; align-items:stretch; gap:.4rem; margin:0 0 .6rem; }
+  .phrail .ph { flex:1 1 0; min-width:0; border:1px solid var(--rule); border-radius:8px;
+                padding:.35rem .6rem; font-size:.78rem; background:#f7f9fb;
+                color:var(--muted); display:flex; align-items:center; gap:.4rem; }
+  .phrail .ph b { font-size:.74rem; width:1.15rem; height:1.15rem; flex:0 0 auto;
+                  border-radius:50%; background:var(--rule); color:#fff;
+                  display:flex; align-items:center; justify-content:center; }
+  .phrail .ph.on   { background:var(--tint-blue); border-color:var(--blue);
+                     color:var(--blue); font-weight:650; }
+  .phrail .ph.on b { background:var(--blue); }
+  .phrail .ph.done { background:var(--tint-green); border-color:rgba(28,126,69,.35);
+                     color:var(--green); }
+  .phrail .ph.done b { background:var(--green); }
 </style>
 </head>
 <body>
@@ -256,6 +342,8 @@
     <span class="spacer"></span>
     <span class="step-hint">&larr; &rarr; arrow keys step &middot; space plays</span>
   </div>
+
+  <div id="howto"></div>
 
   <div class="panel">
     <div class="row">
@@ -379,10 +467,24 @@ var FACTS = {
   counting: {
     title: "Counting Sort",
     idea: "Do not compare anything. Make one counter per possible value, tally how many times each appears, then write the sorted array straight out of the tallies.",
-    steps: ["Find <code>min</code> and <code>max</code> in one pass each.",
-            "Allocate <code>k = max - min + 1</code> counters &mdash; <strong>k is the value range, not the element count</strong>.",
-            "Tally: for each value <code>v</code>, increment <code>count[v - min]</code>. The <code>- min</code> offset is what lets the array be only as big as the range.",
-            "Emit: walk the counters in order and write each value out as many times as its counter says."],
+    steps: [{ t: "Measure the range, not the array",
+              b: ["one pass finds <code>min</code> and <code>max</code>",
+                  "<code>k = max - min + 1</code> &mdash; how many <em>distinct values</em> could occur",
+                  "<strong>k has nothing to do with how many elements there are</strong>",
+                  "8 values spread 2..802 still needs 801 counters",
+                  "that single fact is what decides if this sort is brilliant or terrible"] },
+            { t: "Tally into count[v - min]",
+              b: ["one counter per possible value, all starting at 0",
+                  "for each value <code>v</code>, <code>count[v - min]++</code>",
+                  "the <code>- min</code> slides the range down to start at index 0",
+                  "without it, <code>{101, 103, 102}</code> indexes <code>count[101]</code> on a 3-slot array",
+                  "nothing is compared here &mdash; values are used as <em>addresses</em>"] },
+            { t: "Emit straight from the counters",
+              b: ["walk the counters left to right, which is value order",
+                  "write value <code>i + min</code> exactly <code>count[i]</code> times",
+                  "a zero counter writes nothing and costs one check",
+                  "the original elements are never moved &mdash; they are rebuilt",
+                  "O(n + k): n to tally, k to walk the counters"] }],
     time: "O(n + k)", space: "O(k) &mdash; the count array",
     stable: "Not meaningful here &mdash; this version rebuilds values from counts rather than moving elements",
     watch: "<strong>The <code>- min_val</code> offset is the line people drop.</strong> Without it, data like <code>{101, 103, 102}</code> indexes <code>count[101]</code> on an array of size 3. And <code>k</code> is the value <em>range</em>: switch to the 3-digit input and watch it allocate 801 counters to sort 8 numbers."
@@ -390,10 +492,24 @@ var FACTS = {
   bucket: {
     title: "Bucket Sort",
     idea: "Counting sort needs one slot per value, which collapses on a wide range. Bucket sort relaxes that to one bucket per <em>range</em> of values: scatter, sort each small bucket, then gather in order.",
-    steps: ["Find <code>min</code> and <code>max</code>, and bail out early if they are equal &mdash; that would divide by zero.",
-            "Work out how wide each bucket is: <code>per = ceil(range / num_buckets)</code>.",
-            "Distribute: <code>b = (val - min) / per</code>, then <code>push_back</code> into bucket <code>b</code>.",
-            "Sort each bucket with an ordinary comparison sort, then concatenate the buckets in order."],
+    steps: [{ t: "One bucket per range of values",
+              b: ["counting sort needs a slot per <em>value</em>, which a wide range kills",
+                  "a bucket covers a <em>span</em> of values instead",
+                  "<code>per = ceil(range / num_buckets)</code> is how wide each span is",
+                  "all values equal? bail out first &mdash; <code>range</code> would make <code>per</code> zero",
+                  "and dividing by zero is the crash this guard exists for"] },
+            { t: "Scatter: b = (val - min) / per",
+              b: ["integer division maps a value to its bucket number",
+                  "same <code>- min</code> trick as counting sort, for the same reason",
+                  "<code>push_back</code> grows the bucket, so no size is needed up front",
+                  "the maximum lands one bucket too far, so clamp it back",
+                  "buckets hold every element &mdash; that is the O(n) extra space"] },
+            { t: "Sort each bucket, then gather",
+              b: ["each bucket is small, so an ordinary comparison sort is cheap",
+                  "<strong>this is where bucket sort compares</strong>, unlike the other two",
+                  "concatenate the buckets in order and the array is sorted",
+                  "spread evenly &rarr; every bucket is tiny &rarr; near O(n)",
+                  "all in one bucket &rarr; you just paid for <code>std::sort</code> plus overhead"] }],
     time: "O(n + k) when the values spread evenly; O(n log n) when they all land in one bucket",
     space: "O(n + num_buckets) &mdash; the buckets hold every element",
     stable: "Depends on the per-bucket sort; <code>std::sort</code> is not stable, <code>std::stable_sort</code> is",
@@ -402,10 +518,24 @@ var FACTS = {
   radix: {
     title: "Radix Sort (LSD)",
     idea: "Fix counting sort's range problem from the other side: sort one <em>digit</em> at a time. A digit only has ten possible values, so each pass needs exactly ten counters no matter how large the numbers are.",
-    steps: ["Find the maximum, to know how many digit positions there are.",
-            "For each position (<code>exp</code> = 1, 10, 100&hellip;), run a <strong>stable</strong> counting sort on <code>(value / exp) % 10</code>.",
-            "Tally the ten digit counts, then make them <strong>cumulative</strong>: <code>count[i] += count[i-1]</code> turns &ldquo;how many have this digit&rdquo; into &ldquo;where this digit&rsquo;s group ends&rdquo;.",
-            "Walk the input <strong>backwards</strong>, placing each element at <code>output[count[digit] - 1]</code> and decrementing. Backwards is what preserves the previous pass's order."],
+    steps: [{ t: "Sort by one digit at a time",
+              b: ["counting sort's problem is the range; a digit has only ten values",
+                  "so every pass needs exactly <strong>ten</strong> counters, however big the numbers",
+                  "the maximum tells you how many digit positions exist",
+                  "<code>exp</code> = 1, then 10, then 100 &mdash; least significant first",
+                  "<code>(value / exp) % 10</code> pulls out the digit at that position"] },
+            { t: "Cumulative counts give positions",
+              b: ["tally the ten digits of this pass",
+                  "then <code>count[i] += count[i-1]</code>",
+                  "that turns &ldquo;how many have this digit&rdquo; into &ldquo;where its group ends&rdquo;",
+                  "so <code>count[d]</code> is now a <em>position</em>, not a tally",
+                  "this is the step that makes placement a lookup instead of a search"] },
+            { t: "Place backwards, or it breaks",
+              b: ["walk the input from the END to the front",
+                  "put each element at <code>output[count[digit] - 1]</code>, then decrement",
+                  "<strong>backwards is what keeps equal digits in their existing order</strong>",
+                  "that order is the result of the previous pass, and it is load-bearing",
+                  "go forwards and the final answer is wrong, but plausibly so"] }],
     time: "O(d &times; (n + 10)) for d digits", space: "O(n + 10) &mdash; one output array per pass",
     stable: "Yes &mdash; and it has to be, or the whole algorithm collapses",
     watch: "<strong>Iterate backwards in step 3.</strong> Going forwards reverses equal-digit elements, which destroys the order the previous pass established &mdash; and then the final answer is simply wrong, usually in a way that still looks plausible on small inputs. Step the 3-digit input and watch pass 2 keep what pass 1 did."
@@ -755,30 +885,80 @@ function lab(e) { return e.v + (e.tag || ""); }
 // ---- counting sort --------------------------------------------------------
 function countingSort(items) {
   var r = new Recorder(items), a = r.a, n = a.length, i;
-  r.snap('sig', "Start. Counting sort never compares two elements — it uses the values as indices.", {});
-  if (n <= 1) { r.snap('guard', "One element or none: already sorted.", {}); return r; }
+  var B1 = { tone: "build", text: "Phase 1 \u00b7 Measure the range", sub: "how many counters do we need?" };
+  r.snap('sig', "<strong>Entering counting_sort.</strong> It never compares two elements \u2014 it uses " +
+         "the values themselves as <em>indices</em> into a counter array.",
+         { phase: 0, banner: B1, locals: { "data.size()": n }, stack: [],
+           calc: "counting_sort(data)   \u2190  " + n + " elements" });
+  r.snap('guard', "<strong>The size guard.</strong> 0 or 1 element is already sorted. It also protects " +
+         "the lines below: with no elements there is no min or max to dereference.",
+         { phase: 0, banner: B1, locals: { "data.size()": n }, stack: [],
+           calc: "data.size() = " + n + "  \u2192  " + (n <= 1 ? "\u2264 1, return now" : "> 1, keep going") });
+  if (n <= 1) { return r; }
   var vals = a.map(function (e) { return e.v; });
   var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
-  r.snap('minmax', "min = " + mn + ", max = " + mx + ". Two passes over the data, no comparisons between elements.",
-         { readAll: true });
+  r.snap('minmax', "<strong>One walk, both answers.</strong> <code>minmax_element</code> returns two " +
+         "iterators from a single pass, rather than the two separate passes <code>min_element</code> " +
+         "plus <code>max_element</code> would cost.",
+         { readAll: true, phase: 0, banner: B1,
+           locals: { "data.size()": n, min_val: null, max_val: null }, stack: [],
+           calc: "minmax_element(data.begin(), data.end())   \u2190  two iterators, one pass" });
+  r.snap('deref', "<strong>Dereference both iterators.</strong> <code>min_it</code> and " +
+         "<code>max_it</code> <em>point at</em> elements; the <code>*</code> reads the values out so " +
+         "the arithmetic below has plain ints to work with.",
+         { readAll: true, phase: 0, banner: B1,
+           locals: { "data.size()": n, min_val: mn, max_val: mx }, stack: [],
+           calc: "min_val = *min_it = " + mn + "\nmax_val = *max_it = " + mx });
   var k = mx - mn + 1;
   r.aux = k;
-  r.snap('kline', "k = " + mx + " - " + mn + " + 1 = " + k + ". This is the VALUE RANGE, not the number of " +
-         "elements — " + n + " values need " + k + " counters.", { k: k, base: mn });
+  r.snap('kline', "<strong>k is the VALUE RANGE</strong>, not the number of elements. " + n +
+         " values spread across " + mn + ".." + mx + " need " + k + " counters \u2014 and most of them " +
+         "may stay zero.",
+         { k: k, base: mn, phase: 0, banner: B1,
+           locals: { "data.size()": n, min_val: mn, max_val: mx, k: k }, stack: [],
+           calc: "k = max_val \u2212 min_val + 1\n" +
+                 "  = " + mx + " \u2212 " + mn + " + 1\n" +
+                 "  = " + k + "   \u2190  counters, for " + n + " elements" });
   var count = new Array(k).fill(0);
   r.phase("allocate", "count[" + k + "]");
-  r.snap('alloc', k + " counters, all zero. That allocation is counting sort's O(k) space.",
-         { k: k, base: mn, count: count.slice() });
+  r.snap('alloc', "<strong>" + k + " counters, all zero.</strong> This allocation is counting sort's " +
+         "O(k) space, and it happens whether or not the values are dense.",
+         { k: k, base: mn, count: count.slice(), phase: 0, banner: B1,
+           locals: { "data.size()": n, min_val: mn, max_val: mx, k: k }, stack: [],
+           calc: "vector<int> count(" + k + ", 0)" });
+  var B2 = { tone: "extract", text: "Phase 2 \u00b7 Tally", sub: "one pass, no comparisons" };
   r.phase("tally", "one pass over " + n + " values");
+  r.snap('tally', "<strong>The tally loop.</strong> A range-for over the data: each value is read once " +
+         "and used as an address. Nothing is compared and nothing is moved.",
+         { k: k, base: mn, count: count.slice(), phase: 1, banner: B2,
+           locals: { min_val: mn, k: k, val: null }, stack: [],
+           calc: "for (int val : data)   \u2190  " + n + " iterations" });
   for (i = 0; i < n; i++) {
     var slot = a[i].v - mn;
     count[slot]++;
-    r.snap('tally2', "data[" + i + "] = " + a[i].v + ", so count[" + a[i].v + " - " + mn + "] = count[" +
-           slot + "] becomes " + count[slot] + ".",
-           { k: k, base: mn, count: count.slice(), read: [i], hotCount: slot });
+    r.snap('tally2', "<strong>" + a[i].v + " is an index, not a thing to compare.</strong> The " +
+           "<code>- min_val</code> offset slides it down so the counter array only has to cover the " +
+           "range, starting at 0.",
+           { k: k, base: mn, count: count.slice(), read: [i], hotCount: slot, phase: 1, banner: B2,
+             locals: { i: i, val: a[i].v, min_val: mn, slot: slot }, stack: [],
+             calc: "count[val \u2212 min_val]++\n" +
+                   "count[" + a[i].v + " \u2212 " + mn + "] = count[" + slot + "]  \u2192  " +
+                   count[slot] });
   }
+  var B3 = { tone: "done", text: "Phase 3 \u00b7 Emit", sub: "walk the counters in value order" };
   r.phase("emit", "rebuild the array from the counters");
   var idx = 0;
+  r.snap('idx', "<strong>idx is the write cursor.</strong> It walks forward through <code>data</code> " +
+         "as values are emitted, independently of <code>i</code>, which walks the counters.",
+         { k: k, base: mn, count: count.slice(), phase: 2, banner: B3,
+           locals: { idx: 0, k: k, min_val: mn }, stack: [],
+           calc: "int idx = 0   \u2190  nothing written yet" });
+  r.snap('emit', "<strong>Walk the counters in order.</strong> Index order through <code>count</code> " +
+         "IS value order, because counter <code>i</code> stands for the value <code>i + min_val</code>. " +
+         "That is why no sorting happens here \u2014 the order was decided by where the tallies landed.",
+         { k: k, base: mn, count: count.slice(), phase: 2, banner: B3,
+           locals: { i: null, k: k, idx: 0, min_val: mn }, stack: [],
+           calc: "for (int i = 0; i < k; ++i)   \u2190  " + k + " counters to walk" });
   var work = count.slice();
   for (i = 0; i < k; i++) {
     if (work[i] === 0) {
@@ -793,7 +973,10 @@ function countingSort(items) {
           : "count[" + runStart + ".." + i + "] are all 0 — the " + span + " values from " +
             (runStart + mn) + " to " + (i + mn) + " never appeared, so they are skipped in one go. " +
             "Every one of those counters was still allocated.",
-             { k: k, base: mn, count: work.slice(), hotCount: runStart, sortedTo: idx - 1 });
+             { k: k, base: mn, count: work.slice(), hotCount: runStart, sortedTo: idx - 1,
+               phase: 2, banner: B3, locals: { i: runStart, idx: idx, min_val: mn }, stack: [],
+               calc: "count[" + runStart + "] == 0  \u2192  value " + (runStart + mn) +
+                     " never appeared, write nothing" });
       continue;
     }
     while (work[i] > 0) {
@@ -801,132 +984,329 @@ function countingSort(items) {
       work[i]--; r.writes++;
       r.snap('emit3', "Write " + (i + mn) + " into data[" + idx + "]. count[" + i + "] now reads " +
              work[i] + ".",
-             { k: k, base: mn, count: work.slice(), hotCount: i, moved: [idx], sortedTo: idx });
+             { k: k, base: mn, count: work.slice(), hotCount: i, moved: [idx], sortedTo: idx,
+               phase: 2, banner: B3,
+               locals: { i: i, idx: idx, min_val: mn, val: i + mn }, stack: [],
+               calc: "data[idx++] = i + min_val\ndata[" + idx + "] = " + i + " + " + mn +
+                     " = " + (i + mn) });
       idx++;
     }
   }
   r.snap('end', "Sorted. Total work: one pass to find min and max, one to tally, and one walk of the " +
-         k + " counters — O(n + k).", { k: k, base: mn, count: work.slice(), sortedTo: n - 1 });
+         k + " counters — O(n + k).",
+         { k: k, base: mn, count: work.slice(), sortedTo: n - 1, phase: 2,
+           banner: { tone: "done", text: "Sorted", sub: "rebuilt from the counters, never compared" },
+           locals: { idx: idx, k: k, min_val: mn }, stack: [],
+           calc: "return   \u2190  " + n + " elements, " + k + " counters" });
   return r;
 }
 
 // ---- bucket sort ----------------------------------------------------------
 function bucketSort(items) {
   var r = new Recorder(items), a = r.a, n = a.length, i;
-  r.snap('sig', "Start. One bucket per RANGE of values, rather than one counter per value.", {});
-  if (n <= 1) { r.snap('guard', "One element or none: already sorted.", {}); return r; }
+  var B1 = { tone: "build", text: "Phase 1 \u00b7 How wide is a bucket?", sub: "range \u00f7 bucket count" };
+  r.snap('sig', "<strong>Entering bucket_sort.</strong> Counting sort needed one slot per <em>value</em>. " +
+         "This needs one bucket per <em>span</em> of values, which is what lets it survive a wide range.",
+         { phase: 0, banner: B1, locals: { "data.size()": n, num_buckets: NUM_BUCKETS }, stack: [],
+           calc: "bucket_sort(data, " + NUM_BUCKETS + ")" });
+  r.snap('guard', "<strong>The size guard.</strong> 0 or 1 element is already sorted, and there is no " +
+         "min or max to dereference below.",
+         { phase: 0, banner: B1, locals: { "data.size()": n }, stack: [],
+           calc: "data.size() = " + n + "  \u2192  " + (n <= 1 ? "\u2264 1, return now" : "> 1, keep going") });
+  if (n <= 1) { return r; }
   var vals = a.map(function (e) { return e.v; });
   var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
-  r.snap('minmax', "min = " + mn + ", max = " + mx + ".", { readAll: true });
-  if (mn === mx) {
-    r.snap('same', "Every value is identical, so the span is zero. Return now — the bucket index " +
-           "below would divide by zero.", {});
-    return r;
-  }
+  r.snap('minmax', "<strong>One walk, both answers</strong> \u2014 the same <code>minmax_element</code> " +
+         "counting sort used, for the same reason.",
+         { readAll: true, phase: 0, banner: B1,
+           locals: { "data.size()": n, min_val: null, max_val: null }, stack: [],
+           calc: "minmax_element(data.begin(), data.end())   \u2190  two iterators, one pass" });
+  r.snap('deref', "<strong>Dereference both iterators</strong> to get plain ints for the arithmetic below.",
+         { readAll: true, phase: 0, banner: B1,
+           locals: { min_val: mn, max_val: mx }, stack: [],
+           calc: "min_val = *min_it = " + mn + "\nmax_val = *max_it = " + mx });
+  r.snap('same', "<strong>The divide-by-zero guard.</strong> If every value is identical then " +
+         "<code>range</code> is 1 \u2026 but on the general case this check is what stops " +
+         "<code>per</code> from being 0 two lines down, and <code>(val - min_val) / 0</code> " +
+         "is a crash, not a wrong answer.",
+         { phase: 0, banner: B1, locals: { min_val: mn, max_val: mx }, stack: [],
+           calc: "min_val == max_val ?  " + mn + " == " + mx + "  \u2192  " +
+                 (mn === mx ? "yes, return now" : "no, keep going") });
+  if (mn === mx) { return r; }
   var range = mx - mn + 1;
-  r.snap('range', "range = " + range + " distinct possible values across " + NUM_BUCKETS + " buckets.", {});
+  r.snap('range', "<strong>range</strong> is how many distinct values could occur \u2014 the same " +
+         "quantity counting sort called <code>k</code>, and the same thing that made counting sort " +
+         "expensive. Bucket sort divides it up instead of allocating all of it.",
+         { phase: 0, banner: B1, locals: { min_val: mn, max_val: mx, range: range }, stack: [],
+           calc: "range = max_val \u2212 min_val + 1\n" +
+                 "      = " + mx + " \u2212 " + mn + " + 1 = " + range });
   var per = Math.ceil(range / NUM_BUCKETS);
-  r.snap('per', "per = ceil(" + range + " / " + NUM_BUCKETS + ") = " + per +
-         ". Each bucket covers " + per + " value" + (per === 1 ? "" : "s") + ".", { per: per });
+  r.snap('per', "<strong>per</strong> is how many values share a bucket. <code>ceil</code> rounds UP, " +
+         "so the buckets cover at least the whole range \u2014 rounding down would leave the top " +
+         "values with nowhere to go.",
+         { per: per, phase: 0, banner: B1,
+           locals: { range: range, num_buckets: NUM_BUCKETS, per: per }, stack: [],
+           calc: "per = ceil((double)range / num_buckets)\n" +
+                 "    = ceil(" + range + " / " + NUM_BUCKETS + ") = " + per +
+                 "   \u2190  values per bucket" });
   var buckets = [];
   for (i = 0; i < NUM_BUCKETS; i++) buckets.push([]);
   r.aux = n + NUM_BUCKETS;
   r.phase("distribute", n + " values into " + NUM_BUCKETS + " buckets");
-  r.snap('alloc', NUM_BUCKETS + " empty buckets. Between them they will hold every element, which is " +
-         "bucket sort's O(n) extra space.", { buckets: buckets.map(function (b) { return b.slice(); }), per: per, base: mn });
+  var B2 = { tone: "extract", text: "Phase 2 \u00b7 Scatter", sub: "b = (val \u2212 min_val) / per" };
+  r.snap('alloc', "<strong>" + NUM_BUCKETS + " empty buckets.</strong> They start empty and grow with " +
+         "<code>push_back</code>, so no size has to be worked out in advance \u2014 but between them " +
+         "they end up holding every element, which is the O(n) extra space.",
+         { buckets: buckets.map(function (b) { return b.slice(); }), per: per, base: mn,
+           phase: 1, banner: B2, locals: { num_buckets: NUM_BUCKETS, per: per }, stack: [],
+           calc: "vector<vector<int>> buckets(" + NUM_BUCKETS + ")" });
+  r.snap('dloop', "<strong>The scatter loop.</strong> One pass over the data; each value is read once " +
+         "and dropped into exactly one bucket. No value is compared with another here.",
+         { buckets: buckets.map(function (b) { return b.slice(); }), per: per, base: mn,
+           phase: 1, banner: B2, locals: { per: per, min_val: mn, val: null }, stack: [],
+           calc: "for (int val : data)   \u2190  " + n + " iterations" });
   for (i = 0; i < n; i++) {
-    var b = Math.floor((a[i].v - mn) / per);
-    var clamped = false;
-    if (b >= NUM_BUCKETS) { b = NUM_BUCKETS - 1; clamped = true; }
-    buckets[b].push(a[i]);
-    r.snap(clamped ? 'clamp' : 'push',
-           lab(a[i]) + " → bucket (" + a[i].v + " - " + mn + ") / " + per + " = " + b +
-           (clamped ? ". That came out past the last bucket, so it is clamped — this is what " +
-            "stops the maximum element landing out of bounds." : "."),
+    var raw = Math.floor((a[i].v - mn) / per);
+    var b = raw, clamped = false;
+    r.snap('bidx', "<strong>Integer division picks the bucket.</strong> Subtract the minimum so the " +
+           "range starts at 0, then divide by the bucket width \u2014 the quotient IS the bucket number.",
            { buckets: buckets.map(function (x) { return x.slice(); }), per: per, base: mn,
-             read: [i], hotBucket: b });
+             read: [i], hotBucket: Math.min(raw, NUM_BUCKETS - 1), phase: 1, banner: B2,
+             locals: { i: i, val: a[i].v, min_val: mn, per: per, b: raw }, stack: [],
+             calc: "b = (val \u2212 min_val) / per\n" +
+                   "  = (" + a[i].v + " \u2212 " + mn + ") / " + per +
+                   " = " + (a[i].v - mn) + " / " + per + " = " + raw });
+    if (raw >= NUM_BUCKETS) { b = NUM_BUCKETS - 1; clamped = true; }
+    r.snap('clamp', clamped
+        ? "<strong>Clamped.</strong> " + a[i].v + " is the maximum, and <code>range</code> was rounded " +
+          "up, so its quotient lands one past the last bucket. Without this line that is an " +
+          "out-of-bounds write."
+        : "<strong>Not clamped this time</strong> \u2014 " + raw + " is already a valid bucket. The " +
+          "line still runs on every element; it only changes anything for values at the very top of " +
+          "the range.",
+           { buckets: buckets.map(function (x) { return x.slice(); }), per: per, base: mn,
+             read: [i], hotBucket: b, phase: 1, banner: B2,
+             locals: { i: i, val: a[i].v, b: b, num_buckets: NUM_BUCKETS }, stack: [],
+             calc: "b >= num_buckets ?  " + raw + " >= " + NUM_BUCKETS + "  \u2192  " +
+                   (clamped ? "yes, b = " + b : "no, b stays " + b) });
+    buckets[b].push(a[i]);
+    r.snap('push', "<strong>" + lab(a[i]) + " joins bucket " + b + ".</strong> <code>push_back</code> " +
+           "grows the bucket as needed, which is why no bucket size had to be computed.",
+           { buckets: buckets.map(function (x) { return x.slice(); }), per: per, base: mn,
+             read: [i], hotBucket: b, phase: 1, banner: B2,
+             locals: { i: i, val: a[i].v, b: b }, stack: [],
+             calc: "buckets[" + b + "].push_back(" + a[i].v + ")   \u2190  now holds " +
+                   buckets[b].length });
   }
+  var B3 = { tone: "done", text: "Phase 3 \u00b7 Sort each, then gather", sub: "this is the part that compares" };
   r.phase("sort each", "an ordinary comparison sort per bucket");
   var idx = 0;
+  r.snap('idx', "<strong>idx is the write cursor</strong> into <code>data</code>. It keeps counting " +
+         "across bucket boundaries, which is what makes the gather a plain concatenation.",
+         { buckets: buckets.map(function (x) { return x.slice(); }), per: per, base: mn,
+           phase: 2, banner: B3, locals: { idx: 0 }, stack: [],
+           calc: "int idx = 0   \u2190  nothing written yet" });
+  r.snap('bloop', "<strong>Walk the buckets in order.</strong> Bucket order is value order: every value " +
+         "in bucket b is smaller than every value in bucket b+1, which is the property that makes " +
+         "concatenating them enough.",
+         { buckets: buckets.map(function (x) { return x.slice(); }), per: per, base: mn,
+           phase: 2, banner: B3, locals: { num_buckets: NUM_BUCKETS, idx: 0 }, stack: [],
+           calc: "for (auto& bucket : buckets)   \u2190  " + NUM_BUCKETS + " buckets" });
   for (b = 0; b < NUM_BUCKETS; b++) {
     if (!buckets[b].length) continue;
     var before = buckets[b].map(lab).join(", ");
     buckets[b].sort(function (x, y) { return x.v - y.v; });
     r.snap('sortb', "Bucket " + b + " held [" + before + "]; std::sort puts it in order. Note this step " +
            "DOES compare — bucket sort is only non-comparison at the top level.",
-           { buckets: buckets.map(function (x) { return x.slice(); }), per: per, base: mn, hotBucket: b });
+           { buckets: buckets.map(function (x) { return x.slice(); }), per: per, base: mn, hotBucket: b,
+             phase: 2, banner: B3, locals: { b: b, idx: idx }, stack: [],
+             calc: "sort(bucket.begin(), bucket.end())   \u2190  " + buckets[b].length +
+                   " element(s), and this DOES compare" });
     for (i = 0; i < buckets[b].length; i++) {
       a[idx] = buckets[b][i]; r.writes++;
       r.snap('cloop', "Copy " + lab(buckets[b][i]) + " back into data[" + idx + "].",
              { buckets: buckets.map(function (x) { return x.slice(); }), per: per, base: mn,
-               hotBucket: b, moved: [idx], sortedTo: idx });
+               hotBucket: b, moved: [idx], sortedTo: idx, phase: 2, banner: B3,
+               locals: { b: b, idx: idx, val: buckets[b][i].v }, stack: [],
+               calc: "data[idx++] = val\ndata[" + idx + "] = " + buckets[b][i].v });
       idx++;
     }
   }
   r.snap('end', "Sorted. The buckets are gathered left to right, and because every value in bucket b is " +
          "smaller than every value in bucket b+1, concatenating them is enough.",
-         { sortedTo: n - 1, per: per, base: mn });
+         { sortedTo: n - 1, per: per, base: mn, phase: 2,
+           banner: { tone: "done", text: "Sorted", sub: "scattered, sorted per bucket, gathered" },
+           locals: { idx: idx, num_buckets: NUM_BUCKETS }, stack: [],
+           calc: "return   \u2190  " + n + " elements through " + NUM_BUCKETS + " buckets" });
   return r;
 }
 
 // ---- radix sort -----------------------------------------------------------
 function radixSort(items) {
   var r = new Recorder(items), a = r.a, n = a.length, i;
-  r.snap('rsig', "Start. Radix sort runs one stable pass per digit position, least significant first.", {});
-  if (n <= 1) { r.snap('rsig', "One element or none: already sorted.", {}); return r; }
+  // One entry per live call. radix_sort is the root and is drawn separately,
+  // so this holds counting_sort_by_digit while a pass is running.
+  var stk = [];
+  function frame(exp) { return { fn: "counting_sort_by_digit", args: "data, exp=" + exp }; }
+  var B1 = { tone: "build", text: "Phase 1 \u00b7 How many digits?", sub: "the maximum decides" };
+
+  r.snap('rsig', "<strong>Entering radix_sort.</strong> It never compares two elements either. It sorts " +
+         "by one <em>digit</em> at a time, least significant first, and leans entirely on each pass " +
+         "being stable.",
+         { phase: 0, banner: B1, locals: { "data.size()": n }, stack: [],
+           calc: "radix_sort(data)   \u2190  " + n + " elements" });
+  if (n <= 1) { return r; }
   var mx = Math.max.apply(null, a.map(function (e) { return e.v; }));
-  r.snap('rmax', "max = " + mx + ", so there are " + String(mx).length + " digit position" +
-         (String(mx).length === 1 ? "" : "s") + " to process.", { readAll: true });
+  var digits = String(mx).length;
+  r.snap('rmax', "<strong>The maximum sets the pass count.</strong> " + mx + " has " + digits +
+         " digit" + (digits === 1 ? "" : "s") + ", so " + digits + " pass" +
+         (digits === 1 ? "" : "es") + " are needed \u2014 no more, because every other value is " +
+         "shorter and its missing digits read as 0.",
+         { readAll: true, phase: 0, banner: B1,
+           locals: { "data.size()": n, max_val: mx }, stack: [],
+           calc: "max_val = *max_element(..) = " + mx + "   \u2192  " + digits + " digit position" +
+                 (digits === 1 ? "" : "s") });
   var passNo = 0;
+  var B2 = { tone: "extract", text: "Phase 2 \u00b7 One pass per digit",
+             sub: "exp = 1, 10, 100 \u2026" };
+  r.snap('rloop', "<strong>The pass loop.</strong> <code>exp</code> is not a counter, it is a " +
+         "<em>place value</em>: 1 for the ones, 10 for the tens, 100 for the hundreds. It multiplies " +
+         "by 10 each time, and the loop stops when <code>max_val / exp</code> reaches 0 \u2014 i.e. " +
+         "once there are no digits left.",
+         { phase: 1, banner: B2, locals: { max_val: mx, exp: 1 }, stack: [],
+           calc: "for (int exp = 1; max_val / exp > 0; exp *= 10)\n" +
+                 "     " + mx + " / 1 = " + Math.floor(mx / 1) + "  > 0  \u2192  enter the loop" });
   for (var exp = 1; Math.floor(mx / exp) > 0; exp *= 10) {
     passNo++;
     var place = exp === 1 ? "ones" : exp === 10 ? "tens" : exp === 100 ? "hundreds" : "exp=" + exp;
+    var BP = { tone: "extract", text: "Pass " + passNo + " \u00b7 the " + place + " digit",
+               sub: "exp = " + exp + ", one stable counting sort" };
     r.phase("pass " + passNo, "the " + place + " digit");
-    r.snap('rcall', "Pass " + passNo + ": sort by the " + place + " digit, (value / " + exp + ") % 10.",
-           { exp: exp, pass: passNo });
+    r.snap('rcall', "<strong>Call counting_sort_by_digit with exp = " + exp + ".</strong> Nothing has " +
+           "moved yet. The helper will sort the whole array by its " + place + " digit and leave " +
+           "everything else about the order alone.",
+           { exp: exp, pass: passNo, phase: 1, banner: BP,
+             locals: { exp: exp, passNo: passNo, max_val: mx }, stack: [],
+             calc: "counting_sort_by_digit(data, " + exp + ")" });
+    stk.push(frame(exp));
+    r.snap('dsig', "<strong>Entering counting_sort_by_digit.</strong> This is an ordinary counting " +
+           "sort \u2014 but on <em>digits</em>, not values. A digit has only ten possibilities, so " +
+           "the counter array is ten entries no matter how large the numbers are.",
+           { exp: exp, pass: passNo, phase: 1, banner: BP,
+             locals: { exp: exp, n: n }, stack: stk.slice(),
+             calc: "counting_sort_by_digit(data, exp = " + exp + ")" });
     var count = new Array(10).fill(0);
     var output = new Array(n).fill(null);
     r.aux = n + 10;
-    r.snap('dout', "A fresh output array of " + n + " and exactly 10 counters — ten, however big the " +
-           "numbers get. That is the whole point of going digit by digit.",
-           { exp: exp, pass: passNo, count: count.slice(), output: output.slice() });
+    r.snap('dout', "<strong>A fresh output array, and exactly ten counters.</strong> Ten \u2014 " +
+           "however big the numbers get. That is the whole reason for going digit by digit instead " +
+           "of value by value.",
+           { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
+             phase: 1, banner: BP, locals: { exp: exp, n: n }, stack: stk.slice(),
+             calc: "vector<int> output(" + n + ");  int count[10] = {0}" });
     // 1. tally
+    r.snap('t1', "<strong>Step 1 of 3: tally this digit.</strong> Count how many elements have each " +
+           "of the ten possible digits in this position. Nothing moves yet.",
+           { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
+             phase: 1, banner: BP, locals: { exp: exp, n: n }, stack: stk.slice(),
+             calc: "// 1. tally this digit" });
+    r.snap('t2', "<strong>The tally loop.</strong> One pass over the data, extracting a digit from " +
+           "each value and bumping its counter.",
+           { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
+             phase: 1, banner: BP, locals: { exp: exp, n: n, i: null, digit: null },
+             stack: stk.slice(),
+             calc: "for (int i = 0; i < n; ++i) count[(data[i]/exp) % 10]++" });
     for (i = 0; i < n; i++) {
       var d = Math.floor(a[i].v / exp) % 10;
       count[d]++;
-      r.snap('t2', lab(a[i]) + " has " + place + " digit " + d + ", so count[" + d + "] becomes " +
-             count[d] + ".",
+      r.snap('t2', "<strong>" + lab(a[i]) + " has " + place + " digit " + d + ".</strong> Divide to " +
+             "throw away the digits below this position, then take the remainder mod 10 to keep just " +
+             "this one.",
              { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
-               read: [i], hotCount: d });
+               read: [i], hotCount: d, phase: 1, banner: BP,
+               locals: { i: i, exp: exp, digit: d }, stack: stk.slice(),
+               calc: "(data[" + i + "] / exp) % 10\n" +
+                     "(" + a[i].v + " / " + exp + ") % 10 = " + Math.floor(a[i].v / exp) +
+                     " % 10 = " + d + "   \u2192  count[" + d + "] = " + count[d] });
     }
     // 2. cumulative
+    r.snap('c1', "<strong>Step 2 of 3: make the counts cumulative.</strong> Right now each entry says " +
+           "&ldquo;how many have this digit&rdquo;. After this sweep it will say &ldquo;where this " +
+           "digit's group ENDS&rdquo; \u2014 a position rather than a tally.",
+           { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
+             phase: 1, banner: BP, locals: { exp: exp }, stack: stk.slice(),
+             calc: "// 2. make the counts CUMULATIVE" });
     for (i = 1; i < 10; i++) {
+      var prev = count[i];
       count[i] += count[i - 1];
-      r.snap('c2', "count[" + i + "] += count[" + (i - 1) + "] → " + count[i] +
-             ". After this sweep each entry says where that digit's group ENDS in the output.",
+      r.snap('c2', "<strong>count[" + i + "] += count[" + (i - 1) + "].</strong> Each entry absorbs " +
+             "everything to its left, so it ends up holding the position just past this digit's group.",
              { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
-               hotCount: i, cumulative: true });
+               hotCount: i, cumulative: true, phase: 1, banner: BP,
+               locals: { i: i, exp: exp }, stack: stk.slice(),
+               calc: "count[" + i + "] = " + prev + " + count[" + (i - 1) + "] (" +
+                     count[i - 1] + ") = " + count[i] });
     }
     // 3. place, backwards
+    r.snap('p1', "<strong>Step 3 of 3: place, walking BACKWARDS.</strong> This is the line people get " +
+           "wrong, and the direction is the entire reason radix sort works.",
+           { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
+             phase: 1, banner: BP, locals: { exp: exp, n: n }, stack: stk.slice(),
+             calc: "// 3. place, walking the input BACKWARDS" });
+    r.snap('p2', "<strong>From the last element to the first.</strong> Going forwards would hand out " +
+           "positions in the opposite order for equal digits, reversing them \u2014 and the order " +
+           "they are in right now is the previous pass's result, which must survive.",
+           { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
+             phase: 1, banner: BP, locals: { i: n - 1, n: n, exp: exp }, stack: stk.slice(),
+             calc: "for (int i = n\u22121; i >= 0; \u2212\u2212i)   \u2190  starts at " + (n - 1) +
+                   ", ends at 0" });
     for (i = n - 1; i >= 0; i--) {
       var dg = Math.floor(a[i].v / exp) % 10;
+      r.snap('p3', "<strong>Pull the digit out again</strong> \u2014 the same expression the tally " +
+             "loop used, because the placement has to agree with the counts it is reading.",
+             { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
+               read: [i], hotCount: dg, phase: 1, banner: BP,
+               locals: { i: i, exp: exp, digit: dg }, stack: stk.slice(),
+               calc: "digit = (data[" + i + "] / exp) % 10\n" +
+                     "      = (" + a[i].v + " / " + exp + ") % 10 = " + dg });
       var pos = count[dg] - 1;
       output[pos] = a[i];
       count[dg]--;
       r.writes++;
-      r.snap('p4', lab(a[i]) + " (digit " + dg + ") goes to output[" + pos + "], then count[" + dg +
-             "] drops to " + count[dg] + ". Walking BACKWARDS is what keeps equal digits in the order " +
-             "the last pass left them — forwards would reverse them and break the whole algorithm.",
+      r.snap('p4', "<strong>" + lab(a[i]) + " lands at output[" + pos + "].</strong> The counter said " +
+             "where this digit's group ends; take one off it and that slot is claimed, so the next " +
+             "element with the same digit goes just to the left of this one.",
              { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
-               read: [i], hotCount: dg, moved: [pos], inOutput: true });
+               read: [i], hotCount: dg, moved: [pos], inOutput: true, phase: 1, banner: BP,
+               locals: { i: i, digit: dg, pos: pos }, stack: stk.slice(),
+               calc: "output[count[" + dg + "] \u2212 1] = data[" + i + "]\n" +
+                     "output[" + pos + "] = " + a[i].v + "   \u2192  count[" + dg + "] drops to " +
+                     count[dg] });
     }
     for (i = 0; i < n; i++) a[i] = output[i];
-    r.snap('assign', "Copy the output back over data. The array is now sorted by every digit up to the " +
-           place + " — and, crucially, ties are still in their earlier order.",
-           { exp: exp, pass: passNo, count: count.slice() });
+    r.snap('assign', "<strong>Copy the output back over data.</strong> The array is now sorted by every " +
+           "digit up to the " + place + " \u2014 and ties are still in the order the previous pass " +
+           "left them.",
+           { exp: exp, pass: passNo, count: count.slice(), phase: 1, banner: BP,
+             locals: { exp: exp, passNo: passNo }, stack: stk.slice(),
+             calc: "data = output   \u2190  " + n + " elements copied back" });
+    r.snap('dend', "<strong>counting_sort_by_digit returns.</strong> Control goes back to the pass " +
+           "loop, which multiplies <code>exp</code> by 10 and " +
+           (Math.floor(mx / (exp * 10)) > 0 ? "comes straight back in for the next digit."
+                                            : "finds no digits left, so the loop ends."),
+           { exp: exp, pass: passNo, count: count.slice(), phase: 1, banner: BP,
+             locals: { exp: exp, passNo: passNo }, stack: stk.slice(),
+             calc: "return   \u2190  sorted by the " + place + " digit" });
+    stk.pop();
   }
-  r.snap('rend', "Sorted after " + passNo + " pass" + (passNo === 1 ? "" : "es") +
-         ". No two elements were ever compared with each other.", { sortedTo: n - 1 });
+  r.snap('rend', "<strong>Sorted after " + passNo + " pass" + (passNo === 1 ? "" : "es") +
+         ".</strong> No two elements were ever compared with each other \u2014 every decision came " +
+         "from a digit used as an index.",
+         { sortedTo: n - 1, phase: 2,
+           banner: { tone: "done", text: "Sorted", sub: passNo + " stable passes, no comparisons" },
+           locals: { passNo: passNo, max_val: mx }, stack: [],
+           calc: "return   \u2190  " + passNo + " pass" + (passNo === 1 ? "" : "es") + " over " +
+                 n + " elements" });
   return r;
 }
 
@@ -1083,6 +1463,77 @@ function lineInfoHtml(key, executing) {
     '</p></div>';
 }
 
+// Filled in by stage C. Returning "" keeps the stage valid in the meantime.
+function phaseRail(m) { return m && m.phase ? railHtml(m) : ""; }
+function bannerHtml(m) {
+  if (!m || !m.banner) return "";
+  return '<div class="banner ' + (m.banner.tone || "") + '"><strong>' + m.banner.text +
+         '</strong><span>' + (m.banner.sub || "") + '</span></div>';
+}
+var RAIL = {
+  counting: ["Measure the range", "Tally the counters", "Emit from the counters"],
+  bucket:   ["Work out the bucket width", "Scatter into buckets", "Sort each, then gather"],
+  radix:    ["Find the digit count", "Tally and make cumulative", "Place backwards"]
+};
+function railHtml(m) {
+  var names = RAIL[state.mode];
+  if (!names) return "";
+  var at = m.phase;
+  return '<div class="phrail">' + names.map(function (nm, i) {
+    return '<div class="ph' + (at === i ? " on" : (at > i ? " done" : "")) + '">' +
+           '<b>' + (i + 1) + '</b>' + nm + '</div>';
+  }).join("") + '</div>';
+}
+function localsHtml(f) {
+  var m = f.marks;
+  if (!m.locals) return "";
+  // What each name means, so the panel teaches rather than just dumps values.
+  var MEANS = {
+    i: "loop cursor", val: "the value being placed", slot: "which counter",
+    min_val: "smallest value present", max_val: "largest value present",
+    k: "how many counters \u2014 the VALUE RANGE", idx: "where the next value is written",
+    range: "how many distinct values could occur", per: "values per bucket",
+    b: "which bucket", digit: "the digit being sorted on this pass",
+    exp: "1, 10, 100 \u2026 which digit position", pos: "where this element lands",
+    "data.size()": "how many elements \u2014 a count, not an index",
+    num_buckets: "how many buckets", n: "how many elements", passNo: "which digit pass"
+  };
+  var rows = "";
+  for (var key in m.locals) {
+    var v = m.locals[key];
+    if (v === undefined) continue;
+    if (v === null) {
+      // Declared on a later line. Saying so beats showing a value that the
+      // line highlighted above has not produced yet.
+      rows += '<div class="lv"><span class="ln">' + key + '</span>' +
+              '<span class="lval pend">&mdash;</span>' +
+              '<span class="lat pend">not yet &mdash; a later line creates it</span></div>';
+      continue;
+    }
+    rows += '<div class="lv"><span class="ln">' + key + '</span>' +
+            '<span class="lval">' + v + '</span>' +
+            '<span class="lat">' + (MEANS[key] || "") + '</span></div>';
+  }
+  if (!rows) return "";
+
+  var root = { counting: "counting_sort", bucket: "bucket_sort", radix: "radix_sort" }[state.mode];
+  var inRoot = !(m.stack && m.stack.length);
+  var stack = '<div class="lv stackline' + (inRoot ? " here" : "") + '">' +
+              '<span class="ln">' + root + '</span>' +
+              '<span class="lat">(data)' + (inRoot ? ' &larr; here' : '') + '</span></div>';
+  if (m.stack) {
+    m.stack.forEach(function (fr2, d) {
+      var here = d === m.stack.length - 1;
+      stack += '<div class="lv stackline' + (here ? " here" : "") + '" ' +
+               'style="padding-left:' + (0.7 + d * 0.7) + 'rem">' +
+               '<span class="ln">' + fr2.fn + '</span><span class="lat">(' + fr2.args + ')' +
+               (here ? ' &larr; here' : '') + '</span></div>';
+    });
+  }
+  return '<div class="locals"><div><h5>Variables in scope</h5>' + rows + '</div>' +
+         '<div><h5>Call stack</h5>' + stack + '</div></div>';
+}
+
 function renderSolo() {
   var key = state.mode, run = state.runs[key], f = FACTS[key];
   var idx = Math.min(state.step, run.frames.length - 1);
@@ -1096,37 +1547,56 @@ function renderSolo() {
       'one it is the worst, and nothing about the code changed.</div>';
   }
 
+  // How it works goes ABOVE the controls, so Play and the presets stay within
+  // reach of the array they drive. Beside the stage it pushed them away.
+  document.getElementById("howto").innerHTML =
+    '<div class="card"><h2>How it works</h2><div class="card-body howto">' +
+      '<p class="lead">' + f.idea + '</p>' +
+      '<div class="howto-steps">' +
+        f.steps.map(function (st, i) {
+          return '<div class="hstep"><h4><span class="hnum">' + (i + 1) + '</span>' +
+                 st.t + '</h4><ul>' +
+                 st.b.map(function (b) { return '<li>' + b + '</li>'; }).join("") +
+                 '</ul></div>';
+        }).join("") +
+      '</div><div class="callout warn">' + f.watch + '</div>' +
+    '</div></div>';
+
   document.getElementById("stage").innerHTML =
-    '<div class="solo"><div>' +
+    '<div class="solo">' +
+      // Two independent flows. As plain grid children, pinning a line of code
+      // grew the right side and shoved the Phases card down with it.
+      '<div class="col">' +
       '<div class="card"><h2>' + f.title + (done ? ' <span class="done-badge">done</span>' : '') +
         '</h2><div class="card-body">' +
+        phaseRail(fr.marks) +
+        bannerHtml(fr.marks) +
         '<div class="rowlab">data[]</div>' +
         '<div class="cells big">' + cellsHtml(fr, true) + '</div>' +
         '<div class="bounds">' + boundsHtml(key, fr) + '</div>' +
         extraHtml(key, fr) + kNote +
+        localsHtml(fr) +
         '<p class="note">' + fr.note + '</p>' +
         '<div class="stats"><span>array writes <b>' + fr.writes + '</b></span>' +
           '<span>auxiliary cells <b>' + fr.aux + '</b></span></div>' +
       '</div></div>' +
-      '<div class="card" style="margin-top:1rem"><h2>The code</h2><div class="card-body">' +
+      '<div class="card"><h2>Phases</h2><div class="card-body">' +
+        phaseTable(run, idx) + '</div></div>' +
+      '</div>' +
+
+      '<div class="col">' +
+      '<div class="card"><h2>The code</h2><div class="card-body">' +
         '<div class="code" id="code-solo"></div>' +
           lineInfoHtml(key, fr.line) +
         '</div></div>' +
-    '</div><div>' +
-      '<div class="card"><h2>How it works</h2><div class="card-body">' +
-        '<p style="margin:0 0 .6rem;font-size:.85rem">' + f.idea + '</p>' +
-        '<ol style="margin:0;padding-left:1.2rem;font-size:.83rem">' +
-          f.steps.map(function (s) { return '<li style="margin-bottom:.3rem">' + s + '</li>'; }).join("") +
-        '</ol><div class="callout warn">' + f.watch + '</div></div></div>' +
-      '<div class="card" style="margin-top:1rem"><h2>Phases</h2><div class="card-body">' +
-        phaseTable(run, idx) + '</div></div>' +
-      '<div class="card" style="margin-top:1rem"><h2>For the record</h2><div class="card-body">' +
+      '<div class="card"><h2>For the record</h2><div class="card-body">' +
         '<dl class="facts"><dt>Time</dt><dd>' + f.time + '</dd>' +
         '<dt>Extra space</dt><dd>' + f.space + '</dd>' +
         '<dt>Stable</dt><dd>' + f.stable + '</dd>' +
         '<dt>This run</dt><dd>' + last.writes + ' array writes, ' + last.aux +
           ' auxiliary cells at peak</dd></dl></div></div>' +
-    '</div></div>';
+      '</div>' +
+    '</div>';
 
   var code = document.getElementById("code-solo");
   var clickable = !!LINE_INFO[key];
@@ -1542,11 +2012,40 @@ function selfTest() {
       // Radix sort is only correct BECAUSE each pass is stable, so this is a
       // real check rather than a nicety.
       if (lane === "radix" && !isStable(run)) fails.push(name + "/radix: must be stable");
+      // 21 of 47 lines used to have no frame at all. Without this, the next
+      // line added to a listing quietly joins them.
+      var seen = {};
+      run.frames.forEach(function (x) { seen[x.line] = 1; });
+      CODE[lane].forEach(function (ln) {
+        if (ln.t && !seen[ln.k]) {
+          fails.push(name + "/" + lane + ": line '" + ln.k + "' is never stepped on");
+        }
+      });
       run.frames.forEach(function (fr, i) {
         if (keysOf[lane].indexOf(fr.line) === -1) {
           fails.push(name + "/" + lane + " frame " + i + ": unknown line '" + fr.line + "'");
         }
         if (!fr.note || !fr.note.trim()) fails.push(name + "/" + lane + " frame " + i + ": no note");
+        // The note renders through innerHTML; the THIS STEP band is written
+        // with esc(), so an HTML entity there reaches the student literally.
+        if (fr.marks && fr.marks.calc && /&[a-zA-Z]+;|&#x?[0-9A-Fa-f]+;/.test(fr.marks.calc)) {
+          fails.push(name + "/" + lane + " frame " + i + ": HTML entity in calc '" +
+                     fr.marks.calc.replace(/\n/g, " ").slice(0, 40) + "' -- use the character");
+        }
+        // Pointer art is only worth drawing if it points at something.
+        if (fr.marks && fr.marks.calc && fr.marks.calc.indexOf("\u2191") >= 0) {
+          var cl = fr.marks.calc.split("\n");
+          for (var li = 1; li < cl.length; li++) {
+            for (var ci = 0; ci < cl[li].length; ci++) {
+              if (cl[li].charAt(ci) !== "\u2191") continue;
+              var ab = cl[li - 1].charAt(ci);
+              if (!ab || ab === " ") {
+                fails.push(name + "/" + lane + " frame " + i + ": arrow at column " + ci +
+                           " points at nothing");
+              }
+            }
+          }
+        }
       });
     });
   });
@@ -1585,8 +2084,9 @@ function selfTest() {
     el.className = "selftest pass";
     el.textContent = "Self-check passed: " + runs + " runs across " + Object.keys(PRESETS).length +
       " inputs — every result sorted, radix sort stable on all of them, every step highlights a " +
-      "real line and carries an explanation, each preset's k matches its label, and all " +
-      lineCount + " lines of code have a breakdown behind them.";
+      "real line and carries an explanation, each preset's k matches its label, all " +
+      lineCount + " lines of code are both stepped on and explained, and no THIS STEP box " +
+      "holds a raw HTML entity or an arrow pointing at nothing.";
   }
 }
 
