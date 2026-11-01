@@ -197,8 +197,13 @@
                 line-height:1.5; }
   .locals .ln { font-family:Consolas,monospace; font-weight:650; color:var(--ink);
                 min-width:4.6rem; }
-  .locals .lval { font-family:Consolas,monospace; font-weight:700; color:var(--blue);
-                  min-width:1.4rem; text-align:right; }
+  .locals .lval { font-family:Consolas,monospace; font-weight:700;
+                  color:var(--blue); background:var(--tint-blue);
+                  border:1px solid rgba(37,115,167,.3); border-radius:999px;
+                  padding:.02rem .45rem; min-width:1.6rem; text-align:center; }
+  .locals .lval.pend { color:var(--muted); background:#f0f2f5;
+                       border-color:var(--rule); font-weight:600; }
+  .locals .lat.pend { font-style:italic; }
   .locals .lat { color:var(--muted); font-size:.75rem; }
   .locals .lat.out { color:var(--red); }
   .locals .stackline .ln { font-weight:600; color:var(--teal); min-width:0; }
@@ -1080,7 +1085,8 @@ function heapSort(items) {
          "</code>" + (depth ? ", and this is a <strong>nested call</strong> at depth " + depth +
          " &mdash; the one the line above made." : ", called from the loop in heap_sort.") +
          " <code>data</code> is a reference, so this is the same array, not a copy.",
-         mk({ calc: "heapify_down(data, heap_size = " + heapSize + ", index = " + index + ")" +
+         mk({ entering: true,
+              calc: "heapify_down(data, heap_size = " + heapSize + ", index = " + index + ")" +
                     (depth ? "   \u2190  depth " + depth : "") }));
     snap('init', "heapify_down at index " + index + ", which holds " + a[index].v +
          ". Its children sit at 2i+1 and 2i+2 &mdash; the boxed family in the tree.",
@@ -1385,8 +1391,16 @@ function tempsHtml(m) {
 // What a debugger's Locals and Call Stack panes would show at this frame.
 function localsHtml(f) {
   var m = f.marks, a = f.a;
-  function slot(name, idx) {
+  // `pending` is for the entry frame: heap_size and index are parameters and are
+  // bound, but largest, left and right are created by the NEXT line. Showing
+  // their values here would be the same lie as swapping before the swap line.
+  function slot(name, idx, pending) {
     if (idx === undefined) return "";
+    if (pending) {
+      return '<div class="lv"><span class="ln">' + name + '</span>' +
+             '<span class="lval pend">&mdash;</span>' +
+             '<span class="lat pend">not yet &mdash; the next line creates it</span></div>';
+    }
     var inHeap = idx < m.heapSize;
     return '<div class="lv"><span class="ln">' + name + '</span>' +
            '<span class="lval">' + idx + '</span>' +
@@ -1395,10 +1409,14 @@ function localsHtml(f) {
   }
   var rows;
   if (m.left !== undefined) {
+    var pend = !!m.entering;
     rows = '<div class="lv"><span class="ln">heap_size</span><span class="lval">' +
-             m.heapSize + '</span><span class="lat">how much is still a heap</span></div>' +
-           slot("index", m.node) + slot("left", m.left) + slot("right", m.right) +
-           slot("largest", m.largest);
+             m.heapSize + '</span><span class="lat">' +
+             (pend ? 'parameter, bound on entry' : 'how much is still a heap') +
+             '</span></div>' +
+           slot("index", m.node) +
+           slot("left", m.left, pend) + slot("right", m.right, pend) +
+           slot("largest", m.largest, pend);
   } else if (m.heapSize !== undefined) {
     rows = '<div class="lv"><span class="ln">n</span><span class="lval">' + a.length +
            '</span><span class="lat">elements in the array</span></div>' +
@@ -1493,9 +1511,7 @@ function treeHtml(f) {
   return '<svg class="tree" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="the array drawn as a binary heap">' +
          '<defs><marker id="sinkArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" ' +
          'orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/></marker></defs>' +
-         out.join("") + '</svg>' +
-         '<p class="treecap">' + caption + '<br>Purple box: the node and its children &middot; ' +
-         'orange: largest so far &middot; red arrow: the value sinking.</p>';
+         out.join("") + '</svg>';
 }
 
 // The history strip: one row per finished heapify_down call or extraction,
@@ -1715,8 +1731,11 @@ function renderSolo() {
         '<div class="cells big">' + cellsHtml(fr, true, heap) + '</div>' +
         '<div class="bounds">' + boundsHtml(key, fr, fr.a.length) + '</div>' +
         extra +
-        '<p class="note">' + fr.note + '</p>' +
+        // Variables in scope sits directly under the tree; the prose note moves
+        // below it. The tree's colour legend is gone -- two lines of words for
+        // things that are visible, and it pushed the panel out of sight.
         (heap ? localsHtml(fr) : '') +
+        '<p class="note">' + fr.note + '</p>' +
         (heap ? phaseHelp(m, fr.line) : '') +
         '<div class="stats"><span>compares <b>' + fr.comparisons + '</b></span>' +
           '<span>writes <b>' + fr.writes + '</b></span></div>' +
