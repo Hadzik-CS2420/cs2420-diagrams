@@ -297,6 +297,13 @@
                    display:flex; align-items:flex-start; gap:.55rem;
                    padding:.22rem .8rem; margin:.12rem 0;
                    border-left:4px solid #b8860b; }
+  /* The text is its own span so it can take min-width:0. An anonymous flex
+     item cannot, and without it the text refuses to shrink and never wraps. */
+  .code div.calc > .cv { min-width:0; white-space:pre-wrap;
+                         text-indent:-1.1rem; padding-left:1.1rem; }
+  /* Index-math art is the one thing that must NOT wrap -- wrapping it
+     destroys the column alignment that is its whole purpose. */
+  .code div.calc.art > .cv { white-space:pre; text-indent:0; padding-left:0; }
   .code div.calc::before { content:"THIS STEP"; font-size:.62rem; font-weight:800;
                            letter-spacing:.06em; color:#6b4f04;
                            background:rgba(0,0,0,.09); border-radius:3px;
@@ -884,6 +891,9 @@ function lab(e) { return e.v + (e.tag || ""); }
 // The THIS STEP band is plain text, not markup. Escaping it is why a calc
 // string must contain real characters rather than HTML entities.
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+// Index-math art must keep its columns, so it does not get to wrap. Prose
+// does. These are the characters the art is drawn with.
+function isArt(t) { return /[\u2191\u2502\u2514\u2500]/.test(String(t)); }
 
 // ---- counting sort --------------------------------------------------------
 function countingSort(items) {
@@ -1613,7 +1623,8 @@ function renderSolo() {
            (explained ? ' role="button" tabindex="0" title="Click for a breakdown of this line"' : '') +
            '>' + ln.t + '</div>' +
            (i === calcAt && fr.marks.calc
-              ? '<div class="calc">' + esc(fr.marks.calc) + '</div>' : '');
+              ? '<div class="calc' + (isArt(fr.marks.calc) ? ' art' : '') + '">' +
+                  '<span class="cv">' + esc(fr.marks.calc) + '</span></div>' : '');
   }).join("");
   Array.prototype.forEach.call(code.children, function (d) {
     var k = d.getAttribute("data-k");
@@ -2043,6 +2054,22 @@ function selfTest() {
                      fr.marks.calc.replace(/\n/g, " ").slice(0, 40) + "' -- use the character");
         }
         // Pointer art is only worth drawing if it points at something.
+        // Prose bands wrap now, so their length is harmless. Art bands keep
+        // white-space:pre to protect their columns, which means an art band
+        // wider than the panel is clipped with no way to recover.
+        if (fr.marks && fr.marks.calc && isArt(fr.marks.calc)) {
+          var widest = 0;
+          CODE[lane].forEach(function (ln) {
+            if (ln.t) widest = Math.max(widest, ln.t.replace(/<[^>]+>/g, "")
+              .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").length);
+          });
+          fr.marks.calc.split("\n").forEach(function (cline) {
+            if (cline.length > widest - 11) {
+              fails.push(name + "/" + lane + " frame " + i + ": art band line is " +
+                         cline.length + " cols, the panel fits " + (widest - 11));
+            }
+          });
+        }
         if (fr.marks && fr.marks.calc && fr.marks.calc.indexOf("\u2191") >= 0) {
           var cl = fr.marks.calc.split("\n");
           for (var li = 1; li < cl.length; li++) {

@@ -334,6 +334,13 @@
                    display:flex; align-items:flex-start; gap:.55rem;
                    padding:.22rem .8rem; margin:.12rem 0;
                    border-left:4px solid #b8860b; }
+  /* The text is its own span so it can take min-width:0. An anonymous flex
+     item cannot, and without it the text refuses to shrink and never wraps. */
+  .code div.calc > .cv { min-width:0; white-space:pre-wrap;
+                         text-indent:-1.1rem; padding-left:1.1rem; }
+  /* Index-math art is the one thing that must NOT wrap -- wrapping it
+     destroys the column alignment that is its whole purpose. */
+  .code div.calc.art > .cv { white-space:pre; text-indent:0; padding-left:0; }
   .code div.calc::before { content:"THIS STEP"; font-size:.62rem; font-weight:800;
                            letter-spacing:.06em; color:#6b4f04;
                            background:rgba(0,0,0,.09); border-radius:3px;
@@ -965,7 +972,7 @@ function pointAtArgs(fn, n) {
   function sp(k) { return new Array(k + 1).join(" "); }
   return call + "\n" +
          sp(c0) + "\u2191" + sp(cN - c0 - 1) + "\u2191\n" +
-         sp(c0) + "\u2502" + sp(cN - c0 - 1) + "\u2514\u2500 last index, not the count\n" +
+         sp(c0) + "\u2502" + sp(cN - c0 - 1) + "\u2514\u2500 last index, not " + n + "\n" +
          sp(c0) + "\u2514\u2500 first index";
 }
 
@@ -1823,6 +1830,9 @@ function historyHtml(run, len) {
 }
 
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+// Index-math art must keep its columns, so it does not get to wrap. Prose
+// does. These are the characters the art is drawn with.
+function isArt(t) { return /[\u2191\u2502\u2514\u2500]/.test(String(t)); }
 
 // Phase 1 and phase 2 side by side, current one lit. `built` is the beat
 // between them, where phase 1 is finished and phase 2 has not started.
@@ -2073,7 +2083,8 @@ function renderSolo() {
     return '<div data-k="' + ln.k + '"' + (cls ? ' class="' + cls + '"' : '') +
            (explained ? ' role="button" tabindex="0" title="Click for a breakdown of this line"' : '') +
            '>' + ln.t + '</div>' +
-           (i === calcAt && m.calc ? '<div class="calc">' + esc(m.calc) + '</div>' : '');
+           (i === calcAt && m.calc ? '<div class="calc' + (isArt(m.calc) ? ' art' : '') + '">' +
+                  '<span class="cv">' + esc(m.calc) + '</span></div>' : '');
   }).join("");
   // heapify_down's body, for the overview band below.
   var HELPER = ["hsig", "init", "cmpL", "cmpR", "sink", "rec", "hend"];
@@ -2239,6 +2250,22 @@ function selfTest() {
         // Pointer art is only worth showing if it points at something. Every
         // arrow must sit in the column of a non-space character on the line
         // above it -- which is exactly what was broken when this was written.
+        // Prose bands wrap now, so their length is harmless. Art bands keep
+        // white-space:pre to protect their columns, which means an art band
+        // wider than the panel is clipped with no way to recover.
+        if (f.marks && f.marks.calc && isArt(f.marks.calc)) {
+          var widest = 0;
+          CODE[lane].forEach(function (ln) {
+            if (ln.t) widest = Math.max(widest, ln.t.replace(/<[^>]+>/g, "")
+              .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").length);
+          });
+          f.marks.calc.split("\n").forEach(function (cline) {
+            if (cline.length > widest - 11) {
+              fails.push(name + "/" + lane + " frame " + i + ": art band line is " +
+                         cline.length + " cols, the panel fits " + (widest - 11));
+            }
+          });
+        }
         if (f.marks && f.marks.calc && f.marks.calc.indexOf("\u2191") >= 0) {
           var cl = f.marks.calc.split("\n");
           for (var li = 1; li < cl.length; li++) {
