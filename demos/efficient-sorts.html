@@ -192,6 +192,9 @@
             background:#f7f9fb; border-radius:0 8px 8px 0;
             padding:.6rem .8rem; margin:.6rem 0 0; }
   .phhelp.extract { border-left-color:var(--orange); }
+  .phhelp.math { border-left-color:var(--teal); }
+  .phhelp.math li::before { background:var(--teal); }
+  .phhelp.math .hnum { background:var(--teal); }
   .phhelp h4 { margin:0 0 .35rem; font-size:.82rem; color:var(--ink); }
   .phhelp ul { margin:0; padding:0; list-style:none; }
   .phhelp li { position:relative; padding-left:.85rem; margin-bottom:.3rem;
@@ -1472,6 +1475,25 @@ var PHASE_HELP = {
      "Once every parent obeys the rule it has nowhere higher to go &mdash; which is " +
      "exactly what phase 2 consumes."]
   ] },
+  indexmath: { title: "Where do 2i+1 and 2i+2 come from?", points: [
+    ["<strong>The array IS the tree</strong>, read level by level.",
+     "Index 0 is the root. Indices 1 and 2 are the whole next level, 3 to 6 the level " +
+     "after that. Nothing stores a pointer &mdash; a node's position in the array is its " +
+     "position in the tree."],
+    ["The <strong>i nodes before you</strong> already used <strong>2i</strong> child slots.",
+     "Nodes 0 through i&minus;1 are i nodes, two children each, and those children fill " +
+     "indices 1 through 2i with no gaps. That is the whole derivation."],
+    ["So yours are the next two: <strong>2i+1</strong> and <strong>2i+2</strong>.",
+     "<code>i=0 &rarr; 1, 2</code> &nbsp; <code>i=1 &rarr; 3, 4</code> &nbsp; " +
+     "<code>i=2 &rarr; 5, 6</code> &nbsp; <code>i=3 &rarr; 7, 8</code>. Read down that " +
+     "list and the +1 and +2 stop looking arbitrary."],
+    ["Going back up: parent of j is <strong>(j&minus;1)/2</strong>.",
+     "Integer division, which is why 5 and 6 both give 2 &mdash; they are siblings, and " +
+     "the remainder is what tells them apart."],
+    ["A child index can run off the end, which is what <code>left &lt; heap_size</code> checks.",
+     "2i+1 is just arithmetic; it does not promise the slot exists. On the next line that " +
+     "test is the only thing standing between you and reading past the array."]
+  ] },
   extract: { title: "What this phase is doing", points: [
     ["<strong>Root is the largest</strong> &mdash; swap it to the end.",
      "That slot is finished and never moves again, which is why it turns green."],
@@ -1484,11 +1506,16 @@ var PHASE_HELP = {
   ] }
 };
 
-function phaseHelp(m) {
+function phaseHelp(m, line) {
   if (!m.phase) return "";
-  var h = m.phase === "extract" ? PHASE_HELP.extract : PHASE_HELP.build;
+  // On the lines that compute child indices, explain the arithmetic instead of
+  // the phase -- that is where the question actually gets asked.
+  var h = (line === "init" || line === "hsig") ? PHASE_HELP.indexmath
+        : (m.phase === "extract" ? PHASE_HELP.extract : PHASE_HELP.build);
   var open = state.helpOpen;
-  return '<div class="phhelp' + (m.phase === "extract" ? " extract" : "") + '">' +
+  var tone = (h === PHASE_HELP.indexmath) ? " math"
+           : (m.phase === "extract" ? " extract" : "");
+  return '<div class="phhelp' + tone + '">' +
     '<div class="hhead"><h4>' + h.title + '</h4>' +
     '<button class="hmore" id="help-toggle" aria-expanded="' + open + '">' +
       (open ? "Less &#9652;" : "More detail &#9662;") + '</button></div><ul>' +
@@ -1619,7 +1646,7 @@ function renderSolo() {
         '<div class="bounds">' + boundsHtml(key, fr, fr.a.length) + '</div>' +
         extra +
         '<p class="note">' + fr.note + '</p>' +
-        (heap ? phaseHelp(m) : '') +
+        (heap ? phaseHelp(m, fr.line) : '') +
         '<div class="stats"><span>compares <b>' + fr.comparisons + '</b></span>' +
           '<span>writes <b>' + fr.writes + '</b></span></div>' +
       '</div></div>' +
