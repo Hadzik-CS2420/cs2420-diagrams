@@ -166,6 +166,63 @@
              background:var(--tint-purple); border:1px solid #d1c4e9; color:var(--deep); }
   .callout.warn { background:var(--tint-red); border-color:#f5c6cb; color:var(--red); }
   .callout.k    { background:var(--tint-orange); border-color:#f5d6a8; color:var(--orange); }
+
+  /* ---- "why twice" box, counting tab only ---- */
+  #whyTwice { margin-top:1.3rem; }
+  #whyTwice > h2 { border-top:3px solid var(--deep); }
+  .w2grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  @media (max-width:1040px) { .w2grid { grid-template-columns:1fr; } }
+  .w2 h3 { font-size:.86rem; margin:0 0 .45rem; color:var(--deep);
+           text-transform:uppercase; letter-spacing:.04em; }
+  .w2 p { margin:0 0 .5rem; font-size:.84rem; }
+  .w2 p:last-child { margin-bottom:0; }
+  .w2 ul { margin:0 0 .5rem; padding-left:1.1rem; font-size:.84rem; }
+  .w2 li { margin-bottom:.2rem; }
+  .perpair { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; margin:.55rem 0; }
+  @media (max-width:620px) { .perpair { grid-template-columns:1fr; } }
+  .pp { border:1px solid var(--rule); border-radius:8px; padding:.5rem .65rem;
+        font-size:.8rem; background:#fbfcfd; }
+  .pp.win { border-color:var(--green); background:var(--tint-green); }
+  .pp .q { display:block; font-weight:700; color:var(--deep); margin-bottom:.2rem; }
+  .pp.win .q { color:var(--green); }
+  .pp ol { margin:.2rem 0 0; padding-left:1.1rem; }
+  .pp li { margin-bottom:.1rem; }
+  .pp li.gone { color:var(--muted); text-decoration:line-through; }
+
+  table.trace td { vertical-align:top; }
+  table.trace td.c { width:2.2rem; text-align:right; color:var(--muted);
+                     font-variant-numeric:tabular-nums; }
+  table.trace td.t { text-align:right; font-variant-numeric:tabular-nums;
+                     font-weight:700; width:3rem; }
+  table.trace tr.seedrow td { background:var(--tint-blue); }
+  table.trace tr.skiprow td { background:#fbfcfd; color:var(--muted);
+                              font-size:.74rem; font-style:italic; }
+  table.trace tr.lastrow td { background:var(--tint-green); font-weight:600; }
+  .w2 table { margin:.3rem 0 .55rem; }
+  .w2 td.n, .w2 th.n { text-align:right; font-variant-numeric:tabular-nums; }
+  .w2 tr.same td { background:var(--tint-orange); }
+  .w2 tr.used td { background:var(--tint-green); font-weight:600; }
+  .verdicts { display:grid; gap:.5rem; margin:.55rem 0; }
+  .vd { border:1px solid var(--rule); border-radius:8px; padding:.55rem .7rem;
+        font-size:.82rem; }
+  .vd .vh { display:block; font-weight:700; margin-bottom:.2rem; }
+  .vd p { margin:0; }
+  .vd.no  { background:var(--tint-red);   border-color:#f0c6c6; }
+  .vd.no .vh  { color:var(--red); }
+  .vd.yes { background:var(--tint-green); border-color:#a8d5ba; }
+  .vd.yes .vh { color:var(--green); }
+
+  table.timing { margin:.3rem 0 .55rem; }
+  table.timing tr.fastest td { background:var(--tint-green); }
+  table.timing tr.slowest td { background:var(--tint-red); }
+  table.timing td.n, table.timing th.n { text-align:right;
+                                         font-variant-numeric:tabular-nums; }
+  .rowsub { display:block; font-size:.72rem; color:var(--muted); font-weight:400;
+            margin-top:.1rem; }
+  .callout.ask { background:var(--tint-teal); border-color:#9fcdc7; color:var(--teal); }
+  .w2 .same-flag { color:var(--orange); font-weight:700; }
+  .w2 a { color:var(--deep); }
+
   .legend { margin-top:.85rem; font-size:.75rem; color:var(--muted); }
   .legend span { display:inline-block; margin-right:.9rem; white-space:nowrap; }
   .sw { display:inline-block; width:.7rem; height:.7rem; border-radius:3px;
@@ -231,6 +288,8 @@
     <span><i class="sw" style="border-style:dashed"></i>not written yet</span>
   </div>
 
+  <div class="card" id="whyTwice"></div>
+
   <div class="selftest" id="selftest"></div>
 </div>
 
@@ -264,7 +323,8 @@ var CODE = {
   counting: [
     {k:'sig',    t:K+'void'+E+' '+F+'counting_sort'+E+'(vector&lt;'+K+'int'+E+'&gt;&amp; data) {'},
     {k:'guard',  t:'  '+K+'if'+E+' (data.size() &lt;= '+N+'1'+E+') '+K+'return'+E+';'},
-    {k:'minmax', t:'  '+K+'int'+E+' min_val = *'+F+'min_element'+E+'(..), max_val = *'+F+'max_element'+E+'(..);'},
+    {k:'minmax', t:'  '+K+'auto'+E+' [min_it, max_it] = '+F+'minmax_element'+E+'(..);   '+C+'// ONE walk'+E},
+    {k:'deref',  t:'  '+K+'int'+E+' min_val = *min_it, max_val = *max_it;'},
     {k:'kline',  t:'  '+K+'int'+E+' k = max_val - min_val + '+N+'1'+E+';   '+C+'// the VALUE RANGE'+E},
     {k:'alloc',  t:'  vector&lt;'+K+'int'+E+'&gt; count(k, '+N+'0'+E+');'},
     {k:'tally',  t:'  '+K+'for'+E+' ('+K+'int'+E+' val : data)'},
@@ -278,7 +338,8 @@ var CODE = {
   bucket: [
     {k:'sig',    t:K+'void'+E+' '+F+'bucket_sort'+E+'(vector&lt;'+K+'int'+E+'&gt;&amp; data, '+K+'int'+E+' num_buckets) {'},
     {k:'guard',  t:'  '+K+'if'+E+' (data.size() &lt;= '+N+'1'+E+') '+K+'return'+E+';'},
-    {k:'minmax', t:'  '+K+'int'+E+' min_val = *'+F+'min_element'+E+'(..), max_val = *'+F+'max_element'+E+'(..);'},
+    {k:'minmax', t:'  '+K+'auto'+E+' [min_it, max_it] = '+F+'minmax_element'+E+'(..);   '+C+'// ONE walk'+E},
+    {k:'deref',  t:'  '+K+'int'+E+' min_val = *min_it, max_val = *max_it;'},
     {k:'same',   t:'  '+K+'if'+E+' (min_val == max_val) '+K+'return'+E+';   '+C+'// all equal: avoid /0'+E},
     {k:'range',  t:'  '+K+'int'+E+' range = max_val - min_val + '+N+'1'+E+';'},
     {k:'per',    t:'  '+K+'int'+E+' per = '+F+'ceil'+E+'(('+K+'double'+E+')range / num_buckets);'},
@@ -375,12 +436,19 @@ var LINE_INFO = {
         ["syntax", "<code>size()</code> returns an unsigned <code>size_t</code>. Comparing it to <code>1</code> is fine, but never write <code>data.size() - 1</code> without checking first &mdash; on an empty vector that wraps around to about 18 quintillion."],
         ["note", "A guard clause at the top, rather than wrapping the whole body in an <code>if</code>. It keeps the real work at one indent level."]
       ] },
-    minmax: { src: "int min_val = *min_element(..), max_val = *max_element(..);",
-      what: "Two passes over the data to find the extremes, because the size of the count array depends on them.",
+    minmax: { src: "auto [min_it, max_it] = minmax_element(data.begin(), data.end());",
+      what: "Finds both extremes in a single walk, because the size of the count array depends on them.",
       items: [
-        ["syntax", "<code>min_element</code> returns an <strong>iterator</strong>, not a value. The leading <code>*</code> dereferences it. Leaving it off is a compile error, which is the kind of mistake you want."],
-        ["note", "Both live in <code>&lt;algorithm&gt;</code>. Two declarations share one <code>int</code> here only to keep the stepper's line short; splitting them across two lines is better style."],
-        ["why", "Counting sort cannot allocate anything until it knows the range, so it reads the whole array twice before it starts sorting. Those passes are part of the <code>n</code> in O(n + k)."]
+        ["syntax", "<code>minmax_element</code> returns a <strong>pair of iterators</strong>, not values. <code>auto [min_it, max_it] = ...</code> is a <em>structured binding</em>: it unpacks the pair into two named iterators on one line."],
+        ["why", "One walk, not two. <code>min_element</code> followed by <code>max_element</code> gives the same answer but reads the array twice, and makes 2(n&minus;1) comparisons where this makes at most 3(n&minus;1)/2. The box under this stepper counts both."],
+        ["trap", "It returns iterators precisely so you can check them. On an empty range they both equal <code>end()</code>, and dereferencing that is undefined behaviour &mdash; which is what the <code>size() &lt;= 1</code> guard above is protecting. Writing <code>*min_element(..)</code> throws that chance away on the same line it is handed to you."],
+        ["note", "Lives in <code>&lt;algorithm&gt;</code>, added in C++11. The dereferences happen on the next line so each step is visible; <code>*min_it</code> is where you finally get an <code>int</code>."]
+      ] },
+    deref: { src: "int min_val = *min_it, max_val = *max_it;",
+      what: "Dereferences the two iterators to get the actual values.",
+      items: [
+        ["syntax", "An iterator is pointer-like: <code>*</code> gets the thing it points at. Leaving it off is a compile error, which is the kind of mistake you want."],
+        ["note", "This is only safe because the guard above has already ruled out an empty vector. That is the whole reason the guard is the first line of the function."]
       ] },
     kline: { src: "int k = max_val - min_val + 1;",
       what: "<code>k</code> is the <strong>value range</strong> &mdash; how many values are <em>possible</em> between the smallest and largest, not how many elements there are.",
@@ -455,11 +523,18 @@ var LINE_INFO = {
         ["why", "<code>min_element</code> on an empty range is undefined behaviour, so this has to come first."],
         ["note", "All three sorts in this activity open with this line. When the same guard appears three times it is worth noticing <em>why</em> rather than copying it: each one is about to index something derived from the data."]
       ] },
-    minmax: { src: "int min_val = *min_element(..), max_val = *max_element(..);",
-      what: "The span that gets divided into buckets.",
+    minmax: { src: "auto [min_it, max_it] = minmax_element(data.begin(), data.end());",
+      what: "The span that gets divided into buckets, found in a single walk.",
       items: [
         ["why", "Bucket sort needs the extremes for a different reason than counting sort does. Counting sort sizes an array with them; bucket sort uses them to decide which bucket a value falls in."],
-        ["syntax", "Still iterators, still needing the <code>*</code> to get a value out."]
+        ["syntax", "Same call as counting sort's step 1a: a structured binding unpacking the pair of iterators <code>minmax_element</code> returns."],
+        ["note", "One walk rather than the two that <code>min_element</code> followed by <code>max_element</code> would cost. The box under the counting tab counts the difference."]
+      ] },
+    deref: { src: "int min_val = *min_it, max_val = *max_it;",
+      what: "Dereferences the two iterators to get the actual values.",
+      items: [
+        ["syntax", "An iterator is pointer-like: <code>*</code> gets the thing it points at."],
+        ["trap", "Safe only because the <code>size() &lt;= 1</code> guard already ruled out an empty vector &mdash; on an empty range both iterators are <code>end()</code>, and dereferencing that is undefined behaviour."]
       ] },
     same: { src: "if (min_val == max_val) return;",
       what: "Every element is identical, so the array is already sorted &mdash; and the division below would be by zero.",
@@ -1122,6 +1197,282 @@ function renderCompare() {
     '<div class="hint">' + hints[state.preset] + '</div></div>';
 }
 
+// ---------------------------------------------------------------------------
+// "Why walk it twice?" -- the box under the counting tab
+// ---------------------------------------------------------------------------
+//
+// ! DISCUSSION: Two columns, and the right one is where the mystery is.
+//   - LEFT counts the obvious versions. Two calls and one loop both spend
+//     2(n-1), which is the actual answer to "why twice": nothing is saved by
+//     merging the loops, so there was never a reason not to write it plainly
+//   - RIGHT explains the number nobody can derive by reading the code -- why
+//     the pairwise algorithm, and so std::minmax_element, gets away with about
+//     3n/2. The saving is in the comparisons it NEVER makes, which is exactly
+//     why it is invisible on the page
+//   - the trace is generated from the selected preset, every comparison listed,
+//     so the running total on the last row is the number in the table above it
+//
+// Why there is no "why does counting sort need both min and max" column:
+// students do not ask that, and the code says it plainly enough on its own.
+//
+function renderWhyTwice() {
+  var box = document.getElementById("whyTwice");
+  if (state.mode !== "counting") { box.style.display = "none"; return; }
+  box.style.display = "";
+
+  var v = PRESETS[state.preset];
+  var n = v.length;
+  var k = Math.max.apply(null, v) - Math.min.apply(null, v) + 1;
+
+  var naive = 2 * (n - 1);
+  // Odd n seeds from a lone element for free; even n spends 1 on the first
+  // pair. Same split as expect_pairwise() in big-o-demo-sorting. A flat
+  // 3n/2-2 is the even-n form and is one short when n is odd.
+  var pairs = (n % 2 === 0) ? 1 + 3 * (n - 2) / 2 : 3 * (n - 1) / 2;
+
+  // ---- walk the pairwise algorithm, recording every comparison ----------
+  var rows = [], c = 0, i, mn, mx, t;
+  if (n % 2 === 1) {
+    mn = v[0]; mx = v[0]; i = 1;
+    rows.push({ kind: "seed", c: "&mdash;", text:
+      "odd count, so the lone first element seeds both min and max for " +
+      "<strong>free</strong>", total: 0 });
+  } else {
+    c++;
+    var firstLess = v[0] < v[1];
+    mn = firstLess ? v[0] : v[1];
+    mx = firstLess ? v[1] : v[0];
+    i = 2;
+    rows.push({ kind: "seed", c: c, text:
+      "seed from the first <em>pair</em>: <span class='mono'>" + v[0] + " &lt; " + v[1] +
+      "</span> &rarr; " + (firstLess ? "yes" : "no") + ", so min = <b>" + mn +
+      "</b> and max = <b>" + mx + "</b>. Both answers, one comparison",
+      total: c });
+  }
+
+  for (; i + 1 < n; i += 2) {
+    var lo = v[i], hi = v[i + 1];
+    var swapped = hi < lo;
+    if (swapped) { t = lo; lo = hi; hi = t; }
+
+    c++;
+    rows.push({ kind: "head", c: c, text:
+      "pair (" + v[i] + ", " + v[i + 1] + ") head to head: <span class='mono'>" +
+      v[i + 1] + " &lt; " + v[i] + "</span> &rarr; " + (swapped ? "yes" : "no") +
+      ", smaller = <b>" + lo + "</b>, larger = <b>" + hi + "</b>", total: c });
+
+    c++;
+    var newMin = lo < mn;
+    rows.push({ kind: "min", c: c, text:
+      "<span class='mono'>" + lo + " &lt; min " + mn + "</span> &rarr; " +
+      (newMin ? "yes, min = <b>" + lo + "</b>" : "no, min stays " + mn), total: c });
+    if (newMin) mn = lo;
+
+    c++;
+    var newMax = mx < hi;
+    rows.push({ kind: "max", c: c, text:
+      "<span class='mono'>max " + mx + " &lt; " + hi + "</span> &rarr; " +
+      (newMax ? "yes, max = <b>" + hi + "</b>" : "no, max stays " + mx), total: c });
+    if (newMax) mx = hi;
+
+    rows.push({ kind: "skip", text:
+      "never asked: is <b>" + hi + "</b> below the min, or <b>" + lo +
+      "</b> above the max. The head-to-head already ruled both out. " +
+      "<strong>Two questions skipped, one spent.</strong>" });
+  }
+
+  var traceRows = rows.map(function (r, idx) {
+    if (r.kind === "skip") {
+      return '<tr class="skiprow"><td></td><td colspan="2">' + r.text + "</td></tr>";
+    }
+    var last = (idx === rows.length - 1);
+    return '<tr class="' + (r.kind === "seed" ? "seedrow" : (last ? "lastrow" : "")) +
+      '"><td class="c">' + r.c + "</td><td>" + r.text +
+      '</td><td class="t">' + r.total + "</td></tr>";
+  }).join("");
+
+  // Both spellings, one above the other. The question this box keeps getting
+  // asked is "shouldn't it call minmax_element?" -- which is impossible to
+  // answer while only one of the two is ever shown on screen.
+  var code =
+    '<div class="code">' +
+    '<div><span class="cm">// WHAT STEP 1a WRITES -- one call, one walk, both answers</span></div>' +
+    '<div>auto [min_it, max_it] = std::minmax_element(data.begin(), data.end());</div>' +
+    '<div>int min_val = *min_it;' +
+      '<span class="cm">    // it returns ITERATORS, so you dereference them yourself</span></div>' +
+    '<div>int max_val = *max_it;</div>' +
+    "<div>&nbsp;</div>" +
+    '<div><span class="cm">// THE OBVIOUS ALTERNATIVE -- two functions, two walks over the same list</span></div>' +
+    '<div><span class="cm">// This is what the code used to say, and it is what most people write.</span></div>' +
+    '<div>int min_val2 = *std::min_element(data.begin(), data.end());</div>' +
+    '<div>int max_val2 = *std::max_element(data.begin(), data.end());</div>' +
+    "</div>";
+
+  box.innerHTML =
+    "<h2>Step 1a &mdash; why walk the list twice, and how " +
+      "<span class='mono'>minmax_element</span> gets away with fewer</h2>" +
+    '<div class="card-body">' +
+      code +
+      '<div class="w2grid" style="margin-top:.85rem">' +
+
+        // ---- LEFT: why walk it twice -----------------------------------
+        '<div class="w2">' +
+          "<h3>Why one call, not two</h3>" +
+          "<p>There are three ways to get both numbers. <strong>Step 1a uses the last " +
+          "one</strong>, and the other two are what people reach for first. Count them. " +
+          "With n = <b>" + n + "</b>:</p>" +
+          "<table><thead><tr><th>How you write it</th><th class='n'>Comparisons</th>" +
+          "<th class='n'>Walks</th></tr></thead><tbody>" +
+          "<tr class='same'><td><span class='mono'>min_element</span> then " +
+            "<span class='mono'>max_element</span>" +
+            "<span class='rowsub'>two functions, two walks &mdash; the obvious way</span></td>" +
+            "<td class='n'>" + naive + "</td><td class='n'>2</td></tr>" +
+          "<tr class='same'><td>your own loop with two <span class='mono'>if</span>s" +
+            "<span class='rowsub'>the rewrite everyone reaches for</span></td>" +
+            "<td class='n'>" + naive + "</td><td class='n'>1</td></tr>" +
+          "<tr class='used'><td><span class='mono'>minmax_element</span>" +
+            "<span class='rowsub'>&#x2714; what step 1a calls &mdash; one walk, both answers</span></td>" +
+            "<td class='n'>" + pairs + "</td><td class='n'>1</td></tr>" +
+          "</tbody></table>" +
+          "<p><span class='same-flag'>Look at the top two rows: the same number.</span> " +
+          "That is the surprise. Writing one loop does not halve the comparisons &mdash; it " +
+          "still tests every element twice, once against min and once against max. " + (n - 1) +
+          " elements &times; 2 tests is the same arithmetic as " + (n - 1) + " + " + (n - 1) +
+          ". All one loop saves is reading the array a second time.</p>" +
+          "<p>And every row is <b>O(n)</b>. 2n and 1.5n are one complexity; the constant is " +
+          "exactly what Big O drops.</p>" +
+          '<div class="callout ask"><strong>So why does step 1a call ' +
+          "<span class='mono'>minmax_element</span>?</strong> <strong>Not for speed</strong> " +
+          "&mdash; it is the <em>slowest</em> of the three on a large array. The measured " +
+          "numbers are on the right, and they are worth a minute on their own.<br><br>" +
+          "It is used because it is " +
+          "the function built for this job, it says in one line what two lines said before, " +
+          "and &mdash; the part that matters &mdash; it hands back <em>iterators</em> " +
+          "rather than values. That is the only one of the three you can safely call on a " +
+          "vector that might be empty: you can test <span class='mono'>min_it == " +
+          "data.end()</span> before dereferencing. Writing <span class='mono'>*min_element" +
+          "(..)</span> throws that chance away on the line it is given to you. The " +
+          "<span class='mono'>size() &lt;= 1</span> guard above is the other half of the " +
+          "same defence.</div>" +
+          '<div class="callout k">Which is the real answer: finding the range was never the ' +
+          "expensive part of counting sort. <strong>k is.</strong> On this input k = " + k +
+          " for " + n + " values" +
+          (k > 4 * n ? " &mdash; already " + Math.round(k / n) + " slots per element."
+                     : ". Try the [170, 45, 75, 90, 802, 24, 2, 66] preset: k = 801 for 8 values.") +
+          " That is the number that decides whether counting sort was the right choice, and " +
+          "it is the number this tab is really about.</div>" +
+        "</div>" +
+
+        // ---- RIGHT: where the missing comparisons went -----------------
+        '<div class="w2">' +
+          "<h3>Why only " + pairs + ", not " + naive + "?</h3>" +
+          "<p>The obvious loop asks <strong>two</strong> questions of every element: " +
+          "<em>are you the new min?</em> and <em>are you the new max?</em> " +
+          "<span class='mono'>std::minmax_element</span> asks a different question " +
+          "first &mdash; <em>which of these two is bigger?</em> &mdash; and that one " +
+          "answer makes two of the others pointless.</p>" +
+          '<div class="perpair">' +
+            '<div class="pp"><span class="q">Two elements, the obvious way</span>' +
+              "<ol><li>is a &lt; min?</li><li>is a &gt; max?</li>" +
+              "<li>is b &lt; min?</li><li>is b &gt; max?</li></ol>" +
+              "<p style='margin:.35rem 0 0'><b>4 comparisons</b></p></div>" +
+            '<div class="pp win"><span class="q">Two elements, as a pair</span>' +
+              "<ol><li>is b &lt; a? &mdash; now you know which is which</li>" +
+              "<li>is the <em>smaller</em> &lt; min?</li>" +
+              "<li class='gone'>is the larger &lt; min?</li>" +
+              "<li>is the <em>larger</em> &gt; max?</li>" +
+              "<li class='gone'>is the smaller &gt; max?</li></ol>" +
+              "<p style='margin:.35rem 0 0'><b>3 comparisons</b></p></div>" +
+          "</div>" +
+          "<p>The two struck-out lines are the whole trick. <strong>A value that just lost " +
+          "a head-to-head cannot be the minimum, and the one that won cannot be the " +
+          "maximum.</strong> So one comparison up front buys the right to skip two. Four " +
+          "per pair becomes three &mdash; 1.5 per element instead of 2.</p>" +
+          "<p>Here it is on this input, every comparison listed. The running total on the " +
+          "last line is the <b>" + pairs + "</b> from the table on the left:</p>" +
+          '<table class="trace"><thead><tr><th class="c">#</th><th>Comparison</th>' +
+          '<th class="t">Total</th></tr></thead><tbody>' + traceRows + "</tbody></table>" +
+          "<h3 style='margin-top:1.1rem'>And yet it is the slowest one</h3>" +
+          "<p>Fewer comparisons is not less time. Measured on 50 million ints &mdash; " +
+          "200&nbsp;MB, far too big for cache &mdash; median of 11 interleaved runs, " +
+          "g++ 13 at <span class='mono'>-O2</span> in the Dev Container:</p>" +
+          "<table class='timing'><thead><tr><th>How you write it</th>" +
+          "<th class='n'>Comparisons<br>per element</th>" +
+          "<th class='n'>Nanoseconds<br>per element</th></tr></thead><tbody>" +
+          "<tr><td><span class='mono'>min_element</span> then " +
+            "<span class='mono'>max_element</span></td>" +
+            "<td class='n'>2.00</td><td class='n'>4.71</td></tr>" +
+          "<tr class='fastest'><td>one loop, two <span class='mono'>if</span>s</td>" +
+            "<td class='n'>2.00</td><td class='n'>3.09 &nbsp;&#x2190; fastest</td></tr>" +
+          "<tr class='slowest'><td><span class='mono'>minmax_element</span>" +
+            "<span class='rowsub'>what step 1a calls</span></td>" +
+            "<td class='n'>1.50</td><td class='n'>5.07 &nbsp;&#x2190; slowest</td></tr>" +
+          "</tbody></table>" +
+          "<p>Read those two columns against each other. <strong>The version doing a " +
+          "quarter fewer comparisons took about 1.6&times; longer.</strong> At " +
+          "<span class='mono'>-O2</span> the two <span class='mono'>if</span>s compile to " +
+          "branchless <span class='mono'>cmov</span> &mdash; 22 instructions per element " +
+          "and no data-dependent branch &mdash; while the pairwise loop needs 47 per pair " +
+          "and five conditional jumps that mispredict on random data. A comparison in " +
+          "source code is not a machine instruction.</p>" +
+          "<p style='font-size:.78rem;color:var(--muted)'>From the " +
+          "<span class='mono'>-minmax</span> target in " +
+          "<span class='mono'>big-o-demo-sorting</span>, which you can build and run. " +
+          "The magnitudes belong to one machine &mdash; a second box measured roughly 8&times; " +
+          "faster across the board &mdash; but the order of the three rows was the same on " +
+          "both. At the few thousand values CT 15 and Lab 6 sort, none of this is " +
+          "measurable at all.</p>" +
+          "<h3 style='margin-top:1.1rem'>So why not just write the fast one?</h3>" +
+          "<p>Because of what you would actually be buying. At 1,000,000 elements the gap " +
+          "between the best and worst of these is <strong>1.0 millisecond</strong>. Lab 6 " +
+          "sorts a few thousand race times &mdash; scale it down and you are fighting over " +
+          "roughly <strong>5 microseconds</strong>, and less than that in practice, because " +
+          "5,000 ints is 20&nbsp;KB and fits in L1 cache where the memory traffic that " +
+          "<em>creates</em> this gap does not happen at all.</p>" +
+          '<div class="verdicts">' +
+            '<div class="vd no"><span class="vh">&#x2716; A &mdash; two calls</span>' +
+              "<p>The <strong>slowest</strong> of the three, and the one carrying the " +
+              "empty-vector bug. There is no argument for it. It is on this page because it " +
+              "is what the code used to say, not because it is an option.</p></div>" +
+            '<div class="vd no"><span class="vh">&#x2716; B &mdash; your own loop</span>' +
+              "<p>The fastest, and still not worth it. It is code you can get wrong three " +
+              "ways &mdash; seeding from <span class='mono'>data[0]</span>, starting the " +
+              "loop at 1, and getting both comparison directions right. It reads " +
+              "<span class='mono'>data[0]</span> unguarded, so it has the <em>same</em> " +
+              "empty-vector bug as A. And its speed depends on this compiler at " +
+              "<span class='mono'>-O2</span> emitting branchless <span class='mono'>cmov</span> " +
+              "on random data; at <span class='mono'>-O0</span>, or on another toolchain, " +
+              "the advantage can shrink or invert.</p></div>" +
+            '<div class="vd yes"><span class="vh">&#x2714; C &mdash; ' +
+              "<span class='mono'>minmax_element</span></span>" +
+              "<p><strong>What step 1a calls.</strong> One line that cannot be written " +
+              "wrong, already tested by whoever wrote your standard library. It returns " +
+              "iterators you can test against <span class='mono'>end()</span> before " +
+              "dereferencing &mdash; the one thing neither A nor B gives you. And the speed " +
+              "difference is invisible at the sizes we sort.</p></div>" +
+          "</div>" +
+          '<div class="callout warn" style="margin-top:.7rem">The mistake to avoid is the one ' +
+          "this table sets you up for. The benchmark exists to kill the idea that " +
+          "<em>fewer comparisons means less time</em> &mdash; it was never a league table for " +
+          "picking a function. <strong>Choosing by a 50-million-element measurement when your " +
+          "input is 5,000 is the same error as choosing by comparison count</strong>, just " +
+          "with better-looking evidence. If this were a hot loop over hundreds of millions of " +
+          "values, B would be the right answer and you would write it and test it hard. " +
+          "Knowing which situation you are in is the skill.</div>" +
+          '<div class="callout">Nothing here is skipped by luck &mdash; it is skipped by ' +
+          "logic, so the count is the same on every input. The standard <em>guarantees</em> " +
+          "<span class='mono'>minmax_element</span> costs at most 3(N&minus;1)/2, and " +
+          "CLRS &sect;9.1 proves 3n/2 &minus; 2 is the best any algorithm can do. You " +
+          "cannot beat it &mdash; and it is still O(n), which is why the course code does " +
+          "not bother.</div>" +
+          '<p style="margin-top:.55rem">Want to watch all three tick up side by side? ' +
+          '<a href="minmax-stepper.html">Open the min/max stepper</a>.</p>' +
+        "</div>" +
+
+      "</div>" +
+    "</div>";
+}
+
 function render() {
   if (state.mode === "compare") renderCompare(); else renderSolo();
   document.getElementById("frameCount").textContent =
@@ -1137,6 +1488,7 @@ function render() {
   Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function (b) {
     b.classList.toggle("on", b.getAttribute("data-preset") === state.preset);
   });
+  renderWhyTwice();
 }
 
 function go(n) { state.step = Math.max(0, Math.min(n, state.maxFrames - 1)); render(); }

@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Min &amp; Max Stepper — Two Passes, One Pass, or One Call?</title>
+<style>
+  :root {
+    --ink:#2c3e50; --muted:#6e6e6e; --rule:#d8dee6;
+    --green:#1c7e45; --blue:#2573a7; --orange:#a95c19;
+    --red:#c0392b; --purple:#8e44ad; --deep:#4527a0; --teal:#00695c;
+    --tint-green:#f2fbf4; --tint-blue:#eaf2f8; --tint-orange:#fff3e0;
+    --tint-red:#fce4ec; --tint-purple:#ede7f6;
+    --code-bg:#1e1e2e; --code-fg:#cdd6f4; --code-dim:#6c7086; --code-hit:#45475a;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; padding:1.5rem 1.25rem 3rem;
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+    color:var(--ink); background:#fff; line-height:1.5;
+  }
+  .wrap { max-width:1280px; margin:0 auto; }
+  h1 { font-size:1.35rem; margin:0 0 .2rem; }
+  .sub { color:var(--muted); font-size:.9rem; margin:0 0 1rem; }
+
+  .asked {
+    border-left:5px solid var(--deep); background:var(--tint-purple);
+    border-radius:0 8px 8px 0; padding:.85rem 1.1rem; margin:0 0 1.1rem;
+    font-size:.9rem;
+  }
+  .asked strong { color:var(--deep); }
+
+  /* ---- tabs ---- */
+  .tabs { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:1rem;
+          border-bottom:2px solid var(--rule); padding-bottom:.6rem; }
+  .tabs button {
+    font:inherit; font-size:.9rem; font-weight:600; padding:.45rem 1rem;
+    border:1px solid var(--rule); border-radius:7px 7px 0 0;
+    background:#f7f9fb; color:var(--muted); cursor:pointer;
+  }
+  .tabs button:hover { color:var(--ink); }
+  .tabs button.on { background:#fff; color:var(--ink); border-bottom-color:#fff; }
+  .tabs button[data-mode="twopass"].on { border-top:3px solid var(--blue);   color:var(--blue); }
+  .tabs button[data-mode="onepass"].on { border-top:3px solid var(--green);  color:var(--green); }
+  .tabs button[data-mode="pairs"].on   { border-top:3px solid var(--orange); color:var(--orange); }
+  .tabs button[data-mode="compare"].on { border-top:3px solid var(--deep);   color:var(--deep); }
+
+  /* ---- controls ---- */
+  .panel { border:1px solid var(--rule); border-radius:10px;
+           padding:.85rem 1rem; margin-bottom:1.1rem; background:#fcfdfe; }
+  .row { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+  .row + .row { margin-top:.6rem; }
+  .lbl { font-size:.73rem; text-transform:uppercase; letter-spacing:.05em;
+         color:var(--muted); min-width:7rem; }
+  button.ctl { font:inherit; font-size:.86rem; padding:.38rem .8rem;
+               border:1px solid var(--rule); border-radius:6px;
+               background:#fff; color:var(--ink); cursor:pointer; }
+  button.ctl:hover:not(:disabled) { border-color:var(--blue); color:var(--blue); }
+  button.ctl:disabled { opacity:.4; cursor:default; }
+  button.ctl.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+  button.ctl.primary { background:var(--deep); border-color:var(--deep); color:#fff; }
+  .count { font-variant-numeric:tabular-nums; font-size:.84rem;
+           color:var(--muted); margin-left:auto; }
+
+  /* ---- layout ---- */
+  .solo { display:grid; grid-template-columns:1.05fr .95fr; gap:1.1rem; align-items:start; }
+  @media (max-width:980px) { .solo { grid-template-columns:1fr; } }
+  .card { border:1px solid var(--rule); border-radius:10px; overflow:hidden;
+          margin-bottom:1.1rem; }
+  .card > h2 { font-size:.92rem; margin:0; padding:.5rem .85rem;
+               border-bottom:1px solid var(--rule); background:#f7f9fb; }
+  .card-body { padding:.85rem; }
+
+  /* ---- the array ---- */
+  .arr { display:flex; gap:.3rem; flex-wrap:wrap; margin:0 0 .2rem; }
+  .cell { width:3.1rem; border:2px solid var(--rule); border-radius:7px;
+          text-align:center; padding:.35rem 0 .2rem; background:#fff; }
+  .cell .v { font-size:1.02rem; font-weight:700; font-variant-numeric:tabular-nums; }
+  .cell .i { font-size:.63rem; color:var(--muted); }
+  .cell.seen   { background:#f4f6f8; }
+  .cell.cur    { border-color:var(--orange); background:var(--tint-orange);
+                 box-shadow:0 0 0 3px rgba(169,92,25,.14); }
+  .cell.ismin  { border-color:var(--green);  background:var(--tint-green); }
+  .cell.ismax  { border-color:var(--purple); background:var(--tint-purple); }
+  .cell.ismin.ismax { border-color:var(--deep); background:#f3e8ff; }
+  .legend { font-size:.72rem; color:var(--muted); margin:.45rem 0 0; }
+  .legend span { display:inline-block; margin-right:.9rem; }
+  .swatch { display:inline-block; width:.7rem; height:.7rem; border-radius:3px;
+            border:2px solid var(--rule); vertical-align:-1px; margin-right:.25rem; }
+  .sw-cur { border-color:var(--orange); background:var(--tint-orange); }
+  .sw-min { border-color:var(--green);  background:var(--tint-green); }
+  .sw-max { border-color:var(--purple); background:var(--tint-purple); }
+
+  /* ---- state strip ---- */
+  .state { display:flex; flex-wrap:wrap; gap:.5rem; margin:.85rem 0 0; }
+  .chip { font-size:.8rem; padding:.3rem .65rem; border-radius:999px;
+          border:1px solid var(--rule); background:#fff;
+          font-variant-numeric:tabular-nums; }
+  .chip b { font-weight:700; }
+  .chip.min { border-color:var(--green);  color:var(--green);  background:var(--tint-green); }
+  .chip.max { border-color:var(--purple); color:var(--purple); background:var(--tint-purple); }
+  .chip.pass{ border-color:var(--blue);   color:var(--blue);   background:var(--tint-blue); }
+
+  .tally { margin:.85rem 0 0; border:2px solid var(--deep); border-radius:10px;
+           background:var(--tint-purple); padding:.6rem .9rem;
+           display:flex; align-items:baseline; gap:.6rem; }
+  .tally .n { font-size:1.75rem; font-weight:800; color:var(--deep);
+              font-variant-numeric:tabular-nums; line-height:1; }
+  .tally .t { font-size:.82rem; color:var(--deep); }
+
+  .test { margin:.75rem 0 0; font-size:.9rem; padding:.55rem .8rem;
+          border-radius:8px; border:1px solid var(--rule); background:#fbfcfd; }
+  .test .q { font-family:Consolas,"Courier New",monospace; font-weight:700; }
+  .test .yes { color:var(--green); font-weight:700; }
+  .test .no  { color:var(--muted); font-weight:700; }
+
+  /* ---- narration ---- */
+  .head { font-size:.98rem; font-weight:600; margin:0 0 .4rem; }
+  .why { margin:0; padding-left:1.1rem; font-size:.86rem; }
+  .why li { margin-bottom:.22rem; }
+
+  /* ---- code ---- */
+  .code { background:var(--code-bg); color:var(--code-fg); border-radius:8px;
+          padding:.6rem 0; font-family:Consolas,"Courier New",monospace;
+          font-size:.82rem; line-height:1.55; overflow-x:auto; }
+  .code div { padding:.02rem .9rem; white-space:pre; }
+  .code div.hit { background:var(--code-hit); border-left:3px solid #f9e2af;
+                  padding-left:calc(.9rem - 3px); }
+  .code .cm { color:var(--code-dim); }
+
+  /* ---- facts ---- */
+  .facts { font-size:.8rem; margin:0; }
+  .facts dt { font-weight:600; float:left; width:8.5rem; clear:left; color:var(--muted); }
+  .facts dd { margin:0 0 .3rem 8.5rem; }
+
+  /* ---- compare lanes ---- */
+  .lanes { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; }
+  @media (max-width:980px) { .lanes { grid-template-columns:1fr; } }
+  .lane { border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
+  .lane h2 { font-size:.9rem; margin:0; padding:.5rem .85rem;
+             border-bottom:1px solid var(--rule); }
+  .lane.twopass h2 { background:var(--tint-blue);   color:var(--blue); }
+  .lane.onepass h2 { background:var(--tint-green);  color:var(--green); }
+  .lane.pairs   h2 { background:var(--tint-orange); color:var(--orange); }
+  .lane .card-body { padding:.7rem; }
+  .lane .cell { width:2.3rem; }
+  .lane .cell .v { font-size:.85rem; }
+  .lane .tally { padding:.45rem .7rem; }
+  .lane .tally .n { font-size:1.4rem; }
+  .lane .mini { font-size:.78rem; color:var(--muted); margin:.5rem 0 0;
+                min-height:2.4rem; }
+
+  /* ---- verdict ---- */
+  table.v { width:100%; border-collapse:collapse; font-size:.85rem; margin:.3rem 0 .9rem; }
+  table.v th, table.v td { border:1px solid var(--rule); padding:.4rem .6rem; text-align:left; }
+  table.v th { background:#f5f7f9; }
+  table.v td.n { text-align:right; font-variant-numeric:tabular-nums; }
+  table.v tr.hi td { background:var(--tint-green); }
+  .punch { border-left:5px solid var(--deep); background:var(--tint-purple);
+           border-radius:0 8px 8px 0; padding:.9rem 1.1rem; font-size:.9rem; }
+  .punch p { margin:0 0 .55rem; }
+  .punch p:last-child { margin:0; }
+  .big { font-size:1.05rem; font-weight:700; color:var(--deep); }
+
+  .selftest { margin-top:1.2rem; font-size:.78rem; color:var(--muted);
+              border-top:1px solid var(--rule); padding-top:.6rem; }
+  .selftest .ok   { color:var(--green); font-weight:600; }
+  .selftest .fail { color:var(--red);   font-weight:700; }
+  code.inl { background:#eef2f6; padding:.08em .32em; border-radius:4px;
+             font-family:Consolas,monospace; font-size:.92em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Min and max: two passes, one pass, or one call?</h1>
+  <p class="sub">CS 2420 &middot; Module 6 &middot; counting comparisons on eight values &mdash; no timing, no clock, nothing that changes between runs</p>
+
+  <div class="asked">
+    <strong>The question, from class:</strong> step 1a of bucket sort and counting sort
+    <em>used to</em> call <code class="inl">std::min_element</code> and then
+    <code class="inl">std::max_element</code>. That is two walks over the list &mdash; about
+    <strong>2n</strong> comparisons. Would one loop not be better?
+    <br><br>
+    Step the three versions below and watch the counter. Two of the three answers are going to
+    surprise you &mdash; and the question changed the code: <strong>CT 15 now calls
+    <code class="inl">std::minmax_element</code></strong>, which is the third tab.
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button data-mode="twopass">1 &middot; Two passes (what it used to do)</button>
+    <button data-mode="onepass">2 &middot; One pass (what you would write)</button>
+    <button data-mode="pairs">3 &middot; Pairs &mdash; what <code>minmax_element</code> does</button>
+    <button data-mode="compare">4 &middot; All three side by side</button>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <span class="lbl">Data</span>
+      <button class="ctl" data-preset="mixed">Mixed</button>
+      <button class="ctl" data-preset="asc">Ascending</button>
+      <button class="ctl" data-preset="desc">Descending</button>
+      <span class="count" id="dataNote"></span>
+    </div>
+    <div class="row">
+      <span class="lbl">Step</span>
+      <button class="ctl" id="first">&laquo; First</button>
+      <button class="ctl" id="prev">&lsaquo; Prev</button>
+      <button class="ctl primary" id="play">&#9654; Play</button>
+      <button class="ctl" id="next">Next &rsaquo;</button>
+      <button class="ctl" id="last">Last &raquo;</button>
+      <span class="count" id="frameCount"></span>
+    </div>
+  </div>
+
+  <div id="stage"></div>
+
+  <div class="selftest" id="selftest"></div>
+</div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// Fixed data. Three presets, same eight values in three orders, so the counts
+// can be compared against each other and against the formulas. Nothing here is
+// random and nothing is timed -- the same click gives the same number forever.
+// ---------------------------------------------------------------------------
+var PRESETS = {
+  mixed: { label: "Mixed",      v: [38, 27, 43, 3, 9, 82, 10, 55] },
+  asc:   { label: "Ascending",  v: [3, 9, 10, 27, 38, 43, 55, 82] },
+  desc:  { label: "Descending", v: [82, 55, 43, 38, 27, 10, 9, 3] }
+};
+
+var MODES = [
+  { key: "twopass", name: "Two passes",  cls: "twopass" },
+  { key: "onepass", name: "One pass",    cls: "onepass" },
+  { key: "pairs",   name: "Pairs = minmax_element", cls: "pairs" }
+];
+
+// ---------------------------------------------------------------------------
+// The code each tab shows, and the per-line breakdowns
+// ---------------------------------------------------------------------------
+var CODE = {
+  twopass: [
+    "// The two lines from bucket sort, written out longhand:",
+    "//   int min_val = *std::min_element(data.begin(), data.end());",
+    "//   int max_val = *std::max_element(data.begin(), data.end());",
+    "",
+    "int mn = data[0];                           // pass 1 starts",
+    "for (size_t i = 1; i < data.size(); ++i)",
+    "    if (data[i] < mn) mn = data[i];         // 1 comparison each time",
+    "",
+    "int mx = data[0];                           // pass 2 starts, back at the front",
+    "for (size_t i = 1; i < data.size(); ++i)",
+    "    if (mx < data[i]) mx = data[i];         // 1 comparison each time"
+  ],
+  onepass: [
+    "// One loop. The obvious fix -- and it does not do what you expect.",
+    "",
+    "int mn = data[0], mx = data[0];",
+    "",
+    "for (size_t i = 1; i < data.size(); ++i) {  // ONE walk over the array",
+    "    if (data[i] < mn) mn = data[i];         // comparison 1",
+    "    if (mx < data[i]) mx = data[i];         // comparison 2",
+    "}"
+  ],
+  pairs: [
+    "// Take them TWO at a time and spend 3 comparisons per pair.",
+    "",
+    "int mn, mx;",
+    "if (data[0] < data[1]) {          // seed: 1 comparison",
+    "    mn = data[0];",
+    "    mx = data[1];",
+    "} else {",
+    "    mn = data[1];",
+    "    mx = data[0];",
+    "}",
+    "",
+    "for (size_t i = 2; i + 1 < data.size(); i += 2) {",
+    "    int lo = data[i], hi = data[i + 1];   // pick up the next two",
+    "    if (hi < lo) std::swap(lo, hi);   // 1. the pair against each other",
+    "    if (lo < mn) mn = lo;             // 2. only the smaller can lower min",
+    "    if (mx < hi) mx = hi;             // 3. only the larger can raise max",
+    "}"
+  ]
+};
+
+var FACTS = {
+  twopass: [
+    ["Comparisons", "2(n &minus; 1) &mdash; exactly n&minus;1 per pass, every time"],
+    ["Passes", "<strong>2</strong> walks over the array"],
+    ["At n = 1,000,000", "1,999,998 comparisons"],
+    ["Big O", "<strong>O(n)</strong>"],
+    ["In the course", "what CT 15 used to write. Replaced by <code class=\"inl\">minmax_element</code> &mdash; see tab 3"]
+  ],
+  onepass: [
+    ["Comparisons", "2(n &minus; 1) &mdash; <strong>the same as two passes</strong>"],
+    ["Passes", "<strong>1</strong> walk over the array"],
+    ["At n = 1,000,000", "1,999,998 comparisons"],
+    ["Big O", "<strong>O(n)</strong>"],
+    ["What it saves", "a second trip through memory &mdash; not a single comparison"]
+  ],
+  pairs: [
+    ["Comparisons", "3n/2 &minus; 2 &mdash; a quarter fewer"],
+    ["Passes", "<strong>1</strong> walk, two elements at a time"],
+    ["At n = 1,000,000", "1,499,998 comparisons"],
+    ["Big O", "<strong>O(n)</strong> &mdash; still"],
+    ["In the course", "<strong>this is what step 1a calls now.</strong> <code class=\"inl\">std::minmax_element</code> runs exactly this algorithm, and the standard guarantees the count"],
+    ["Measured", "the <em>slowest</em> of the three on a large array &mdash; see the note at the end of tab 4"]
+  ]
+};
+
+// ---------------------------------------------------------------------------
+// Frame builders. Each pushes one frame per comparison, so "click Next" and
+// "spend a comparison" are the same action -- the counter can never drift away
+// from what is on screen.
+// ---------------------------------------------------------------------------
+function frame(o) {
+  return {
+    line: o.line, cmp: o.cmp,
+    mnIdx: (o.mnIdx === undefined ? null : o.mnIdx),
+    mxIdx: (o.mxIdx === undefined ? null : o.mxIdx),
+    cur: o.cur || [], seen: (o.seen === undefined ? -1 : o.seen),
+    pass: o.pass || null,
+    test: o.test || null,
+    head: o.head, why: o.why || []
+  };
+}
+
+function buildTwoPass(v) {
+  var f = [], cmp = 0, mnIdx = 0, mxIdx = null, i;
+
+  f.push(frame({
+    line: 4, cmp: 0, mnIdx: 0, cur: [0], seen: 0, pass: 1,
+    head: "Pass 1 begins. min starts as data[0].",
+    why: ["<code class=\"inl\">min_element</code> has to look at something first, so element 0 is the running minimum before any comparison happens",
+          "that seeding costs <strong>0</strong> comparisons"]
+  }));
+
+  f.push(frame({
+    line: 5, cmp: 0, mnIdx: 0, cur: [], seen: 0, pass: 1,
+    head: "The first loop starts. It visits every element once.",
+    why: ["one comparison per element, and only the minimum is being looked for",
+          "<strong>no comparison on this line</strong> &mdash; the counter is still 0"]
+  }));
+
+  for (i = 1; i < v.length; i++) {
+    cmp++;
+    var isMin = v[i] < v[mnIdx];
+    f.push(frame({
+      line: 6, cmp: cmp, mnIdx: isMin ? i : mnIdx, cur: [i], seen: i, pass: 1,
+      test: { q: v[i] + " &lt; " + v[mnIdx] + " ?", yes: isMin,
+              res: isMin ? ("min becomes " + v[i]) : ("min stays " + v[mnIdx]) },
+      head: "Pass 1, element " + i + " &mdash; comparison " + cmp,
+      why: ["one comparison per element, and nothing about max is being learned here"]
+    }));
+    if (isMin) mnIdx = i;
+  }
+
+  f.push(frame({
+    line: 8, cmp: cmp, mnIdx: mnIdx, mxIdx: 0, cur: [0], seen: 0, pass: 2,
+    head: "Pass 1 done in " + cmp + " comparisons. Now the cursor goes <em>back to the front</em>.",
+    why: ["this is the moment the question is about &mdash; the array gets walked a second time",
+          "max starts as data[0], again for free"]
+  }));
+
+  mxIdx = 0;
+  f.push(frame({
+    line: 9, cmp: cmp, mnIdx: mnIdx, mxIdx: 0, cur: [], seen: 0, pass: 2,
+    head: "The second loop starts &mdash; the same elements, walked again.",
+    why: ["this is the second walk the whole question was about",
+          "<strong>no comparison on this line</strong> &mdash; the counter is still " + cmp]
+  }));
+
+  for (i = 1; i < v.length; i++) {
+    cmp++;
+    var isMax = v[mxIdx] < v[i];
+    f.push(frame({
+      line: 10, cmp: cmp, mnIdx: mnIdx, mxIdx: isMax ? i : mxIdx, cur: [i], seen: i, pass: 2,
+      test: { q: v[mxIdx] + " &lt; " + v[i] + " ?", yes: isMax,
+              res: isMax ? ("max becomes " + v[i]) : ("max stays " + v[mxIdx]) },
+      head: "Pass 2, element " + i + " &mdash; comparison " + cmp,
+      why: ["the same elements, read a second time, for the other answer"]
+    }));
+    if (isMax) mxIdx = i;
+  }
+
+  f.push(frame({
+    line: 10, cmp: cmp, mnIdx: mnIdx, mxIdx: mxIdx, cur: [], seen: v.length - 1,
+    head: "Done. min = " + v[mnIdx] + ", max = " + v[mxIdx] + ", in <strong>" + cmp + "</strong> comparisons.",
+    why: ["n&minus;1 for the first pass plus n&minus;1 for the second = 2(n&minus;1)",
+          "with n = 8 that is 14, and it is 14 on <em>any</em> ordering of these values"]
+  }));
+  return f;
+}
+
+function buildOnePass(v) {
+  var f = [], cmp = 0, mnIdx = 0, mxIdx = 0, i;
+
+  f.push(frame({
+    line: 2, cmp: 0, mnIdx: 0, mxIdx: 0, cur: [0], seen: 0,
+    head: "Both start as data[0], and the loop will go through the array once.",
+    why: ["one walk instead of two &mdash; that part is real",
+          "watch what happens to the counter anyway"]
+  }));
+
+  f.push(frame({
+    line: 4, cmp: 0, mnIdx: 0, mxIdx: 0, cur: [], seen: 0,
+    head: "The loop starts. One walk &mdash; but it tests each element twice.",
+    why: ["<strong>no comparison on this line</strong> &mdash; the counter is still 0"]
+  }));
+
+  for (i = 1; i < v.length; i++) {
+    cmp++;
+    var isMin = v[i] < v[mnIdx];
+    f.push(frame({
+      line: 5, cmp: cmp, mnIdx: isMin ? i : mnIdx, mxIdx: mxIdx, cur: [i], seen: i,
+      test: { q: v[i] + " &lt; " + v[mnIdx] + " ?", yes: isMin,
+              res: isMin ? ("min becomes " + v[i]) : ("min stays " + v[mnIdx]) },
+      head: "Element " + i + ", first test &mdash; comparison " + cmp,
+      why: ["the cursor does not move yet; this element gets tested twice before moving on"]
+    }));
+    if (isMin) mnIdx = i;
+
+    cmp++;
+    var isMax = v[mxIdx] < v[i];
+    f.push(frame({
+      line: 6, cmp: cmp, mnIdx: mnIdx, mxIdx: isMax ? i : mxIdx, cur: [i], seen: i,
+      test: { q: v[mxIdx] + " &lt; " + v[i] + " ?", yes: isMax,
+              res: isMax ? ("max becomes " + v[i]) : ("max stays " + v[mxIdx]) },
+      head: "Element " + i + ", second test &mdash; comparison " + cmp,
+      why: ["<strong>two</strong> comparisons spent at this one stop",
+            "one loop, but still two comparisons per element"]
+    }));
+    if (isMax) mxIdx = i;
+  }
+
+  f.push(frame({
+    line: 7, cmp: cmp, mnIdx: mnIdx, mxIdx: mxIdx, cur: [], seen: v.length - 1,
+    head: "Done. min = " + v[mnIdx] + ", max = " + v[mxIdx] + ", in <strong>" + cmp + "</strong> comparisons.",
+    why: ["<strong>the same 14 as two passes.</strong> Halving the loops did not halve the comparisons",
+          "7 elements &times; 2 tests each is the same arithmetic as 7 + 7",
+          "what this version really saves is reading the array a second time, which is a memory cost, not a comparison"]
+  }));
+  return f;
+}
+
+function buildPairs(v) {
+  var f = [], cmp = 0, mn, mx, mnIdx, mxIdx, i, t;
+
+  // ---- seed: the test, then the branch that actually ran -----------------
+  cmp++;
+  var firstSmaller = v[0] < v[1];
+  mnIdx = firstSmaller ? 0 : 1;
+  mxIdx = firstSmaller ? 1 : 0;
+
+  f.push(frame({
+    line: 3, cmp: 1, cur: [0, 1], seen: 1,
+    test: { q: v[0] + " &lt; " + v[1] + " ?", yes: firstSmaller,
+            res: firstSmaller ? "take the if branch" : "take the else branch" },
+    head: "Seed from the first <em>pair</em> &mdash; comparison 1",
+    why: ["one comparison is enough to sort two elements into a smaller and a larger",
+          "min and max are not assigned yet &mdash; that is the next line"]
+  }));
+
+  f.push(frame({
+    line: firstSmaller ? 4 : 7, cmp: 1, mnIdx: mnIdx, mxIdx: mxIdx, cur: [0, 1], seen: 1,
+    head: (firstSmaller ? "The <code>if</code> branch runs" : "The <code>else</code> branch runs") +
+          " &mdash; min = " + v[mnIdx] + ", max = " + v[mxIdx],
+    why: ["both answers are known for these two elements now",
+          "<strong>no comparison here</strong> &mdash; assignment is free. The counter does not move"]
+  }));
+
+  // ---- each pair: for, pick up, then the three tests ---------------------
+  for (i = 2; i + 1 < v.length; i += 2) {
+    var lo = v[i], hi = v[i + 1];
+
+    f.push(frame({
+      line: 11, cmp: cmp, mnIdx: mnIdx, mxIdx: mxIdx, cur: [], seen: i - 1,
+      head: "Next pair: <code>i</code> is now " + i,
+      why: ["<code>i += 2</code>, because this loop consumes <strong>two</strong> elements " +
+            "per turn where the other versions consume one",
+            "<strong>no comparison here</strong>"]
+    }));
+
+    f.push(frame({
+      line: 12, cmp: cmp, mnIdx: mnIdx, mxIdx: mxIdx, cur: [i, i + 1], seen: i + 1,
+      head: "Pick up data[" + i + "] and data[" + (i + 1) + "] &mdash; " + v[i] + " and " + v[i + 1],
+      why: ["<code>lo</code> and <code>hi</code> are just names for the two so far; which is " +
+            "which has not been decided",
+            "<strong>no comparison here</strong> &mdash; the counter is still " + cmp]
+    }));
+
+    cmp++;
+    var swapped = hi < lo;
+    if (swapped) { t = lo; lo = hi; hi = t; }
+    f.push(frame({
+      line: 13, cmp: cmp, mnIdx: mnIdx, mxIdx: mxIdx, cur: [i, i + 1], seen: i + 1,
+      test: { q: v[i + 1] + " &lt; " + v[i] + " ?", yes: swapped,
+              res: (swapped ? "swap, so " : "no swap, so ") + "smaller = " + lo + ", larger = " + hi },
+      head: "Pair (" + v[i] + ", " + v[i + 1] + ") step 1 &mdash; comparison " + cmp,
+      why: ["spend one comparison deciding which of the two is smaller",
+            "this is the comparison the other versions never make &mdash; and it is what buys the savings"]
+    }));
+
+    cmp++;
+    var newMin = lo < v[mnIdx];
+    f.push(frame({
+      line: 14, cmp: cmp, mnIdx: newMin ? (lo === v[i] ? i : i + 1) : mnIdx, mxIdx: mxIdx,
+      cur: [i, i + 1], seen: i + 1,
+      test: { q: lo + " &lt; min " + v[mnIdx] + " ?", yes: newMin,
+              res: newMin ? ("min becomes " + lo) : ("min stays " + v[mnIdx]) },
+      head: "Pair step 2 &mdash; comparison " + cmp,
+      why: ["only the <strong>smaller</strong> of the pair is tested against min",
+            "the larger one cannot possibly be a new minimum, so it is never tested &mdash; that is the comparison being saved"]
+    }));
+    if (newMin) mnIdx = (lo === v[i] ? i : i + 1);
+
+    cmp++;
+    var newMax = v[mxIdx] < hi;
+    f.push(frame({
+      line: 15, cmp: cmp, mnIdx: mnIdx, mxIdx: newMax ? (hi === v[i] ? i : i + 1) : mxIdx,
+      cur: [i, i + 1], seen: i + 1,
+      test: { q: "max " + v[mxIdx] + " &lt; " + hi + " ?", yes: newMax,
+              res: newMax ? ("max becomes " + hi) : ("max stays " + v[mxIdx]) },
+      head: "Pair step 3 &mdash; comparison " + cmp,
+      why: ["only the <strong>larger</strong> is tested against max, for the same reason in reverse",
+            "3 comparisons have handled 2 elements, where the other versions spend 4"]
+    }));
+    if (newMax) mxIdx = (hi === v[i] ? i : i + 1);
+  }
+
+  f.push(frame({
+    line: 16, cmp: cmp, mnIdx: mnIdx, mxIdx: mxIdx, cur: [], seen: v.length - 1,
+    head: "Done. min = " + v[mnIdx] + ", max = " + v[mxIdx] + ", in <strong>" + cmp + "</strong> comparisons.",
+    why: ["3 comparisons per 2 elements is 3n/2, against 2n for the other two",
+          "with n = " + v.length + ": <strong>" + cmp + "</strong> instead of " +
+            (2 * (v.length - 1)) + " &mdash; a quarter fewer",
+          "CLRS &sect;9.1 proves 3n/2 &minus; 2 is the best any algorithm can do, so this is the floor"]
+  }));
+  return f;
+}
+
+var BUILD = { twopass: buildTwoPass, onepass: buildOnePass, pairs: buildPairs };
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+var state = { mode: "twopass", preset: "mixed", step: 0, runs: {}, maxFrames: 1, timer: null };
+
+function compute() {
+  var v = PRESETS[state.preset].v;
+  state.runs = {};
+  MODES.forEach(function (m) { state.runs[m.key] = BUILD[m.key](v); });
+  state.maxFrames = (state.mode === "compare")
+    ? Math.max.apply(null, MODES.map(function (m) { return state.runs[m.key].length; }))
+    : state.runs[state.mode].length;
+  state.step = 0;
+}
+
+function frameAt(key, step) {
+  var r = state.runs[key];
+  return r[Math.min(step, r.length - 1)];
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function cellsHtml(v, f) {
+  return '<div class="arr">' + v.map(function (val, i) {
+    var c = ["cell"];
+    if (f.seen >= i) c.push("seen");
+    if (f.cur.indexOf(i) !== -1) c.push("cur");
+    if (f.mnIdx === i) c.push("ismin");
+    if (f.mxIdx === i) c.push("ismax");
+    return '<div class="' + c.join(" ") + '"><div class="v">' + val +
+           '</div><div class="i">' + i + "</div></div>";
+  }).join("") + "</div>";
+}
+
+function stateHtml(v, f) {
+  var out = [];
+  if (f.pass) out.push('<span class="chip pass">pass <b>' + f.pass + " of 2</b></span>");
+  out.push('<span class="chip min">min <b>' + (f.mnIdx === null ? "&mdash;" : v[f.mnIdx]) + "</b></span>");
+  out.push('<span class="chip max">max <b>' + (f.mxIdx === null ? "&mdash;" : v[f.mxIdx]) + "</b></span>");
+  return '<div class="state">' + out.join("") + "</div>";
+}
+
+function tallyHtml(f) {
+  return '<div class="tally"><span class="n">' + f.cmp + '</span>' +
+         '<span class="t">comparisons spent so far</span></div>';
+}
+
+function testHtml(f) {
+  if (!f.test) return "";
+  return '<div class="test"><span class="q">' + f.test.q + "</span> &nbsp;" +
+         (f.test.yes ? '<span class="yes">yes</span>' : '<span class="no">no</span>') +
+         " &rarr; " + f.test.res + "</div>";
+}
+
+function codeHtml(key, hit) {
+  return '<div class="code">' + CODE[key].map(function (ln, i) {
+    var cls = (i === hit) ? ' class="hit"' : "";
+    var t = esc(ln);
+    var at = t.indexOf("//");
+    if (at !== -1) t = t.slice(0, at) + '<span class="cm">' + t.slice(at) + "</span>";
+    return "<div" + cls + ">" + (t === "" ? "&nbsp;" : t) + "</div>";
+  }).join("") + "</div>";
+}
+
+function factsHtml(key) {
+  return '<dl class="facts">' + FACTS[key].map(function (p) {
+    return "<dt>" + p[0] + "</dt><dd>" + p[1] + "</dd>";
+  }).join("") + "</dl>";
+}
+
+function renderSolo() {
+  var key = state.mode, v = PRESETS[state.preset].v, f = frameAt(key, state.step);
+  var m = MODES.filter(function (x) { return x.key === key; })[0];
+
+  document.getElementById("stage").innerHTML =
+    '<div class="solo">' +
+      '<div>' +
+        '<div class="card"><h2>' + m.name + " &mdash; " + PRESETS[state.preset].label + " data</h2>" +
+          '<div class="card-body">' +
+            cellsHtml(v, f) +
+            '<p class="legend">' +
+              '<span><i class="swatch sw-cur"></i>being compared</span>' +
+              '<span><i class="swatch sw-min"></i>running min</span>' +
+              '<span><i class="swatch sw-max"></i>running max</span>' +
+            "</p>" +
+            stateHtml(v, f) +
+            testHtml(f) +
+            tallyHtml(f) +
+          "</div>" +
+        "</div>" +
+        '<div class="card"><h2>What just happened</h2><div class="card-body">' +
+          '<p class="head">' + f.head + "</p>" +
+          (f.why.length ? '<ul class="why">' + f.why.map(function (w) {
+            return "<li>" + w + "</li>"; }).join("") + "</ul>" : "") +
+        "</div></div>" +
+      "</div>" +
+      '<div>' +
+        '<div class="card"><h2>The code</h2><div class="card-body">' +
+          codeHtml(key, f.line) + "</div></div>" +
+        '<div class="card"><h2>What it costs</h2><div class="card-body">' +
+          factsHtml(key) + "</div></div>" +
+      "</div>" +
+    "</div>";
+}
+
+function renderCompare() {
+  var v = PRESETS[state.preset].v;
+  var atEnd = MODES.every(function (m) {
+    return state.step >= state.runs[m.key].length - 1;
+  });
+
+  var lanes = MODES.map(function (m) {
+    var f = frameAt(m.key, state.step);
+    var done = state.step >= state.runs[m.key].length - 1;
+    return '<div class="lane ' + m.cls + '"><h2>' + m.name +
+             (done ? " &mdash; finished" : "") + "</h2>" +
+           '<div class="card-body">' +
+             cellsHtml(v, f) + stateHtml(v, f) + tallyHtml(f) +
+             '<p class="mini">' + f.head + "</p>" +
+           "</div></div>";
+  }).join("");
+
+  var verdict = "";
+  if (atEnd) {
+    var a = state.runs.twopass[state.runs.twopass.length - 1].cmp;
+    var b = state.runs.onepass[state.runs.onepass.length - 1].cmp;
+    var c = state.runs.pairs[state.runs.pairs.length - 1].cmp;
+    verdict =
+      '<div class="card"><h2>So what was the answer?</h2><div class="card-body">' +
+      '<table class="v"><thead><tr>' +
+        "<th>Version</th><th>Walks</th><th>Comparisons on these 8</th>" +
+        "<th>Formula</th><th>At n = 1,000,000</th><th>Big O</th>" +
+      "</tr></thead><tbody>" +
+      "<tr><td>Two passes (what step 1a used to do)</td><td>2</td><td class='n'>" + a +
+        "</td><td>2(n&minus;1)</td><td class='n'>1,999,998</td><td>O(n)</td></tr>" +
+      "<tr><td>One pass, two <code class='inl'>if</code>s</td><td>1</td><td class='n'>" + b +
+        "</td><td>2(n&minus;1)</td><td class='n'>1,999,998</td><td>O(n)</td></tr>" +
+      "<tr class='hi'><td>Pairs &mdash; <code class='inl'>minmax_element</code> " +
+        "<strong>(what step 1a calls now)</strong></td><td>1</td><td class='n'>" + c +
+        "</td><td>3n/2 &minus; 2</td><td class='n'>1,499,998</td><td>O(n)</td></tr>" +
+      "</tbody></table>" +
+      '<div class="punch">' +
+        "<p><span class='big'>One loop was not half the work.</span> The one-pass version " +
+        "made <strong>" + b + "</strong> comparisons &mdash; exactly as many as the two-pass " +
+        "version it was supposed to improve on. Seven elements tested twice each is the same " +
+        "arithmetic as seven plus seven.</p>" +
+        "<p>The pairs version really does make fewer: <strong>" + c + "</strong> instead of " +
+        a + ", a quarter off, and that is provably the floor. <strong>And it is still " +
+        "O(n).</strong></p>" +
+        "<p><strong>It is also the slowest of the three on a real machine.</strong> " +
+        "Timed on 50 million ints, the pairwise version costs about 5.07 nanoseconds per " +
+        "element against 3.09 for the one-pass loop &mdash; a quarter fewer comparisons " +
+        "and roughly 1.6&times; <em>more</em> time, because the one-pass loop compiles to " +
+        "branchless <code>cmov</code> while the pairwise loop makes five conditional jumps " +
+        "per pair that mispredict. Counting comparisons is not measuring time; the numbers " +
+        "are in <code>big-o-demo-sorting</code>.</p>" +
+        "<p>Which is the actual answer to the question. 2n, 2n and 1.5n are the same " +
+        "complexity. Big O throws the constant away on purpose, because a constant is the part " +
+        "that changes with your compiler and your machine &mdash; and the part you cannot " +
+        "predict by counting. Finding the range was never what made bucket sort O(n + k).</p>" +
+        "<p>So the two calls stay. Each line says plainly what it does, and the lesson at that " +
+        "point in CT 15 is the range <em>k</em>, not how <em>k</em> gets found.</p>" +
+      "</div></div></div>";
+  }
+
+  var hint = atEnd ? "" :
+    '<p style="margin:1.1rem 0 0;font-size:.85rem;color:var(--muted)">' +
+    "Keep stepping &mdash; or press <strong>Last &raquo;</strong>. The three counters finish at " +
+    "different times, and the comparison table and the measured timings appear here once all " +
+    "three have.</p>";
+
+  document.getElementById("stage").innerHTML =
+    '<div class="lanes">' + lanes + "</div>" + hint +
+    (verdict ? '<div style="margin-top:1.1rem">' + verdict + "</div>" : "");
+}
+
+function render() {
+  if (state.mode === "compare") renderCompare(); else renderSolo();
+
+  document.getElementById("frameCount").textContent =
+    "step " + (state.step + 1) + " of " + state.maxFrames;
+  document.getElementById("dataNote").textContent =
+    PRESETS[state.preset].v.join(", ") + "  (n = " + PRESETS[state.preset].v.length + ")";
+
+  document.getElementById("first").disabled = state.step === 0;
+  document.getElementById("prev").disabled = state.step === 0;
+  document.getElementById("next").disabled = state.step >= state.maxFrames - 1;
+  document.getElementById("last").disabled = state.step >= state.maxFrames - 1;
+
+  Array.prototype.forEach.call(document.querySelectorAll("#tabs [data-mode]"), function (b) {
+    b.classList.toggle("on", b.getAttribute("data-mode") === state.mode);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function (b) {
+    b.classList.toggle("on", b.getAttribute("data-preset") === state.preset);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Controls
+// ---------------------------------------------------------------------------
+function go(n) {
+  state.step = Math.max(0, Math.min(n, state.maxFrames - 1));
+  render();
+}
+
+function stopPlay() {
+  if (state.timer) { clearInterval(state.timer); state.timer = null; }
+  document.getElementById("play").innerHTML = "&#9654; Play";
+}
+
+function togglePlay() {
+  if (state.timer) { stopPlay(); return; }
+  document.getElementById("play").innerHTML = "&#10073;&#10073; Pause";
+  state.timer = setInterval(function () {
+    if (state.step >= state.maxFrames - 1) { stopPlay(); return; }
+    go(state.step + 1);
+  }, 850);
+}
+
+document.getElementById("first").addEventListener("click", function () { stopPlay(); go(0); });
+document.getElementById("prev").addEventListener("click", function () { stopPlay(); go(state.step - 1); });
+document.getElementById("next").addEventListener("click", function () { stopPlay(); go(state.step + 1); });
+document.getElementById("last").addEventListener("click", function () { stopPlay(); go(state.maxFrames - 1); });
+document.getElementById("play").addEventListener("click", togglePlay);
+
+Array.prototype.forEach.call(document.querySelectorAll("#tabs [data-mode]"), function (b) {
+  b.addEventListener("click", function () {
+    stopPlay();
+    state.mode = b.getAttribute("data-mode");
+    compute();
+    render();
+  });
+});
+
+Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function (b) {
+  b.addEventListener("click", function () {
+    stopPlay();
+    state.preset = b.getAttribute("data-preset");
+    compute();
+    render();
+  });
+});
+
+document.addEventListener("keydown", function (e) {
+  if (e.key === "ArrowRight") { stopPlay(); go(state.step + 1); }
+  else if (e.key === "ArrowLeft") { stopPlay(); go(state.step - 1); }
+});
+
+// ---------------------------------------------------------------------------
+// Self-test. The counts are the whole point of this page, so they are checked
+// against their formulas rather than trusted -- on every preset, at load.
+// ---------------------------------------------------------------------------
+(function selftest() {
+  var checks = [], pass = 0;
+
+  Object.keys(PRESETS).forEach(function (p) {
+    var v = PRESETS[p].v, n = v.length;
+    var want = { twopass: 2 * (n - 1), onepass: 2 * (n - 1),
+                 pairs: (n % 2 === 0) ? 1 + 3 * (n - 2) / 2 : 3 * (n - 1) / 2 };
+    var trueMin = Math.min.apply(null, v), trueMax = Math.max.apply(null, v);
+
+    MODES.forEach(function (m) {
+      var f = BUILD[m.key](v), last = f[f.length - 1];
+      var okCount = last.cmp === want[m.key];
+      var okMin = v[last.mnIdx] === trueMin;
+      var okMax = v[last.mxIdx] === trueMax;
+      checks.push({
+        name: PRESETS[p].label + " / " + m.name,
+        ok: okCount && okMin && okMax,
+        got: last.cmp + " comparisons, min " + v[last.mnIdx] + ", max " + v[last.mxIdx],
+        want: want[m.key] + " comparisons, min " + trueMin + ", max " + trueMax
+      });
+    });
+  });
+
+  checks.forEach(function (c) { if (c.ok) pass++; });
+  var bad = checks.filter(function (c) { return !c.ok; });
+
+  document.getElementById("selftest").innerHTML =
+    (bad.length === 0
+      ? '<span class="ok">&#x2714; ' + pass + " of " + checks.length +
+        " self-checks passed</span> &mdash; every comparison count on this page matches its " +
+        "formula (2(n&minus;1), 2(n&minus;1), 3n/2&minus;2) and every run finds the true min and max."
+      : '<span class="fail">&#x2716; ' + bad.length + " of " + checks.length +
+        " self-checks FAILED</span>: " + bad.map(function (c) {
+          return c.name + " got " + c.got + ", expected " + c.want;
+        }).join("; "));
+})();
+
+compute();
+render();
+</script>
+</body>
+</html>
