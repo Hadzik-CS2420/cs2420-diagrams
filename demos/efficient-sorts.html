@@ -1890,9 +1890,11 @@ function selfTest() {
 Array.prototype.forEach.call(document.querySelectorAll("#tabs [data-mode]"), function (b) {
   b.addEventListener("click", function () {
     var mode = b.getAttribute("data-mode");
-    // Arriving on the heap tab starts zoomed out, on the input that fills the tree.
+      // Arriving on the heap tab starts on the LINE WALK, on the input that fills the tree.
+      // This forced "overview", which silently beat the default: the default only
+      // applied if you started ON the heap tab, and the page opens on merge.
     if (mode === "heap" && state.mode !== "heap") {
-      state.heapView = "overview";
+      state.heapView = "detail";
       if (state.preset === "random") state.preset = "heap7";
     }
     state.mode = mode; reset();
