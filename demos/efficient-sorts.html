@@ -324,15 +324,21 @@
   /* NOT source. This is the executing line with its real values substituted in,
      so it gets a highlighter band and dark text. Nothing else in the code panel
      has a light background, which is what makes it unmistakable. */
+  /* flex, so the THIS STEP pill is its own item and the text is another.
+     As an inline ::before it offset only the FIRST line, which put every
+     later line on a different origin and made the pointer art in the kick
+     frame impossible to align. pre, not pre-wrap: wrapping a line of ASCII
+     art destroys the alignment it exists for, and .code already scrolls. */
   .code div.calc { background:#f9e2af; color:#1e1e2e; font-size:.88rem;
-                   font-weight:600; white-space:pre-wrap; cursor:default;
+                   font-weight:600; white-space:pre; cursor:default;
+                   display:flex; align-items:flex-start; gap:.55rem;
                    padding:.22rem .8rem; margin:.12rem 0;
                    border-left:4px solid #b8860b; }
   .code div.calc::before { content:"THIS STEP"; font-size:.62rem; font-weight:800;
                            letter-spacing:.06em; color:#6b4f04;
                            background:rgba(0,0,0,.09); border-radius:3px;
-                           padding:.08em .32em; margin-right:.55rem;
-                           vertical-align:.1em; }
+                           padding:.08em .32em; flex:0 0 auto;
+                           margin-top:.28em; }
   /* .code div:hover paints a dark grey; on a light band that would flash it
      back to looking like code. */
   .code div.calc:hover { background:#f9e2af; }
@@ -950,6 +956,19 @@ Recorder.prototype.event = function (depth, label, detail) {
   this.log.push({ depth: depth, label: label, detail: detail });
 };
 
+// The kick frame points at two characters in the call it prints. Counting
+// the spaces by hand got them wrong, so the columns come from the string.
+function pointAtArgs(fn, n) {
+  var head = fn + "(data, ", first = "0, ", call = head + first + n + " \u2212 1)";
+  var c0 = head.length;                  // the 0
+  var cN = head.length + first.length;   // the n
+  function sp(k) { return new Array(k + 1).join(" "); }
+  return call + "\n" +
+         sp(c0) + "\u2191" + sp(cN - c0 - 1) + "\u2191\n" +
+         sp(c0) + "\u2502" + sp(cN - c0 - 1) + "\u2514\u2500 last index, not the count\n" +
+         sp(c0) + "\u2514\u2500 first index";
+}
+
 // ---- merge sort -----------------------------------------------------------
 function mergeSort(items) {
   var r = new Recorder(items), a = r.a, n = a.length;
@@ -1100,9 +1119,7 @@ function mergeSort(items) {
            n + " elements live at indices 0 through " + (n - 1) + ", so the first call sorts " +
            "0.." + (n - 1) + " &mdash; the whole array. Every deeper call narrows that range.",
            { range: [0, n - 1], locals: { "data.size()": n }, stack: [],
-             calc: "merge_sort_recursive(data, 0, " + n + " \u2212 1)\n" +
-                   "                          \u2191        \u2191\n" +
-                   "                      first    last index, not the count" });
+             calc: pointAtArgs("merge_sort_recursive", n) });
     rec(0, n - 1, 0);
   }
   r.snap('msend', "<strong>merge_sort returns.</strong> The array is sorted in place, which is " +
@@ -1258,9 +1275,7 @@ function quickSort(items) {
            "through " + (n - 1) + ", so the first call sorts 0.." + (n - 1) + ". From here on " +
            "the work happens on the way DOWN &mdash; the opposite of merge sort.",
            { range: [0, n - 1], locals: { "data.size()": n }, stack: [],
-             calc: "quick_sort_recursive(data, 0, " + n + " \u2212 1)\n" +
-                   "                          \u2191        \u2191\n" +
-                   "                      first    last index, not the count" });
+             calc: pointAtArgs("quick_sort_recursive", n) });
     rec(0, n - 1, 0);
   }
   r.snap('qend', "<strong>quick_sort returns.</strong> Sorted in place, nothing returned, and no " +
@@ -2220,6 +2235,22 @@ function selfTest() {
         if (f.marks && f.marks.calc && /&[a-zA-Z]+;|&#x?[0-9A-Fa-f]+;/.test(f.marks.calc)) {
           fails.push(name + "/" + lane + " frame " + i + ": HTML entity in calc '" +
                      f.marks.calc.replace(/\n/g, " ").slice(0, 40) + "' -- use the character");
+        }
+        // Pointer art is only worth showing if it points at something. Every
+        // arrow must sit in the column of a non-space character on the line
+        // above it -- which is exactly what was broken when this was written.
+        if (f.marks && f.marks.calc && f.marks.calc.indexOf("\u2191") >= 0) {
+          var cl = f.marks.calc.split("\n");
+          for (var li = 1; li < cl.length; li++) {
+            for (var ci = 0; ci < cl[li].length; ci++) {
+              if (cl[li].charAt(ci) !== "\u2191") continue;
+              var above = cl[li - 1].charAt(ci);
+              if (!above || above === " ") {
+                fails.push(name + "/" + lane + " frame " + i + ": arrow at column " +
+                           ci + " points at nothing");
+              }
+            }
+          }
         }
       });
     });
