@@ -447,7 +447,12 @@ var CODE = {
     {k:'cmp',   t:'  '+K+'while'+E+' (i &lt; L.size() &amp;&amp; j &lt; R.size())'},
     {k:'take',  t:'    data[k++] = (L[i] &lt;= R[j]) ? L[i++] : R[j++];'},
     {k:'drain', t:'  '+C+'// 3. drain whichever half still has elements'+E},
-    {k:'mend',  t:'}'}
+    {k:'mend',  t:'}'},
+    {k:'msort', t:''},
+    {k:'msort', t:K+'void'+E+' '+F+'merge_sort'+E+'(v&amp; data) {           '+C+'// the public one'+E},
+    {k:'guard', t:'  '+K+'if'+E+' (data.size() &lt;= '+N+'1'+E+') '+K+'return'+E+';'},
+    {k:'kick',  t:'  '+F+'merge_sort_recursive'+E+'(data, '+N+'0'+E+', data.size() - '+N+'1'+E+');'},
+    {k:'msend', t:'}'}
   ],
   quick: [
     {k:'rsig',  t:K+'static void'+E+' '+F+'quick_sort_recursive'+E+'(v&amp; data, '+K+'int'+E+' low, '+K+'int'+E+' high) {'},
@@ -465,7 +470,12 @@ var CODE = {
     {k:'scan',  t:'  '+K+'for'+E+' ('+K+'int'+E+' j = low; j &lt; high; ++j)'},
     {k:'cmp',   t:'    '+K+'if'+E+' (data[j] &lt;= pivot) '+F+'swap'+E+'(++i, j);'},
     {k:'place', t:'  '+F+'swap'+E+'(data[i+'+N+'1'+E+'], data[high]);  '+K+'return'+E+' i + '+N+'1'+E+';'},
-    {k:'pend',  t:'}'}
+    {k:'pend',  t:'}'},
+    {k:'qsort', t:''},
+    {k:'qsort', t:K+'void'+E+' '+F+'quick_sort'+E+'(v&amp; data) {           '+C+'// the public one'+E},
+    {k:'guard', t:'  '+K+'if'+E+' (data.size() &lt;= '+N+'1'+E+') '+K+'return'+E+';'},
+    {k:'kick',  t:'  '+F+'quick_sort_recursive'+E+'(data, '+N+'0'+E+', data.size() - '+N+'1'+E+');'},
+    {k:'qend',  t:'}'}
   ],
   heap: [
     {k:'hsig',  t:K+'static void'+E+' '+F+'heapify_down'+E+'(v&amp; data, '+K+'int'+E+' heap_size, '+K+'int'+E+' index) {'},
@@ -658,6 +668,36 @@ var LINE_INFO = {
         ["why", "Only one of the two drain loops ever does anything on a given call &mdash; the other's condition is already false. Both still have to be written."],
         ["note", "No comparisons happen here. Whatever is left in a sorted half is already in order, so it can be copied straight across."]
       ] },
+    msort: { src: "void merge_sort(v& data)",
+      what: "The public entry point &mdash; a two-line wrapper that does no sorting.",
+      items: [
+        ["why", "The only one of the three functions declared in the header. <code>merge_sort_recursive</code> and <code>merge</code> are both <code>static</code>, meaning internal to this .cpp, because nobody outside should call them &mdash; they need a left and a right that only the algorithm knows."],
+        ["why", "The recursive worker needs a <em>range</em>, but a caller only has a <em>vector</em>. Converting one into the other is the entire reason this wrapper exists."],
+        ["syntax", "<code>v&amp;</code> is this panel's shorthand for <code>std::vector&lt;int&gt;&amp;</code>. The <code>&amp;</code> makes <code>data</code> a <strong>reference</strong> &mdash; inside the function <code>data</code> <em>is</em> the caller's vector under a second name, so sorting it sorts theirs."],
+        ["why", "That is why the return type is <code>void</code>. The work lands in the caller's array, so there is nothing to give back."],
+        ["trap", "Drop the <code>&amp;</code> and you sort a copy. It compiles, it runs, your algorithm is correct, and the caller's vector comes back untouched &mdash; so every test fails."]
+      ] },
+    guard: { src: "if (data.size() <= 1) return;",
+      what: "The base case that lives in the wrapper rather than the recursion.",
+      items: [
+        ["why", "0 or 1 element is sorted by definition, so there is no work to do."],
+        ["trap", "<strong>This line is load-bearing, not defensive padding.</strong> <code>size()</code> returns an <em>unsigned</em> type. On an empty vector <code>data.size() - 1</code> is not &minus;1; it wraps around to 18446744073709551615, which gets converted to <code>right</code> and the recursion walks off the end of the array."],
+        ["note", "<code>merge_sort_recursive</code> has its own <code>left &gt;= right</code> check, but that one fires on ranges reached <em>during</em> the recursion. It never sees the empty-vector case, because the bad index was computed before the first call."]
+      ] },
+    kick: { src: "merge_sort_recursive(data, 0, data.size() - 1);",
+      what: "Turns a count into a pair of inclusive indices, then hands off.",
+      items: [
+        ["why", "<strong>This is where <code>right</code> comes from.</strong> <code>size()</code> counts elements; <code>left</code> and <code>right</code> are indices. 8 elements occupy indices 0..7, so the last index is always <code>size() - 1</code>, never <code>size()</code>."],
+        ["syntax", "The range is <strong>inclusive</strong> on both ends &mdash; <code>right</code> is a real element you are allowed to read, unlike <code>end()</code> on an iterator or <code>heap_size</code> on the heap tab, both of which sit one past the last item. Mixing the two conventions up is a reliable source of off-by-one bugs."],
+        ["note", "The real source writes <code>static_cast&lt;int&gt;(data.size()) - 1</code>. The cast is what stops the unsigned arithmetic above from biting; the listing drops it only so the line fits."],
+        ["why", "One call sorts everything. Every call below this one sorts a strictly smaller range, and that shrinking is what guarantees the recursion ends."]
+      ] },
+    msend: { src: "}   // closes merge_sort",
+      what: "Done &mdash; the caller's array is sorted.",
+      items: [
+        ["note", "Nothing is returned and nothing is copied out. The sort happened through the reference, in the caller's own memory."],
+        ["why", "Every temporary <code>L</code> and <code>R</code> created along the way has already been destroyed. Merge sort's O(n) extra space is the cost of the <em>deepest single merge</em>, not the sum of all of them."]
+      ] },
     mend: { src: "}   // closes merge",
       what: "The whole range <code>left..right</code> is now one sorted run.",
       items: [
@@ -750,6 +790,36 @@ var LINE_INFO = {
       items: [
         ["why", "Everything at or below <code>i</code> is &le; pivot and everything above is greater, so slot <code>i+1</code> is exactly where the pivot belongs &mdash; permanently."],
         ["trap", "Returning <code>i</code> instead of <code>i + 1</code> is an off-by-one that still sorts <em>some</em> inputs, which makes it unpleasant to track down. Watch the cell turn green in the stepper to confirm the index."]
+      ] },
+    qsort: { src: "void quick_sort(v& data)",
+      what: "The public entry point &mdash; the same two-line wrapper merge sort has.",
+      items: [
+        ["why", "Worth noticing how identical this is to <code>merge_sort</code>: same signature, same guard, same single call, same <code>void</code>. Every difference between the two algorithms lives in the recursive helper, not here."],
+        ["why", "<code>quick_sort_recursive</code> and <code>partition</code> are <code>static</code> &mdash; internal to this .cpp. Only this function is declared in the header."],
+        ["syntax", "<code>v&amp;</code> is this panel's shorthand for <code>std::vector&lt;int&gt;&amp;</code>. The <code>&amp;</code> makes <code>data</code> a <strong>reference</strong> &mdash; inside the function <code>data</code> <em>is</em> the caller's vector under a second name, so sorting it sorts theirs."],
+        ["why", "That is why the return type is <code>void</code>. The work lands in the caller's array, so there is nothing to give back."],
+        ["trap", "Drop the <code>&amp;</code> and you sort a copy. It compiles, it runs, your algorithm is correct, and the caller's vector comes back untouched &mdash; so every test fails."]
+      ] },
+    guard: { src: "if (data.size() <= 1) return;",
+      what: "The base case that lives in the wrapper rather than the recursion.",
+      items: [
+        ["why", "0 or 1 element is sorted by definition."],
+        ["trap", "<code>size()</code> is <em>unsigned</em>. On an empty vector <code>data.size() - 1</code> wraps to a huge positive number instead of &minus;1, and <code>partition</code> reads <code>data[high]</code> far off the end. The guard is what prevents it."],
+        ["note", "The <code>low &gt;= high</code> check inside the recursion does not cover this. That one catches ranges produced <em>by</em> the recursion; the bad index here is computed before the first call is even made."]
+      ] },
+    kick: { src: "quick_sort_recursive(data, 0, data.size() - 1);",
+      what: "Turns a count into a pair of inclusive indices, then hands off.",
+      items: [
+        ["why", "<strong>This is where <code>high</code> comes from.</strong> <code>size()</code> counts elements, <code>low</code> and <code>high</code> are indices, and 8 elements live at 0..7 &mdash; so the last index is <code>size() - 1</code>."],
+        ["syntax", "Both ends are <strong>inclusive</strong>: <code>data[high]</code> is a real element, and <code>partition</code> depends on that &mdash; it parks the pivot at <code>data[high]</code> and reads it."],
+        ["note", "The real source writes <code>static_cast&lt;int&gt;(data.size()) - 1</code>; the cast is what keeps the subtraction in signed arithmetic."],
+        ["why", "From this call onward the work happens on the way <em>down</em> &mdash; each call partitions before it recurses. Merge sort is the mirror image: it splits on the way down and does the work on the way back up."]
+      ] },
+    qend: { src: "}   // closes quick_sort",
+      what: "Done &mdash; sorted in place, with no extra array anywhere.",
+      items: [
+        ["note", "Nothing returned, nothing copied out; the sort happened through the reference."],
+        ["why", "Count the allocations in this whole lane: zero. That is quick sort's real advantage over merge sort, which allocated two vectors at every merge."]
       ] },
     pend: { src: "}   // closes partition",
       what: "The slice is split and the pivot is home.",
@@ -897,6 +967,15 @@ function mergeSort(items) {
            { range: [left, right], depth: depth, entering: true,
              locals: { left: left, mid: mid, right: right }, stack: callStack.slice(),
              calc: "merge(data, " + left + ", " + mid + ", " + right + ")" });
+    r.snap('copy', "<strong>Why copy at all?</strong> The merged output has to be written back " +
+           "into <code>data[" + left + ".." + right + "]</code> &mdash; the very slots being read " +
+           "from. The first write would land on <code>data[" + left + "]</code> and destroy a " +
+           "value still needed later, so both halves are saved out first. Nothing has been " +
+           "copied yet on this step.",
+           { range: [left, right], depth: depth,
+             locals: { left: left, mid: mid, right: right }, stack: callStack.slice(),
+             calc: "read from data[" + left + ".." + right + "]\n" +
+                   "write to  data[" + left + ".." + right + "]   \u2190  the same slots" });
     var L = a.slice(left, mid + 1).map(function (e) { return e; });
     var R = a.slice(mid + 1, right + 1).map(function (e) { return e; });
     r.event(depth, "merge " + left + ".." + right,
@@ -1002,10 +1081,35 @@ function mergeSort(items) {
     callStack.pop();
   }
 
-  r.snap('rsig', "Start. Merge sort splits without looking at the values, and does all its work " +
-         "on the way back up.", {});
-  if (n > 1) rec(0, n - 1, 0);
-  r.snap('rend', "Sorted.", { sortedRange: [0, n - 1] });
+  r.snap('msort', "<strong>Entering merge_sort.</strong> This is the function <code>main()</code> " +
+         "calls and the only one the header declares &mdash; everything below it is " +
+         "<code>static</code> and invisible from outside. It does no sorting itself; it is a " +
+         "two-line wrapper whose job is to set up the first call.",
+         { locals: { "data.size()": n }, stack: [],
+           calc: "merge_sort(data)   \u2190  data holds " + n + " elements" });
+  r.snap('guard', "<strong>The size guard.</strong> 0 or 1 element is already sorted, so return " +
+         "immediately. This is not just tidiness: on an empty vector <code>data.size() - 1</code> " +
+         "would be the next line's <code>right</code>, and size is unsigned, so 0 - 1 wraps to a " +
+         "huge positive number instead of &minus;1.",
+         { locals: { "data.size()": n }, stack: [],
+           calc: "data.size() = " + n + "  \u2192  " + (n <= 1 ? "&le; 1, return now"
+                                                               : "&gt; 1, keep going") });
+  if (n > 1) {
+    r.snap('kick', "<strong>The one call that starts it all.</strong> Note what this line " +
+           "converts: a <em>count</em> into a pair of <em>inclusive indices</em>. " +
+           n + " elements live at indices 0 through " + (n - 1) + ", so the first call sorts " +
+           "0.." + (n - 1) + " &mdash; the whole array. Every deeper call narrows that range.",
+           { range: [0, n - 1], locals: { "data.size()": n }, stack: [],
+             calc: "merge_sort_recursive(data, 0, " + n + " \u2212 1)\n" +
+                   "                          \u2191        \u2191\n" +
+                   "                      first    last index, not the count" });
+    rec(0, n - 1, 0);
+  }
+  r.snap('msend', "<strong>merge_sort returns.</strong> The array is sorted in place, which is " +
+         "why the function is <code>void</code> &mdash; there is nothing to hand back. The " +
+         "caller's vector has been changed through the reference.",
+         { sortedRange: [0, n - 1], locals: { "data.size()": n }, stack: [],
+           calc: "return   \u2190  data[0.." + (n - 1) + "] sorted" });
   return r;
 }
 
@@ -1136,10 +1240,34 @@ function quickSort(items) {
     callStack.pop();
   }
 
-  r.snap('rsig', "Start. Quick sort partitions first and recurses after — the opposite order to " +
-         "merge sort.", {});
-  if (n > 1) rec(0, n - 1, 0);
-  r.snap('rend', "Sorted.", { sortedRange: [0, n - 1] });
+  r.snap('qsort', "<strong>Entering quick_sort.</strong> Line for line this wrapper is " +
+         "identical to merge sort's &mdash; same guard, same single call, same <code>void</code>. " +
+         "All of the difference between the two algorithms is inside the recursive helper.",
+         { locals: { "data.size()": n }, stack: [],
+           calc: "quick_sort(data)   \u2190  data holds " + n + " elements" });
+  r.snap('guard', "<strong>The size guard.</strong> 0 or 1 element is already sorted, so return " +
+         "immediately. It also protects the next line: <code>size()</code> is unsigned, so on an " +
+         "empty vector <code>data.size() - 1</code> wraps to a huge positive number rather than " +
+         "giving &minus;1.",
+         { locals: { "data.size()": n }, stack: [],
+           calc: "data.size() = " + n + "  \u2192  " + (n <= 1 ? "&le; 1, return now"
+                                                               : "&gt; 1, keep going") });
+  if (n > 1) {
+    r.snap('kick', "<strong>The one call that starts it all.</strong> It turns a <em>count</em> " +
+           "into a pair of <em>inclusive indices</em>: " + n + " elements sit at indices 0 " +
+           "through " + (n - 1) + ", so the first call sorts 0.." + (n - 1) + ". From here on " +
+           "the work happens on the way DOWN &mdash; the opposite of merge sort.",
+           { range: [0, n - 1], locals: { "data.size()": n }, stack: [],
+             calc: "quick_sort_recursive(data, 0, " + n + " \u2212 1)\n" +
+                   "                          \u2191        \u2191\n" +
+                   "                      first    last index, not the count" });
+    rec(0, n - 1, 0);
+  }
+  r.snap('qend', "<strong>quick_sort returns.</strong> Sorted in place, nothing returned, and no " +
+         "extra array was ever allocated &mdash; compare merge sort, which allocated two " +
+         "temporaries at every single merge.",
+         { sortedRange: [0, n - 1], locals: { "data.size()": n }, stack: [],
+           calc: "return   \u2190  data[0.." + (n - 1) + "] sorted" });
   return r;
 }
 
@@ -1530,7 +1658,8 @@ function localsHtml(f) {
                   mid: "the split point", low: "start of this range",
                   high: "end of this range, and where the pivot sits",
                   i: "cursor", j: "cursor", k: "where the next value is written",
-                  p: "the pivot's final index", pivot: "the value being compared against" };
+                  p: "the pivot's final index", pivot: "the value being compared against",
+                  "data.size()": "how many elements &mdash; a count, not an index" };
     rows = "";
     for (var key in m.locals) {
       var v = m.locals[key];
@@ -1565,8 +1694,10 @@ function localsHtml(f) {
 
   var root = { heap: "heap_sort", merge: "merge_sort", quick: "quick_sort" }[state.mode] ||
              "sort";
-  var stack = '<div class="lv stackline"><span class="ln">' + root + '</span>' +
-              '<span class="lat">(data)</span></div>';
+  var inWrapper = !(m.stack && m.stack.length);
+  var stack = '<div class="lv stackline' + (inWrapper ? " here" : "") + '">' +
+              '<span class="ln">' + root + '</span>' +
+              '<span class="lat">(data)' + (inWrapper ? ' &larr; here' : '') + '</span></div>';
   if (m.stack && m.stack.length) {
     m.stack.forEach(function (fr, d) {
       var here = d === m.stack.length - 1;
