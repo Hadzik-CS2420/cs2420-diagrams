@@ -187,6 +187,23 @@
   td.no  { color:var(--red);   font-weight:600; }
   .mono { font-family:Consolas,monospace; }
 
+  /* A debugger's Locals and Call Stack, in the place you would look for them. */
+  .locals { display:grid; grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));
+            gap:.5rem 1.1rem; margin:.6rem 0 0; padding:.55rem .7rem;
+            border:1px solid var(--rule); border-radius:8px; background:#fbfcfd; }
+  .locals h5 { margin:0 0 .3rem; font-size:.68rem; font-weight:700; color:var(--muted);
+               text-transform:uppercase; letter-spacing:.06em; }
+  .locals .lv { display:flex; align-items:baseline; gap:.45rem; font-size:.79rem;
+                line-height:1.5; }
+  .locals .ln { font-family:Consolas,monospace; font-weight:650; color:var(--ink);
+                min-width:4.6rem; }
+  .locals .lval { font-family:Consolas,monospace; font-weight:700; color:var(--blue);
+                  min-width:1.4rem; text-align:right; }
+  .locals .lat { color:var(--muted); font-size:.75rem; }
+  .locals .lat.out { color:var(--red); }
+  .locals .stackline .ln { font-weight:600; color:var(--teal); min-width:0; }
+  .locals .stackline.here .lat { color:var(--ink); font-weight:600; }
+
   /* Plain language, under the step that uses the jargon. */
   .phhelp { border:1px solid var(--rule); border-left:4px solid var(--blue);
             background:#f7f9fb; border-radius:0 8px 8px 0;
@@ -1016,6 +1033,7 @@ function quickSort(items) {
 function heapSort(items) {
   var r = new Recorder(items), a = r.a, n = a.length;
   var lastParent = Math.floor(n / 2) - 1, banner = null, trail = [];
+  var callStack = [];
   r.ov = [];
   function sw(x, y) { var t = a[x]; a[x] = a[y]; a[y] = t; r.writes += 2; }
   function copy() { return a.map(function (e) { return { v: e.v, tag: e.tag, id: e.id }; }); }
@@ -1042,8 +1060,14 @@ function heapSort(items) {
 
   function heapify(heapSize, index, phase, depth) {
     var largest = index, left = 2 * index + 1, right = 2 * index + 2, was;
+    callStack.push({ index: index, heapSize: heapSize });
     function mk(extra) {
+      // left and right unfiltered: the panel has to show the index the
+      // arithmetic produced even when it lands past the end of the heap, since
+      // that is the case `left < heap_size` exists to catch.
       var m = { heapSize: heapSize, phase: phase, node: index, depth: depth,
+                left: left, right: right, largest: largest,
+                stack: callStack.map(function (f) { return f; }),
                 parents: phase === 'build' ? lastParent : undefined,
                 kids: [left, right].filter(function (c) { return c < heapSize; }) };
       for (var key in extra) m[key] = extra[key];
@@ -1105,7 +1129,11 @@ function heapSort(items) {
            largest + ", and it may still be smaller than its new children, so " +
            "heapify_down calls itself on index " + largest + " to carry on sinking. " +
            "Same array, same heap_size &mdash; only the index changes.",
-           mk({ moved: [index, largest], path: [index, largest], node: largest, kids: [],
+           // NOT node: largest. On this frame we are still executing inside the
+           // call at `index`; the deeper call has not been entered yet. Setting
+           // node to the child made the locals panel read index 6 beside left 5
+           // and right 6, which belong to index 2.
+           mk({ moved: [index, largest], path: [index, largest], kids: [],
                 calc: "heapify_down(data, heap_size = " + heapSize + ", index = " + largest +
                       ")   \u2192  about to enter depth " + (depth + 1) }));
       heapify(heapSize, largest, phase, depth + 1);
@@ -1120,6 +1148,7 @@ function heapSort(items) {
            "so the sinking stops.",
            mk({ calc: "largest == index == " + index + "   →   no swap, return" }));
     }
+    callStack.pop();
   }
 
   banner = { phase: 'start', text: 'The array is a tree', sub: 'children of index i sit at 2i+1 and 2i+2' };
@@ -1353,6 +1382,47 @@ function tempsHtml(m) {
 // is unreadable as a flat row, so it gets drawn properly: the family under
 // examination is boxed, the sink is an arrow, and in phase 1 the leaves are
 // dashed because heapify_down is never called on them.
+// What a debugger's Locals and Call Stack panes would show at this frame.
+function localsHtml(f) {
+  var m = f.marks, a = f.a;
+  function slot(name, idx) {
+    if (idx === undefined) return "";
+    var inHeap = idx < m.heapSize;
+    return '<div class="lv"><span class="ln">' + name + '</span>' +
+           '<span class="lval">' + idx + '</span>' +
+           (inHeap ? '<span class="lat">data[' + idx + '] = ' + a[idx].v + '</span>'
+                   : '<span class="lat out">past heap_size, not read</span>') + '</div>';
+  }
+  var rows;
+  if (m.left !== undefined) {
+    rows = '<div class="lv"><span class="ln">heap_size</span><span class="lval">' +
+             m.heapSize + '</span><span class="lat">how much is still a heap</span></div>' +
+           slot("index", m.node) + slot("left", m.left) + slot("right", m.right) +
+           slot("largest", m.largest);
+  } else if (m.heapSize !== undefined) {
+    rows = '<div class="lv"><span class="ln">n</span><span class="lval">' + a.length +
+           '</span><span class="lat">elements in the array</span></div>' +
+           '<div class="lv"><span class="ln">heap_size</span><span class="lval">' +
+           m.heapSize + '</span><span class="lat">how much is still a heap</span></div>' +
+           (m.node !== undefined ? slot("i", m.node) : "");
+  } else return "";
+
+  var stack = '<div class="lv stackline"><span class="ln">heap_sort</span>' +
+              '<span class="lat">(data)</span></div>';
+  if (m.stack && m.stack.length) {
+    m.stack.forEach(function (fr, d) {
+      var here = d === m.stack.length - 1;
+      stack += '<div class="lv stackline' + (here ? " here" : "") + '" ' +
+               'style="padding-left:' + (0.7 + d * 0.7) + 'rem">' +
+               '<span class="ln">heapify_down</span><span class="lat">(data, ' +
+               fr.heapSize + ', ' + fr.index + ')' +
+               (here ? ' &larr; here' : '') + '</span></div>';
+    });
+  }
+  return '<div class="locals"><div><h5>Variables in scope</h5>' + rows + '</div>' +
+         '<div><h5>Call stack</h5>' + stack + '</div></div>';
+}
+
 function treeHtml(f) {
   var m = f.marks, a = f.a, n = a.length;
   if (m.heapSize === undefined) return "";
@@ -1646,6 +1716,7 @@ function renderSolo() {
         '<div class="bounds">' + boundsHtml(key, fr, fr.a.length) + '</div>' +
         extra +
         '<p class="note">' + fr.note + '</p>' +
+        (heap ? localsHtml(fr) : '') +
         (heap ? phaseHelp(m, fr.line) : '') +
         '<div class="stats"><span>compares <b>' + fr.comparisons + '</b></span>' +
           '<span>writes <b>' + fr.writes + '</b></span></div>' +
