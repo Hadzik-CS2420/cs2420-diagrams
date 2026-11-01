@@ -316,7 +316,7 @@
   .code div.ranblock { background:rgba(137,220,235,.08);
                        box-shadow:inset 3px 0 0 #89dceb; }
   .code div.ranblock.ranhead::after {
-      content:"   \2190  this whole call ran, top to bottom";
+      content:"   \2190  all of this ran during that one call";
       color:#89dceb; font-style:italic; font-size:.8rem; }
 </style>
 </head>
@@ -1164,9 +1164,11 @@ function heapSort(items) {
     heapify(n, i, 'build', 0);
     hist('heapify(' + i + ')', 'build', { changed: pathOf() });
     // Beat 2: inside the helper, which is where the comparing and swapping live.
-    ov('hsig', "Inside heapify_down(data, " + n + ", " + i + "): node " + i + " is " + top +
-       ", its children are " + kidsV.join(" and ") + ". " + sinkText(top),
-       { heapSize: n, phase: 'build', parents: lastParent, node: i, before: before,
+    ov('bloop', "<strong>heapify_down(data, " + n + ", " + i + ") has run and returned.</strong> " +
+       "Inside it, node " + i + " held " + top + " and its children were " + kidsV.join(" and ") +
+       ". " + sinkText(top) + " The two rows show the call's net effect &mdash; switch to " +
+       "<strong>Detail</strong> to walk the lines that did it, one at a time.",
+       { heapSize: n, phase: 'build', parents: lastParent, node: i, before: before, ran: true,
          beforeLit: pathOf().length ? pathOf() : [i], path: pathOf(), moved: pathOf(),
          calc: "i = " + i + "   →   heapify_down(data, heap_size = " + n +
                  ", index = " + i + ")" });
@@ -1184,17 +1186,18 @@ function heapSort(items) {
     banner = { phase: 'extract', text: 'Phase 2 · Extract the max',
                sub: 'placing ' + mx + ' at index ' + e + ' &mdash; ' + k + ' of ' + (n - 1) };
     before = copy(); trail = [];
+    // Recorded BEFORE sw() runs. Below it, the top-of-loop frame showed a swap
+    // the line two down had not performed yet -- the same jumping-ahead this
+    // whole pass is about.
+    snap('eloop', "<strong>Top of the phase 2 loop.</strong> i = " + e + ". Nothing has " +
+         "moved yet. This pass will swap the root out to index " + e + " and then shrink " +
+         "the heap to " + e + ". The loop runs down to i = 1, never 0 &mdash; one element " +
+         "left is already in place.",
+         { heapSize: e + 1, phase: 'extract', node: 0, sortedFrom: e + 1,
+           calc: "i = " + e + "   →   this pass will fill index " + e });
     r.event(0, "extract to " + e, "heap_size shrinks to " + e);
     sw(0, e);
     var root = a[0].v;
-    // The loop line itself. `build` is a comment and never executes, but this is a
-    // real statement and detail was stepping straight past it into the swap.
-    snap('eloop', "<strong>Top of the phase 2 loop.</strong> i = " + e + ", so this pass " +
-         "puts the current largest value into index " + e + " and then shrinks the heap to " +
-         e + ". The loop runs down to i = 1, never 0 &mdash; one element left is already " +
-         "in place.",
-         { heapSize: e + 1, phase: 'extract', node: 0, sortedFrom: e + 1,
-           calc: "i = " + e + "   →   this pass fills index " + e });
     snap('eswap', "Swap the max, " + mx + ", out to index " + e + " &mdash; its final position. " + root +
          " lands on the root, where it almost certainly does not belong.",
          { heapSize: e, phase: 'extract', moved: [0, e], sortedFrom: e,
@@ -1217,10 +1220,11 @@ function heapSort(items) {
     heapify(e, 0, 'extract', 0);
     hist('place ' + mx, 'extract', { changed: pathOf(), sortedFrom: e });
     // Beat 2: the repair, inside the helper.
-    ov('hsig', "Inside heapify_down(data, " + e + ", 0): " + sinkText(root) +
-       " Index " + e + " is outside the heap now, so " + mx + " cannot be pulled back in.",
-       { heapSize: e, phase: 'extract', sortedFrom: e, node: 0, before: before, beforeLit: [0, e],
-         beforeSorted: e + 1, path: pathOf(), moved: pathOf(),
+    ov('eloop', "<strong>heapify_down(data, " + e + ", 0) has run and returned.</strong> " +
+       sinkText(root) + " Index " + e + " is outside the heap now, so " + mx + " cannot be " +
+       "pulled back in. Switch to <strong>Detail</strong> to walk the lines.",
+       { heapSize: e, phase: 'extract', sortedFrom: e, node: 0, before: before, ran: true,
+         beforeLit: [0, e], beforeSorted: e + 1, path: pathOf(), moved: pathOf(),
          calc: "i = " + e + "   →   swap data[0] ↔ data[" + e + "],  heapify_down(data, heap_size = " + e + ", index = 0)" });
   }
 
@@ -1670,9 +1674,10 @@ function renderSolo() {
   }).join("");
   // heapify_down's body, for the overview band below.
   var HELPER = ["hsig", "init", "cmpL", "cmpR", "sink", "rec", "hend"];
-  // Band the helper on the beat where it RAN. On the call beat it has not run
-  // yet, and banding it there would say the opposite of the truth.
-  var calling = key === "heap" && state.heapView === "overview" && fr.line === "hsig";
+  // Band the helper on the beat where it ran, which is carried by a mark rather
+  // than by which line is active. Tying it to the active line is what led to
+  // marking the function's ENTRY as executing beside an already-finished array.
+  var calling = key === "heap" && state.heapView === "overview" && !!fr.marks.ran;
 
   Array.prototype.forEach.call(code.children, function (d) {
     var k = d.getAttribute("data-k");
