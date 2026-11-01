@@ -1291,21 +1291,33 @@ function renderWhyTwice() {
       '</td><td class="t">' + r.total + "</td></tr>";
   }).join("");
 
-  // Both spellings, one above the other. The question this box keeps getting
-  // asked is "shouldn't it call minmax_element?" -- which is impossible to
-  // answer while only one of the two is ever shown on screen.
+  // All THREE, numbered and ordered to match the table below them. Showing two
+  // of the three left the hand-written loop as a row in a table with no code
+  // anywhere on the page, and showed the answer before the alternatives it is
+  // being compared against.
   var code =
     '<div class="code">' +
-    '<div><span class="cm">// WHAT STEP 1a WRITES -- one call, one walk, both answers</span></div>' +
+    '<div><span class="cm">// 1. TWO CALLS -- two functions, two walks over the same list.</span></div>' +
+    '<div><span class="cm">//    What step 1a used to say, and what most people write.</span></div>' +
+    '<div>int min_val = *std::min_element(data.begin(), data.end());</div>' +
+    '<div>int max_val = *std::max_element(data.begin(), data.end());</div>' +
+    "<div>&nbsp;</div>" +
+    '<div><span class="cm">// 2. YOUR OWN LOOP -- one walk, but two ifs at every element.</span></div>' +
+    '<div><span class="cm">//    The rewrite everyone reaches for. Same comparison count as 1.</span></div>' +
+    '<div>int min_val = data[0], max_val = data[0];</div>' +
+    '<div>for (size_t i = 1; i &lt; data.size(); ++i) {</div>' +
+    '<div>    if (data[i] &lt; min_val) min_val = data[i];' +
+      '<span class="cm">   // comparison 1</span></div>' +
+    '<div>    if (max_val &lt; data[i]) max_val = data[i];' +
+      '<span class="cm">   // comparison 2</span></div>' +
+    '<div>}</div>' +
+    "<div>&nbsp;</div>" +
+    '<div><span class="cm">// 3. MINMAX_ELEMENT -- one call, one walk, both answers.</span></div>' +
+    '<div><span class="cm">//    &#x2714; This is what step 1a writes today.</span></div>' +
     '<div>auto [min_it, max_it] = std::minmax_element(data.begin(), data.end());</div>' +
     '<div>int min_val = *min_it;' +
       '<span class="cm">    // it returns ITERATORS, so you dereference them yourself</span></div>' +
     '<div>int max_val = *max_it;</div>' +
-    "<div>&nbsp;</div>" +
-    '<div><span class="cm">// THE OBVIOUS ALTERNATIVE -- two functions, two walks over the same list</span></div>' +
-    '<div><span class="cm">// This is what the code used to say, and it is what most people write.</span></div>' +
-    '<div>int min_val2 = *std::min_element(data.begin(), data.end());</div>' +
-    '<div>int max_val2 = *std::max_element(data.begin(), data.end());</div>' +
     "</div>";
 
   box.innerHTML =
@@ -1325,13 +1337,13 @@ function renderWhyTwice() {
           "<th class='n'>Walks</th></tr></thead><tbody>" +
           "<tr class='same'><td><span class='mono'>min_element</span> then " +
             "<span class='mono'>max_element</span>" +
-            "<span class='rowsub'>two functions, two walks &mdash; the obvious way</span></td>" +
+            "<span class='rowsub'>1 above &mdash; two functions, two walks</span></td>" +
             "<td class='n'>" + naive + "</td><td class='n'>2</td></tr>" +
           "<tr class='same'><td>your own loop with two <span class='mono'>if</span>s" +
-            "<span class='rowsub'>the rewrite everyone reaches for</span></td>" +
+            "<span class='rowsub'>2 above &mdash; the rewrite everyone reaches for</span></td>" +
             "<td class='n'>" + naive + "</td><td class='n'>1</td></tr>" +
           "<tr class='used'><td><span class='mono'>minmax_element</span>" +
-            "<span class='rowsub'>&#x2714; what step 1a calls &mdash; one walk, both answers</span></td>" +
+            "<span class='rowsub'>&#x2714; 3 above &mdash; what step 1a calls</span></td>" +
             "<td class='n'>" + pairs + "</td><td class='n'>1</td></tr>" +
           "</tbody></table>" +
           "<p><span class='same-flag'>Look at the top two rows: the same number.</span> " +
