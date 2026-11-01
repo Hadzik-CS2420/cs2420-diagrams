@@ -884,8 +884,19 @@ Recorder.prototype.event = function (depth, label, detail) {
 function mergeSort(items) {
   var r = new Recorder(items), a = r.a, n = a.length;
   function lab(e) { return e.v + (e.tag || ""); }
+  // Same shape as heap sort's: one entry per live call, deepest last.
+  var callStack = [];
+  function frame(fn, args) { return { fn: fn, args: args }; }
 
   function merge(left, mid, right, depth) {
+    callStack.push(frame("merge", left + ", " + mid + ", " + right));
+    r.snap('msig', "<strong>Entering merge.</strong> The arguments bind: <code>left = " + left +
+           "</code>, <code>mid = " + mid + "</code>, <code>right = " + right + "</code>. The two " +
+           "halves " + left + ".." + mid + " and " + (mid + 1) + ".." + right + " are each sorted " +
+           "already; this call makes one sorted run out of them.",
+           { range: [left, right], depth: depth, entering: true,
+             locals: { left: left, mid: mid, right: right }, stack: callStack.slice(),
+             calc: "merge(data, " + left + ", " + mid + ", " + right + ")" });
     var L = a.slice(left, mid + 1).map(function (e) { return e; });
     var R = a.slice(mid + 1, right + 1).map(function (e) { return e; });
     r.event(depth, "merge " + left + ".." + right,
@@ -894,7 +905,9 @@ function mergeSort(items) {
     r.snap('copy2', "Copy both halves out first: L has " + L.length + " element(s), R has " +
            R.length + ". The originals in data are about to be overwritten, so they must be " +
            "saved before the merge starts.",
-           { range: [left, right], depth: depth, temps: { L: L, R: R, i: i, j: j, k: k } });
+           { range: [left, right], depth: depth, temps: { L: L, R: R, i: i, j: j, k: k },
+             locals: { left: left, mid: mid, right: right, i: i, j: j, k: k },
+             stack: callStack.slice() });
     while (i < L.length && j < R.length) {
       r.comparisons++;
       var takeLeft = L[i].v <= R[j].v;
@@ -902,37 +915,59 @@ function mergeSort(items) {
              "? " + (takeLeft ? "Yes" : "No") + " — take from the " + (takeLeft ? "left" : "right") +
              " half." + (L[i].v === R[j].v ? " They are equal, and <= takes the LEFT one: that is stability." : ""),
              { range: [left, right], depth: depth, temps: { L: L, R: R, i: i, j: j, k: k },
-               compare: [k] });
+               compare: [k],
+               locals: { left: left, mid: mid, right: right, i: i, j: j, k: k },
+               stack: callStack.slice() });
       a[k] = takeLeft ? L[i++] : R[j++];
       r.writes++;
       r.snap('take', "Wrote " + a[k].v + " into data[" + k + "].",
              { range: [left, right], depth: depth, moved: [k],
-               temps: { L: L, R: R, i: i, j: j, k: k + 1 } });
+               temps: { L: L, R: R, i: i, j: j, k: k + 1 },
+               locals: { left: left, mid: mid, right: right, i: i, j: j, k: k + 1 },
+               stack: callStack.slice() });
       k++;
     }
     while (i < L.length) {
       a[k] = L[i++]; r.writes++;
       r.snap('drain', "R is empty, so drain L: " + a[k].v + " copied to data[" + k + "].",
              { range: [left, right], depth: depth, moved: [k],
-               temps: { L: L, R: R, i: i, j: j, k: k + 1 } });
+               temps: { L: L, R: R, i: i, j: j, k: k + 1 },
+               locals: { left: left, mid: mid, right: right, i: i, j: j, k: k + 1 },
+               stack: callStack.slice() });
       k++;
     }
     while (j < R.length) {
       a[k] = R[j++]; r.writes++;
       r.snap('drain', "L is empty, so drain R: " + a[k].v + " copied to data[" + k + "].",
              { range: [left, right], depth: depth, moved: [k],
-               temps: { L: L, R: R, i: i, j: j, k: k + 1 } });
+               temps: { L: L, R: R, i: i, j: j, k: k + 1 },
+               locals: { left: left, mid: mid, right: right, i: i, j: j, k: k + 1 },
+               stack: callStack.slice() });
       k++;
     }
-    r.snap('mend', "Range " + left + ".." + right + " is now one sorted run.",
-           { range: [left, right], depth: depth, sortedRange: [left, right] });
+    r.snap('mend', "<strong>merge returns.</strong> Range " + left + ".." + right +
+           " is now one sorted run, and control goes back to the call that asked for it.",
+           { range: [left, right], depth: depth, sortedRange: [left, right],
+             locals: { left: left, mid: mid, right: right, k: k }, stack: callStack.slice(),
+             calc: "return   \u2190  " + left + ".." + right + " merged" });
+    callStack.pop();
   }
 
   function rec(left, right, depth) {
+    callStack.push(frame("merge_sort_recursive", left + ", " + right));
+    r.snap('rsig', "<strong>Entering merge_sort_recursive.</strong> <code>left = " + left +
+           "</code>, <code>right = " + right + "</code>" +
+           (depth ? ", at depth " + depth + " &mdash; called by the line above." : ", the first call.") +
+           " Nothing is compared yet; this function only splits.",
+           { range: [Math.min(left, right), Math.max(left, right)], depth: depth, entering: true,
+             locals: { left: left, right: right }, stack: callStack.slice(),
+             calc: "merge_sort_recursive(data, " + left + ", " + right + ")" });
     if (left >= right) {
       r.snap('base', "Range " + left + ".." + right + " holds " + (right - left + 1) +
              " element(s) — already sorted by definition, so return.",
-             { range: [left, Math.max(left, right)], depth: depth });
+             { range: [left, Math.max(left, right)], depth: depth,
+               locals: { left: left, right: right }, stack: callStack.slice() });
+      callStack.pop();
       return;
     }
     var mid = left + Math.floor((right - left) / 2);
@@ -943,12 +978,28 @@ function mergeSort(items) {
     r.snap('recL', "Recurse into the left half, " + left + ".." + mid + ".",
            { range: [left, mid], depth: depth + 1 });
     rec(left, mid, depth + 1);
+    r.snap('recL', "<strong>Back from the left half.</strong> " + left + ".." + mid +
+           " is sorted now.",
+           { range: [left, mid], depth: depth, locals: { left: left, mid: mid, right: right },
+             stack: callStack.slice(), calc: "return   \u2190  left half done" });
     r.snap('recR', "Left half done. Recurse into the right half, " + (mid + 1) + ".." + right + ".",
-           { range: [mid + 1, right], depth: depth + 1 });
+           { range: [mid + 1, right], depth: depth + 1,
+             locals: { left: left, mid: mid, right: right }, stack: callStack.slice() });
     rec(mid + 1, right, depth + 1);
+    r.snap('recR', "<strong>Back from the right half.</strong> Both halves are sorted, so this " +
+           "call can finally merge them.",
+           { range: [mid + 1, right], depth: depth,
+             locals: { left: left, mid: mid, right: right }, stack: callStack.slice(),
+             calc: "return   \u2190  right half done" });
     r.snap('call', "Both halves are sorted. Now merge " + left + ".." + mid + " with " +
            (mid + 1) + ".." + right + ".", { range: [left, right], depth: depth });
     merge(left, mid, right, depth);
+    r.snap('rend', "<strong>merge_sort_recursive returns.</strong> " + left + ".." + right +
+           " is one sorted run; control goes back to whoever called this.",
+           { range: [left, right], depth: depth, sortedRange: [left, right],
+             locals: { left: left, mid: mid, right: right }, stack: callStack.slice(),
+             calc: "return   \u2190  " + left + ".." + right + " done" });
+    callStack.pop();
   }
 
   r.snap('rsig', "Start. Merge sort splits without looking at the values, and does all its work " +
@@ -962,12 +1013,22 @@ function mergeSort(items) {
 function quickSort(items) {
   var r = new Recorder(items), a = r.a, n = a.length;
   function sw(x, y) { var t = a[x]; a[x] = a[y]; a[y] = t; r.writes += 2; }
+  var callStack = [];
+  function frame(fn, args) { return { fn: fn, args: args }; }
 
   function partition(low, high, depth) {
     var mid = low + Math.floor((high - low) / 2);
+    callStack.push(frame("partition", low + ", " + high));
+    r.snap('psig', "<strong>Entering partition.</strong> <code>low = " + low + "</code>, " +
+           "<code>high = " + high + "</code>. It returns one number: the index the pivot ends " +
+           "up at, which is its final place in the whole array.",
+           { range: [low, high], depth: depth, entering: true,
+             locals: { low: low, high: high, mid: mid }, stack: callStack.slice(),
+             calc: "partition(data, " + low + ", " + high + ")" });
     r.snap('med', "Median-of-three on low=" + low + ", mid=" + mid + ", high=" + high +
            ". Three conditional swaps leave the median at data[high].",
-           { range: [low, high], depth: depth, compare: [low, mid, high] });
+           { range: [low, high], depth: depth, compare: [low, mid, high],
+             locals: { low: low, high: high, mid: mid }, stack: callStack.slice() });
     r.comparisons++;
     if (a[mid].v < a[low].v) { sw(low, mid);
       r.snap('med2', "data[mid] < data[low] — swap them.", { range: [low, high], depth: depth, moved: [low, mid] }); }
@@ -988,38 +1049,91 @@ function quickSort(items) {
     r.snap('pivot', "pivot = " + pivot + ". i starts at low-1 = " + i +
            "; it marks the end of the ≤ pivot region.",
            { range: [low, high], depth: depth, pivot: high, bound: i });
+    r.snap('scan', "<strong>The scan.</strong> <code>j</code> walks from " + low + " up to " +
+           (high - 1) + ", and <code>i</code> trails behind it marking the end of the " +
+           "&le;-pivot region. Everything left of i is &le; the pivot; everything between i " +
+           "and j is greater.",
+           { range: [low, high], depth: depth, pivot: high, bound: i,
+             locals: { low: low, high: high, pivot: pivot, i: i }, stack: callStack.slice(),
+             calc: "for (j = " + low + "; j < " + high + "; ++j)" });
     for (var j = low; j < high; j++) {
       r.comparisons++;
       var le = a[j].v <= pivot;
       r.snap('cmp', "Is data[" + j + "]=" + a[j].v + " <= pivot " + pivot + "? " + (le ? "Yes" : "No") +
              (le ? " — advance i and swap it into the ≤ region." : " — leave it; it belongs on the right."),
-             { range: [low, high], depth: depth, pivot: high, bound: i, compare: [j] });
+             { range: [low, high], depth: depth, pivot: high, bound: i, compare: [j],
+               locals: { low: low, high: high, pivot: pivot, i: i, j: j },
+               stack: callStack.slice() });
       if (le) { i++; sw(i, j);
         r.snap('cmp', "i is now " + i + ", and data[" + i + "] holds " + a[i].v + ".",
-               { range: [low, high], depth: depth, pivot: high, bound: i, moved: [i, j] }); }
+               { range: [low, high], depth: depth, pivot: high, bound: i, moved: [i, j],
+                 locals: { low: low, high: high, pivot: pivot, i: i, j: j },
+                 stack: callStack.slice() }); }
     }
     sw(i + 1, high);
     r.snap('place', "Swap the pivot into position " + (i + 1) +
            ". That is its FINAL home — it is never moved again. Return " + (i + 1) + ".",
-           { range: [low, high], depth: depth, moved: [i + 1], sortedIdx: [i + 1] });
+           { range: [low, high], depth: depth, moved: [i + 1], sortedIdx: [i + 1],
+             locals: { low: low, high: high, pivot: pivot, i: i }, stack: callStack.slice() });
+    r.snap('pend', "<strong>partition returns " + (i + 1) + ".</strong> That index is the " +
+           "pivot's final home, and the caller uses it to split the range in two.",
+           { range: [low, high], depth: depth, sortedIdx: [i + 1],
+             locals: { low: low, high: high, pivot: pivot, i: i }, stack: callStack.slice(),
+             calc: "return " + (i + 1) + "   \u2190  the pivot's final index" });
+    callStack.pop();
     return i + 1;
   }
 
   function rec(low, high, depth) {
+    callStack.push(frame("quick_sort_recursive", low + ", " + high));
+    r.snap('rsig', "<strong>Entering quick_sort_recursive.</strong> <code>low = " + low +
+           "</code>, <code>high = " + high + "</code>" +
+           (depth ? ", at depth " + depth + "." : ", the first call.") +
+           " Unlike merge sort, this one does its work BEFORE recursing.",
+           { range: [Math.min(low, high), Math.max(low, high)], depth: depth, entering: true,
+             locals: { low: low, high: high }, stack: callStack.slice(),
+             calc: "quick_sort_recursive(data, " + low + ", " + high + ")" });
     if (low >= high) {
       r.snap('base', "Range " + low + ".." + high + " has " + Math.max(0, high - low + 1) +
              " element(s) — nothing to do.",
-             { range: [Math.min(low, high), Math.max(low, high)], depth: depth });
+             { range: [Math.min(low, high), Math.max(low, high)], depth: depth,
+               locals: { low: low, high: high }, stack: callStack.slice() });
+      callStack.pop();
       return;
     }
+    r.snap('part', "<strong>Call partition.</strong> It will choose a pivot, move everything " +
+           "&le; it to the left and everything greater to the right, and hand back the index " +
+           "the pivot landed on. Nothing has moved yet.",
+           { range: [low, high], depth: depth,
+             locals: { low: low, high: high }, stack: callStack.slice(),
+             calc: "int p = partition(data, " + low + ", " + high + ")" });
     var p = partition(low, high, depth);
+    r.snap('part', "<strong>partition returned " + p + ".</strong> data[" + p + "] is in its " +
+           "final place for good. The two sides are unsorted, but every value left of " + p +
+           " is &le; it and every value right of it is greater.",
+           { range: [low, high], depth: depth, sortedIdx: [p],
+             locals: { low: low, high: high, p: p }, stack: callStack.slice(),
+             calc: "p = " + p });
     r.snap('recL', "Recurse left of the pivot: " + low + ".." + (p - 1) + ". The pivot itself is " +
            "excluded — including it is how you get infinite recursion.",
            { range: [low, Math.max(low, p - 1)], depth: depth + 1, sortedIdx: [p] });
     rec(low, p - 1, depth + 1);
+    r.snap('recL', "<strong>Back from the left side.</strong> " + low + ".." + (p - 1) +
+           " is sorted.",
+           { range: [low, Math.max(low, p - 1)], depth: depth, sortedIdx: [p],
+             locals: { low: low, high: high, p: p }, stack: callStack.slice(),
+             calc: "return   \u2190  left side done" });
     r.snap('recR', "Recurse right of the pivot: " + (p + 1) + ".." + high + ".",
-           { range: [Math.min(p + 1, high), high], depth: depth + 1, sortedIdx: [p] });
+           { range: [Math.min(p + 1, high), high], depth: depth + 1, sortedIdx: [p],
+             locals: { low: low, high: high, p: p }, stack: callStack.slice() });
     rec(p + 1, high, depth + 1);
+    r.snap('rend', "<strong>quick_sort_recursive returns.</strong> " + low + ".." + high +
+           " is sorted, and there is no merge step &mdash; that is the whole difference from " +
+           "merge sort.",
+           { range: [low, high], depth: depth, sortedRange: [low, high],
+             locals: { low: low, high: high, p: p }, stack: callStack.slice(),
+             calc: "return   \u2190  " + low + ".." + high + " done" });
+    callStack.pop();
   }
 
   r.snap('rsig', "Start. Quick sort partitions first and recurses after — the opposite order to " +
@@ -1408,7 +1522,29 @@ function localsHtml(f) {
                    : '<span class="lat out">past heap_size, not read</span>') + '</div>';
   }
   var rows;
-  if (m.left !== undefined) {
+  if (m.locals) {
+    // Merge and quick carry a plain locals object. Index-valued names get the
+    // array value beside them; the rest are shown as they are.
+    var INDEXY = { left: 1, right: 1, mid: 1, low: 1, high: 1, i: 1, j: 1, k: 1, p: 1 };
+    var MEANS = { left: "start of this range", right: "end of this range",
+                  mid: "the split point", low: "start of this range",
+                  high: "end of this range, and where the pivot sits",
+                  i: "cursor", j: "cursor", k: "where the next value is written",
+                  p: "the pivot's final index", pivot: "the value being compared against" };
+    rows = "";
+    for (var key in m.locals) {
+      var v = m.locals[key];
+      if (v === undefined) continue;
+      var showVal = INDEXY[key] && v >= 0 && v < a.length;
+      rows += '<div class="lv"><span class="ln">' + key + '</span>' +
+              '<span class="lval">' + v + '</span>' +
+              '<span class="lat">' +
+                (showVal ? 'data[' + v + '] = ' + a[v].v +
+                           (MEANS[key] ? ' &middot; ' + MEANS[key] : '')
+                         : (MEANS[key] || '')) +
+              '</span></div>';
+    }
+  } else if (m.left !== undefined) {
     var pend = !!m.entering;
     rows = '<div class="lv"><span class="ln">heap_size</span><span class="lval">' +
              m.heapSize + '</span><span class="lat">' +
@@ -1423,17 +1559,23 @@ function localsHtml(f) {
            '<div class="lv"><span class="ln">heap_size</span><span class="lval">' +
            m.heapSize + '</span><span class="lat">how much is still a heap</span></div>' +
            (m.node !== undefined ? slot("i", m.node) : "");
-  } else return "";
+  } else if (m.heapSize === undefined) return "";
 
-  var stack = '<div class="lv stackline"><span class="ln">heap_sort</span>' +
+  if (!rows) return "";
+
+  var root = { heap: "heap_sort", merge: "merge_sort", quick: "quick_sort" }[state.mode] ||
+             "sort";
+  var stack = '<div class="lv stackline"><span class="ln">' + root + '</span>' +
               '<span class="lat">(data)</span></div>';
   if (m.stack && m.stack.length) {
     m.stack.forEach(function (fr, d) {
       var here = d === m.stack.length - 1;
+      // heap's frames carry index/heapSize; merge and quick carry fn/args.
+      var name = fr.fn || "heapify_down";
+      var args = fr.fn ? fr.args : (fr.heapSize + ", " + fr.index);
       stack += '<div class="lv stackline' + (here ? " here" : "") + '" ' +
                'style="padding-left:' + (0.7 + d * 0.7) + 'rem">' +
-               '<span class="ln">heapify_down</span><span class="lat">(data, ' +
-               fr.heapSize + ', ' + fr.index + ')' +
+               '<span class="ln">' + name + '</span><span class="lat">(data, ' + args + ')' +
                (here ? ' &larr; here' : '') + '</span></div>';
     });
   }
@@ -1734,7 +1876,7 @@ function renderSolo() {
         // Variables in scope sits directly under the tree; the prose note moves
         // below it. The tree's colour legend is gone -- two lines of words for
         // things that are visible, and it pushed the panel out of sight.
-        (heap ? localsHtml(fr) : '') +
+        localsHtml(fr) +
         '<p class="note">' + fr.note + '</p>' +
         (heap ? phaseHelp(m, fr.line) : '') +
         '<div class="stats"><span>compares <b>' + fr.comparisons + '</b></span>' +
