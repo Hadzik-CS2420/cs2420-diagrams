@@ -1092,8 +1092,8 @@ function mergeSort(items) {
          "would be the next line's <code>right</code>, and size is unsigned, so 0 - 1 wraps to a " +
          "huge positive number instead of &minus;1.",
          { locals: { "data.size()": n }, stack: [],
-           calc: "data.size() = " + n + "  \u2192  " + (n <= 1 ? "&le; 1, return now"
-                                                               : "&gt; 1, keep going") });
+           calc: "data.size() = " + n + "  \u2192  " + (n <= 1 ? "\u2264 1, return now"
+                                                               : "> 1, keep going") });
   if (n > 1) {
     r.snap('kick', "<strong>The one call that starts it all.</strong> Note what this line " +
            "converts: a <em>count</em> into a pair of <em>inclusive indices</em>. " +
@@ -1250,8 +1250,8 @@ function quickSort(items) {
          "empty vector <code>data.size() - 1</code> wraps to a huge positive number rather than " +
          "giving &minus;1.",
          { locals: { "data.size()": n }, stack: [],
-           calc: "data.size() = " + n + "  \u2192  " + (n <= 1 ? "&le; 1, return now"
-                                                               : "&gt; 1, keep going") });
+           calc: "data.size() = " + n + "  \u2192  " + (n <= 1 ? "\u2264 1, return now"
+                                                               : "> 1, keep going") });
   if (n > 1) {
     r.snap('kick', "<strong>The one call that starts it all.</strong> It turns a <em>count</em> " +
            "into a pair of <em>inclusive indices</em>: " + n + " elements sit at indices 0 " +
@@ -2215,6 +2215,12 @@ function selfTest() {
           fails.push(name + "/" + lane + " frame " + i + ": unknown line '" + f.line + "'");
         }
         if (!f.note || !f.note.trim()) fails.push(name + "/" + lane + " frame " + i + ": no note");
+        // The note renders through innerHTML; the calc box is written with
+        // esc(), so an HTML entity there reaches the student as "&gt;".
+        if (f.marks && f.marks.calc && /&[a-zA-Z]+;|&#x?[0-9A-Fa-f]+;/.test(f.marks.calc)) {
+          fails.push(name + "/" + lane + " frame " + i + ": HTML entity in calc '" +
+                     f.marks.calc.replace(/\n/g, " ").slice(0, 40) + "' -- use the character");
+        }
       });
     });
     // The heap overview: one step per call, ending on the same sorted array as
