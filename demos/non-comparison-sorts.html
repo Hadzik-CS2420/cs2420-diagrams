@@ -582,9 +582,17 @@ var LINE_INFO = {
         ["why", "Every sort in this module takes a non-const reference and returns <code>void</code>, so the signature itself tells you the sort is in place rather than functional."]
       ] },
     guard: { src: "if (data.size() &lt;= 1) return;",
-      what: "Bails out on an empty vector or a single element &mdash; both are already sorted.",
+      what: "Asks one question: <strong>is there 0 or 1 element?</strong> If so there is nothing to sort, and the lines below would not be safe to run.",
+      live: function (m) {
+        var n = m.locals["data.size()"];
+        return "is there <b>0 or 1</b> element?<br>" +
+               "data.size() = <b>" + n + "</b>  \u2192  " +
+               (n <= 1 ? "yes" : "no, there are " + n) + "<br>" +
+               "0 or 1 element <em>cannot</em> be out of order, so there is nothing to do<br>" +
+               "and on an empty vector the next line would dereference end()";
+      },
       items: [
-        ["why", "Not just an optimisation. The next line calls <code>min_element</code> and dereferences the result; on an empty range that iterator <em>is</em> <code>end()</code>, and dereferencing it is undefined behaviour. This guard is what makes <code>EmptyVector</code> pass."],
+        ["why", "<strong>Two separate reasons, and only one of them is about speed.</strong> A list of 0 or 1 element has no pair that could be out of order, so it is sorted already &mdash; that is why returning is <em>correct</em>. But the next line also calls <code>minmax_element</code> and dereferences the result, and on an empty range that iterator <em>is</em> <code>end()</code>; dereferencing it is undefined behaviour. That is why the guard is not <em>optional</em>. It is what makes <code>EmptyVector</code> pass."],
         ["syntax", "<code>size()</code> returns an unsigned <code>size_t</code>. Comparing it to <code>1</code> is fine, but never write <code>data.size() - 1</code> without checking first &mdash; on an empty vector that wraps around to about 18 quintillion."],
         ["note", "A guard clause at the top, rather than wrapping the whole body in an <code>if</code>. It keeps the real work at one indent level."]
       ] },
@@ -713,7 +721,15 @@ var LINE_INFO = {
         ["why", "<code>num_buckets</code> is the one number in this algorithm that is a judgement call rather than arithmetic. Too few and each bucket is large, so the inner <code>std::sort</code> does all the work and you have gained nothing; too many and most sit empty, paying for vectors that hold nothing. The header line above has the full reasoning, including why a <em>fixed</em> count cannot reach O(n)."]
       ] },
     guard: { src: "if (data.size() &lt;= 1) return;",
-      what: "The same guard as counting sort, for the same reason.",
+      what: "The same question as counting sort asks, for the same two reasons: <strong>is there 0 or 1 element?</strong>",
+      live: function (m) {
+        var n = m.locals["data.size()"];
+        return "is there <b>0 or 1</b> element?<br>" +
+               "data.size() = <b>" + n + "</b>  \u2192  " +
+               (n <= 1 ? "yes" : "no, there are " + n) + "<br>" +
+               "0 or 1 element <em>cannot</em> be out of order, so there is nothing to do<br>" +
+               "and on an empty vector the next line would dereference end()";
+      },
       items: [
         ["why", "<code>min_element</code> on an empty range is undefined behaviour, so this has to come first."],
         ["note", "All three sorts in this activity open with this line. When the same guard appears three times it is worth noticing <em>why</em> rather than copying it: each one is about to index something derived from the data."]
@@ -1007,7 +1023,10 @@ function countingSort(items) {
   r.snap('guard', "<strong>The size guard.</strong> 0 or 1 element is already sorted. It also protects " +
          "the lines below: with no elements there is no min or max to dereference.",
          { phase: 0, banner: B1, locals: { "data.size()": n }, stack: [],
-           calc: "data.size() = " + n + "  \u2192  " + (n <= 1 ? "\u2264 1, return now" : "> 1, keep going") });
+           calc: "data.size() <= 1 ?   is there 0 or 1 element?\n" +
+                 n + " <= 1  is " + (n <= 1 ? "true" : "false") + "  \u2192  " +
+                 (n <= 1 ? "already sorted by definition, return"
+                         : "2 or more, so there IS something to sort") });
   if (n <= 1) { return r; }
   var vals = a.map(function (e) { return e.v; });
   var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
@@ -1134,7 +1153,10 @@ function bucketSort(items) {
   r.snap('guard', "<strong>The size guard.</strong> 0 or 1 element is already sorted, and there is no " +
          "min or max to dereference below.",
          { phase: 0, banner: B1, locals: { "data.size()": n }, stack: [],
-           calc: "data.size() = " + n + "  \u2192  " + (n <= 1 ? "\u2264 1, return now" : "> 1, keep going") });
+           calc: "data.size() <= 1 ?   is there 0 or 1 element?\n" +
+                 n + " <= 1  is " + (n <= 1 ? "true" : "false") + "  \u2192  " +
+                 (n <= 1 ? "already sorted by definition, return"
+                         : "2 or more, so there IS something to sort") });
   if (n <= 1) { return r; }
   var vals = a.map(function (e) { return e.v; });
   var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
