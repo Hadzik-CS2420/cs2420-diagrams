@@ -118,6 +118,19 @@
 
   /* ---- per-line breakdown ---- */
   .lineinfo { border-top:1px solid var(--rule); margin-top:.7rem; padding-top:.7rem; font-size:.93rem; }
+  /* Deliberately identical to .code div.calc. The yellow is the page's "these
+     are this step's real numbers" colour, and using it in both places is what
+     connects the band in the code to the explanation underneath it. */
+  .lineinfo .li-live { background:#f9e2af; color:#1e1e2e; border-left:4px solid #b8860b;
+                       border-radius:0 6px 6px 0; padding:.45rem .7rem; margin:0 0 .6rem;
+                       font-family:Consolas,"Courier New",monospace; font-size:.84rem;
+                       font-weight:600; line-height:1.65; overflow-x:auto; }
+  .lineinfo .li-live b { font-weight:800; }
+  .lineinfo .li-live .lt { display:block; font-family:system-ui,sans-serif; font-weight:800;
+                           font-size:.62rem; letter-spacing:.06em; text-transform:uppercase;
+                           color:#6b4f04; margin-bottom:.2rem; }
+  .lineinfo .li-live em { font-style:normal; background:rgba(0,0,0,.09);
+                          border-radius:3px; padding:.02em .3em; }
   .lineinfo .li-head { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:.45rem; }
   .lineinfo .li-src-wrap { overflow-x:auto; max-width:100%; }
   .lineinfo code.li-src { font-family:Consolas,monospace; font-size:1rem;
@@ -588,10 +601,21 @@ var LINE_INFO = {
         ["note", "This is only safe because the guard above has already ruled out an empty vector. That is the whole reason the guard is the first line of the function."]
       ] },
     kline: { src: "int k = max_val - min_val + 1;",
+      live: function (m) {
+        var lo = m.locals.min_val, hi = m.locals.max_val, k = m.locals.k;
+        var list = [];
+        for (var v = lo; v <= hi && list.length < 12; v++) list.push(v);
+        var shown = list.join(", ") + (hi - lo + 1 > 12 ? ", \u2026" : "");
+        return hi + " \u2212 " + lo + " = " + (hi - lo) +
+               "   \u2190 the <em>gap</em> between them<br>" +
+               "but " + lo + " and " + hi + " are <b>both</b> values we must count<br>" +
+               shown + "   \u2190 that is <b>" + k + "</b> values, not " + (hi - lo) + "<br>" +
+               "so <b>k = " + k + "</b> counters, for " + m.locals["data.size()"] + " elements";
+      },
       what: "<code>k</code> is the <strong>value range</strong> &mdash; how many values are <em>possible</em> between the smallest and largest, not how many elements there are.",
       items: [
         ["why", "This one line is the whole character of counting sort. On <code>{4,2,7,1,9,3}</code>, k is 9 and the sort is unbeatable. On <code>{170,45,75,90,802,24,2,66}</code>, k is 801 to sort 8 numbers. Same code, same algorithm. Switch presets above and watch this number."],
-        ["trap", "The <code>+ 1</code> is inclusive-range arithmetic. Values 3 through 7 need <strong>five</strong> counters, not four. Leave it off and the largest value writes one past the end of the count array."],
+        ["trap", "<strong>The <code>+ 1</code> is the fencepost.</strong> A subtraction gives you the <em>gap</em> between two numbers, not how many numbers there are. 3 to 7 is a gap of 4, but it covers <strong>five</strong> values &mdash; 3, 4, 5, 6, 7. Leave the <code>+ 1</code> off and the largest value writes one past the end of the count array."],
         ["syntax", "With a genuinely huge spread this subtraction can overflow <code>int</code> &mdash; <code>max_val</code> near <code>INT_MAX</code> and a negative <code>min_val</code>. No test here covers it, but counting sort on unbounded input is the wrong tool anyway, which is the lesson."]
       ] },
     alloc: { src: "vector&lt;int&gt; count(k, 0);",
@@ -608,6 +632,19 @@ var LINE_INFO = {
         ["why", "Look at what is missing from this loop: there is no comparison between two elements, here or anywhere else in the function. That is what <em>non-comparison sort</em> means, and it is why the O(n log n) lower bound for comparison sorts does not apply."]
       ] },
     tally2: { src: "count[val - min_val]++;",
+      live: function (m) {
+        var v = m.locals.val, lo = m.locals.min_val, slot = m.locals.slot;
+        var hi = m.base + m.k - 1;          // the largest value present
+        var tail = (v >= m.k)
+          ? "without \u2212 " + lo + " this would write count[" + v + "] on an array of " +
+            m.k + "  \u2014  <b>past the end</b>"
+          : "without \u2212 " + lo + " the array would have to reach " + hi + ", so <b>" +
+            (hi + 1) + "</b> counters instead of <b>" + m.k + "</b>";
+        return "count[val \u2212 min_val]++<br>" +
+               "count[" + v + " \u2212 " + lo + "]  =  count[<b>" + slot + "</b>]<br>" +
+               "the value <b>" + v + "</b> is being used as an <em>address</em>, not compared<br>" +
+               tail;
+      },
       what: "Increments the counter belonging to this value. The <code>- min_val</code> shift is what maps a value onto an index.",
       items: [
         ["why", "The offset is what lets the array be only as wide as the <em>range</em> instead of as wide as the largest value. It is also what makes negative numbers work at all: value <code>-3</code> with <code>min_val</code> of <code>-5</code> lands in <code>count[2]</code>."],
@@ -687,6 +724,17 @@ var LINE_INFO = {
         ["trap", "The <code>+ 1</code> is inclusive again. Leaving it off here does not crash &mdash; it quietly makes the top bucket's boundary wrong, which is the harder kind of bug to find."]
       ] },
     per: { src: "int per = ceil((double)range / num_buckets);",
+      live: function (m) {
+        var r = m.locals.range, nb = m.locals.num_buckets, per = m.locals.per;
+        var exact = r / nb, down = Math.floor(exact);
+        return r + " / " + nb + " = " + (Math.round(exact * 100) / 100) + "<br>" +
+               "round <b>down</b> to " + down + " \u2192 " + nb + " buckets cover only " +
+               (down * nb) + " values, and there are " + r + "<br>" +
+               "round <b>up</b> to " + per + " \u2192 they cover " + (per * nb) +
+               ", which is enough<br>" +
+               "so <b>per = " + per + "</b>  \u2014  covering too much is harmless, too little " +
+               "loses values";
+      },
       what: "How many values each bucket covers. With a range of 41 over 10 buckets, each bucket owns 5 values.",
       items: [
         ["syntax", "The <code>(double)</code> cast is doing real work. Without it, <code>range / num_buckets</code> is integer division and truncates, so <code>ceil</code> receives an already-rounded-down number and has nothing left to round up."],
@@ -706,6 +754,17 @@ var LINE_INFO = {
         ["why", "This pass is O(n) and does no comparing, which is the part of bucket sort that genuinely is a non-comparison sort. The comparing happens further down, and that is the honest caveat about this algorithm."]
       ] },
     bidx: { src: "int b = (val - min_val) / per;",
+      live: function (m) {
+        var v = m.locals.val, lo = m.locals.min_val, per = m.locals.per, b = m.locals.b;
+        var off = v - lo;
+        return "(" + v + " \u2212 " + lo + ") / " + per + "  =  " + off + " / " + per +
+               "  =  <b>" + b + "</b><br>" +
+               "the \u2212 " + lo + " slides the range down so it starts at 0<br>" +
+               "integer division throws away the remainder, and the <em>quotient</em> " +
+               "is the bucket number<br>" +
+               "bucket " + b + " holds values " + (lo + b * per) + " to " +
+               (lo + (b + 1) * per - 1);
+      },
       what: "Maps a value to a bucket number: the same <code>- min_val</code> offset counting sort used, then divided by the bucket width.",
       items: [
         ["why", "Counting sort maps a value to one index; bucket sort maps a whole <em>stretch</em> of values to one index. The only difference between the two lines is the division."],
@@ -793,6 +852,16 @@ var LINE_INFO = {
         ["why", "Before this line, <code>count[d]</code> answers &ldquo;how many elements have digit d&rdquo;. After it, the same array answers &ldquo;where does digit d's group <em>end</em>&rdquo;. Nothing moved; the interpretation changed. Watch the counters turn teal in the panel above when this runs."]
       ] },
     c2: { src: "for (int i = 1; i &lt; 10; ++i) count[i] += count[i-1];",
+      live: function (m) {
+        var i = m.locals.i, c = m.count;
+        if (!c || i === undefined) return "";
+        return "count[" + i + "] += count[" + (i - 1) + "]  \u2192  <b>" + c[i] + "</b><br>" +
+               "before the sweep count[" + i + "] meant &ldquo;how many have digit " + i +
+               "&rdquo;<br>" +
+               "after it, it means &ldquo;how many have a digit of " + i +
+               " <em>or less</em>&rdquo;<br>" +
+               "which is the same as <b>where digit " + i + "'s group ends</b> in the output";
+      },
       what: "A running total across the ten counters, turning tallies into end positions.",
       items: [
         ["syntax", "Starts at <code>i = 1</code>, not 0. <code>count[0]</code> has nothing before it to add, and <code>count[0] += count[-1]</code> would read outside the array."],
@@ -818,6 +887,17 @@ var LINE_INFO = {
         ["why", "Pulled into a named variable because the next line uses it twice. Recomputing it would work; naming it makes that line readable."]
       ] },
     p4: { src: "output[count[digit] - 1] = data[i];  count[digit]--;",
+      live: function (m) {
+        var d = m.locals.digit, pos = m.locals.pos, c = m.count;
+        if (d === undefined || !c) return "";
+        return "digit " + d + "'s group ended at " + (pos + 1) +
+               ", so this one takes output[<b>" + pos + "</b>]<br>" +
+               "count[" + d + "] is now " + c[d] + ", so the NEXT element with digit " + d +
+               " goes to " + (c[d] - 1) + "<br>" +
+               "each one lands just to the <em>left</em> of the last<br>" +
+               "reading the input backwards therefore writes them left-to-right in their " +
+               "original order";
+      },
       what: "Puts the element at the end of its digit's group, then shrinks the group so the next element with that digit lands just before it.",
       items: [
         ["syntax", "The <code>- 1</code> converts a count into an index. If three elements have digit 7 and <code>count[7]</code> is 9, they occupy indices 6, 7 and 8 &mdash; the last of them goes at 8."],
@@ -1451,14 +1531,23 @@ function phaseTable(run, upto) {
 
 // The breakdown for one line. `shown` is the line actually on screen: the
 // pinned one if there is one, otherwise whatever is executing.
-function lineInfoHtml(key, executing) {
-  var table = LINE_INFO[key];
+function lineInfoHtml(key, fr) {
+  var table = LINE_INFO[key], executing = fr.line;
   if (!table) return "";
   var shown = (state.pinned && table[state.pinned]) ? state.pinned : executing;
   var e = table[shown];
   if (!e) return "";
   var pinned = state.pinned === shown;
-  return '<div class="lineinfo">' +
+  // The live numbers describe the EXECUTING line. If the box is pinned to a
+  // different one they belong to something else, so they are dropped rather
+  // than shown against the wrong code.
+  var live = "";
+  if (e.live && shown === executing) {
+    var txt = e.live(fr.marks, fr.a);
+    if (txt) live = '<div class="li-live"><span class="lt">with this run\'s numbers</span>' +
+                    txt + '</div>';
+  }
+  return '<div class="lineinfo">' + live +
     '<div class="li-head">' +
       '<span class="li-tag' + (pinned ? ' pin' : '') + '">' +
         (pinned ? 'pinned' : 'executing') + '</span>' +
@@ -1600,7 +1689,7 @@ function renderSolo() {
       '<div class="col">' +
       '<div class="card"><h2>The code</h2><div class="card-body">' +
         '<div class="code" id="code-solo"></div>' +
-          lineInfoHtml(key, fr.line) +
+          lineInfoHtml(key, fr) +
         '</div></div>' +
       '<div class="card"><h2>For the record</h2><div class="card-body">' +
         '<dl class="facts"><dt>Time</dt><dd>' + f.time + '</dd>' +
@@ -2033,6 +2122,22 @@ function selfTest() {
       // Radix sort is only correct BECAUSE each pass is stable, so this is a
       // real check rather than a nicety.
       if (lane === "radix" && !isStable(run)) fails.push(name + "/radix: must be stable");
+      // live() runs during render, so a bad one does not fail a test -- it
+      // throws and leaves a blank page. Exercise every one on every frame.
+      run.frames.forEach(function (fx, xi) {
+        var ent = LINE_INFO[lane] && LINE_INFO[lane][fx.line];
+        if (!ent || !ent.live) return;
+        try {
+          var out = ent.live(fx.marks, fx.a);
+          if (out && /undefined|NaN/.test(out)) {
+            fails.push(name + "/" + lane + " frame " + xi + ": live() for '" + fx.line +
+                       "' produced " + (/NaN/.test(out) ? "NaN" : "undefined"));
+          }
+        } catch (err) {
+          fails.push(name + "/" + lane + " frame " + xi + ": live() for '" + fx.line +
+                     "' threw: " + err.message);
+        }
+      });
       // 21 of 47 lines used to have no frame at all. Without this, the next
       // line added to a listing quietly joins them.
       var seen = {};
