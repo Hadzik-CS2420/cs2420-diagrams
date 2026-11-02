@@ -532,10 +532,10 @@ var FACTS = {
                   "concatenate the buckets in order and the array is sorted",
                   "spread evenly &rarr; every bucket is tiny &rarr; near O(n)",
                   "all in one bucket &rarr; you just paid for <code>std::sort</code> plus overhead"] }],
-    time: "O(n + k) when the values spread evenly; O(n log n) when they all land in one bucket",
+    time: "O(n + k) only if the bucket count grows with n &mdash; with a fixed 10 it is O(n log(n/10)), which is O(n log n)",
     space: "O(n + num_buckets) &mdash; the buckets hold every element",
     stable: "Depends on the per-bucket sort; <code>std::sort</code> is not stable, <code>std::stable_sort</code> is",
-    watch: "<strong>This is the one of the three that <em>does</em> compare.</strong> It delegates to <code>std::sort</code> inside each bucket, so it is only non-comparison at the top level. Its performance also depends entirely on the data spreading out &mdash; pile everything into one bucket and it degrades to whatever that inner sort costs."
+    watch: "<strong>This is the one of the three that <em>does</em> compare.</strong> It delegates to <code>std::sort</code> inside each bucket, so it is only non-comparison at the top level. It also needs two things to be fast, not one: the values must spread out, <em>and</em> the bucket count must grow with n. With the count fixed at 10 even perfectly spread data gives O(n log(n/10)) &mdash; a constant-factor win over <code>std::sort</code>, not an asymptotic one. Pile everything into one bucket and you have simply called <code>std::sort</code> with extra steps."
   },
   radix: {
     title: "Radix Sort (LSD)",
@@ -700,13 +700,17 @@ var LINE_INFO = {
         ["why", "A <strong>default argument</strong>. A caller who does not care about bucket count writes <code>bucket_sort(data)</code> and gets 10; one who does writes <code>bucket_sort(data, 50)</code>. One function, two levels of control."],
         ["trap", "<strong>The default goes in the declaration ONLY.</strong> Repeating <code>= 10</code> on the definition in the .cpp is a compile error: <em>default argument given for parameter 2</em>. That rule is exactly why the 10 is invisible from the .cpp, and why this line had to be put on screen."],
         ["syntax", "The substitution happens at the <em>call site</em>, at compile time. The function itself never knows whether the value was passed or defaulted \u2014 by the time its body runs, <code>num_buckets</code> is just 10."],
-        ["note", "10 is a guess, not a derived number. There is no bucket count that is right for every input, which is why it is a knob with a sensible default rather than something computed from the data."]
+        ["why", "<strong>The textbook answer is <code>n</code> &mdash; one bucket per element.</strong> That is what the O(n) result depends on: with n buckets and evenly spread values each bucket holds about <em>one</em> element, the inner sorts cost nothing, and all that is left is the two O(n) walks. 10 is not that number."],
+        ["trap", "<strong>A fixed bucket count does not give you O(n), even on perfectly spread data.</strong> k buckets hold n/k elements each, so the inner sorts cost <code>k &times; (n/k)log(n/k) = n&nbsp;log(n/k)</code>. Hold k at 10 and that is <code>n log(n/10)</code> &mdash; still O(n log n), the same class as simply calling <code>std::sort</code>. Counted on uniform data, 10 buckets beat <code>std::sort</code> by 2.0&times; at n=100, 1.5&times; at n=1,000 and 1.2&times; at n=1,000,000. An advantage that shrinks toward 1 as n grows is a constant factor, not a better algorithm."],
+        ["note", "So 10 buys two real things &mdash; a constant-factor speedup from sorting many small arrays instead of one big one, and a diagram you can actually draw. What it does not buy is a change of complexity class. Scaling it with <code>n</code> does."],
+        ["note", "Memory is the other half of the trade. Every bucket is a <code>vector</code> with its own overhead, so <code>n</code> buckets for a million elements is a million vectors. Real implementations compromise &mdash; <code>n</code>, or <code>n/8</code>, or a power of two for cheap indexing."],
+        ["note", "Worth contrasting with the 10 on the radix tab, which looks identical and is not. <strong>Radix's ten counters are forced</strong> &mdash; a base-10 digit has exactly ten possible values, and no other number would be correct. Bucket sort's 10 is chosen, and could be anything."]
       ] },
     sig: { src: "void bucket_sort(vector&lt;int&gt;&amp; data, int num_buckets)",
       what: "Sorts in place like the others, but takes a second parameter: how many buckets to scatter into.",
       items: [
         ["syntax", "No <code>= 10</code> on this line. It is on the header line above, and repeating it here would be a compile error &mdash; which is why the 10 looks like it comes from nowhere when you only read the .cpp."],
-        ["why", "<code>num_buckets</code> is a tuning knob, and the one thing about this algorithm that is a judgement call rather than arithmetic. Too few and each bucket is large, so the inner sort does all the work; too many and most buckets sit empty."]
+        ["why", "<code>num_buckets</code> is the one number in this algorithm that is a judgement call rather than arithmetic. Too few and each bucket is large, so the inner <code>std::sort</code> does all the work and you have gained nothing; too many and most sit empty, paying for vectors that hold nothing. The header line above has the full reasoning, including why a <em>fixed</em> count cannot reach O(n)."]
       ] },
     guard: { src: "if (data.size() &lt;= 1) return;",
       what: "The same guard as counting sort, for the same reason.",
