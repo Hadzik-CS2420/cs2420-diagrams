@@ -1056,6 +1056,16 @@ var LINE_INFO = {
         ["trap", "<code>output</code> must be constructed with <code>(n)</code> rather than left empty and <code>push_back</code>-ed, because the placement loop writes to computed positions and fills <em>backwards</em>. There is no order to append in."]
       ] },
     t1: { src: "// 1. tally this digit",
+      live: function (m, a) {
+        var vals = a.map(function (e) { return e.v; });
+        var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+        var k = hi - lo + 1;
+        return "this array is <b>10</b> long, and always will be<br>" +
+               "counting sort on this same input needed <b>" + k + "</b> (k = " + hi +
+               " &minus; " + lo + " + 1)<br>" +
+               "widen the values and k grows; <b>10</b> does not<br>" +
+               "that is the trade: more passes, each with a fixed-size counter array";
+      },
       what: "Three numbered phases follow. They are worth keeping as comments in your own code.",
       items: [
         ["note", "Tally, accumulate, place. Nearly every bug in radix sort is one of these three phases being merged into another or run in the wrong order."]
@@ -1102,6 +1112,14 @@ var LINE_INFO = {
         ["trap", "The accumulation must run forwards. Going backwards adds in the wrong direction and produces totals that are meaningless rather than merely offset."]
       ] },
     p1: { src: "// 3. place, walking the input BACKWARDS",
+      live: function (m) {
+        var c = m.count, n = m.locals.n;
+        if (!c) return "";
+        return "count[9] = <b>" + c[9] + "</b>, and n = <b>" + n + "</b><br>" +
+               "they match, and must: every element has <em>some</em> digit here<br>" +
+               "so the groups together cover all " + n + " output slots<br>" +
+               "if those two ever disagree, the tally missed an element";
+      },
       what: "The hardest idea in this activity, flagged in the code so it does not get skimmed.",
       items: [
         ["why", "If you take one thing from this stepper, take the next three lines. Everything else in radix sort is bookkeeping; the direction of this loop is the algorithm's correctness."]
@@ -1512,6 +1530,13 @@ function radixSort(items) {
   // so this holds counting_sort_by_digit while a pass is running.
   var stk = [];
   function frame(exp) { return { fn: "counting_sort_by_digit", args: "data, exp=" + exp }; }
+  // The ten counters as a labelled row. Kept short on purpose: these bands are
+  // prose, so they wrap, and a long trailing label would wrap the row out of
+  // alignment with its header.
+  function counters(c) {
+    return "digit     0 1 2 3 4 5 6 7 8 9\n" +
+           "count[]   " + c.map(function (x) { return x > 9 ? "+" : x; }).join(" ");
+  }
   var B1 = { tone: "build", text: "Phase 1 \u00b7 How many digits?", sub: "the maximum decides" };
 
   r.snap('rsig', "<strong>Entering radix_sort.</strong> It never compares two elements either. It sorts " +
@@ -1569,11 +1594,13 @@ function radixSort(items) {
              phase: 1, banner: BP, locals: { exp: exp, n: n }, stack: stk.slice(),
              calc: "vector<int> output(" + n + ");  int count[10] = {0}" });
     // 1. tally
-    r.snap('t1', "<strong>Step 1 of 3: tally this digit.</strong> Count how many elements have each " +
-           "of the ten possible digits in this position. Nothing moves yet.",
+    r.snap('t1', "<strong>Ten counters, and ten is not a coincidence.</strong> A base-10 digit has " +
+           "exactly ten possible values, so this array is ten long whatever the numbers are \u2014 " +
+           "six elements or six million, 9 or 802. That fixed size is the thing counting sort " +
+           "could not have.",
            { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
              phase: 1, banner: BP, locals: { exp: exp, n: n }, stack: stk.slice(),
-             calc: "// 1. tally this digit" });
+             calc: counters(count) + "\nall zero \u2014 nothing counted yet" });
     r.snap('t2', "<strong>One statement doing three things.</strong> The loop runs " + n +
            " times; <code>(data[i] / " + exp + ") % 10</code> works out <em>which</em> counter on " +
            "every pass, so the subscript is a different number each time; and <code>++</code> " +
@@ -1600,12 +1627,13 @@ function radixSort(items) {
                      " % 10 = " + d + "   \u2192  count[" + d + "] = " + count[d] });
     }
     // 2. cumulative
-    r.snap('c1', "<strong>Step 2 of 3: make the counts cumulative.</strong> Right now each entry says " +
-           "&ldquo;how many have this digit&rdquo;. After this sweep it will say &ldquo;where this " +
-           "digit's group ENDS&rdquo; \u2014 a position rather than a tally.",
+    r.snap('c1', "<strong>The tally is finished, and it is about to change meaning.</strong> Every " +
+           "entry below currently answers &ldquo;how many have this digit&rdquo;. After the next " +
+           "sweep the same ten numbers answer &ldquo;where does this digit's group END&rdquo; \u2014 " +
+           "a position, not a count. Nothing in the array moves to make that happen.",
            { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
              phase: 1, banner: BP, locals: { exp: exp }, stack: stk.slice(),
-             calc: "// 2. make the counts CUMULATIVE" });
+             calc: counters(count) + "\nhow many elements have each digit" });
     for (i = 1; i < 10; i++) {
       var prev = count[i];
       count[i] += count[i - 1];
@@ -1618,11 +1646,13 @@ function radixSort(items) {
                      count[i - 1] + ") = " + count[i] });
     }
     // 3. place, backwards
-    r.snap('p1', "<strong>Step 3 of 3: place, walking BACKWARDS.</strong> This is the line people get " +
-           "wrong, and the direction is the entire reason radix sort works.",
+    r.snap('p1', "<strong>Same ten numbers, new meaning.</strong> They are positions now, so placing " +
+           "an element is a lookup rather than a search. The last entry is <code>" + n + "</code>, " +
+           "the element count \u2014 it has to be, since every element fell into some digit. Now the " +
+           "direction matters, and this is the line people get wrong.",
            { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
              phase: 1, banner: BP, locals: { exp: exp, n: n }, stack: stk.slice(),
-             calc: "// 3. place, walking the input BACKWARDS" });
+             calc: counters(count) + "\nwhere each digit's group ENDS" });
     r.snap('p2', "<strong>From the last element to the first.</strong> Going forwards would hand out " +
            "positions in the opposite order for equal digits, reversing them \u2014 and the order " +
            "they are in right now is the previous pass's result, which must survive.",
