@@ -444,7 +444,9 @@ var CODE = {
     {k:'end',    t:'}'}
   ],
   bucket: [
-    {k:'sig',    t:K+'void'+E+' '+F+'bucket_sort'+E+'(vector&lt;'+K+'int'+E+'&gt;&amp; data, '+K+'int'+E+' num_buckets) {'},
+    {k:'hdr',    t:C+'// in NonComparisonSorts.h \u2014 where the 10 actually lives'+E},
+    {k:'hdr',    c:1, t:K+'void'+E+' '+F+'bucket_sort'+E+'(v&amp; data, '+K+'int'+E+' num_buckets = '+N+'10'+E+');'},
+    {k:'sig',    t:K+'void'+E+' '+F+'bucket_sort'+E+'(vector&lt;'+K+'int'+E+'&gt;&amp; data, '+K+'int'+E+' num_buckets) {   '+C+'// no = 10 here'+E},
     {k:'guard',  t:'  '+K+'if'+E+' (data.size() &lt;= '+N+'1'+E+') '+K+'return'+E+';'},
     {k:'minmax', t:'  '+K+'auto'+E+' [min_it, max_it] = '+F+'minmax_element'+E+'(..);   '+C+'// ONE walk'+E},
     {k:'deref',  t:'  '+K+'int'+E+' min_val = *min_it, max_val = *max_it;'},
@@ -685,10 +687,25 @@ var LINE_INFO = {
       ] }
   },
   bucket: {
+    hdr: { src: "void bucket_sort(v&amp; data, int num_buckets = 10);   // the header",
+      what: "The declaration, in <code>NonComparisonSorts.h</code>. This is the only place the 10 exists.",
+      live: function (m) {
+        return "bucket_sort(data);          <em>what main.cpp writes</em><br>" +
+               "bucket_sort(data, <b>" + m.locals.num_buckets + "</b>);      " +
+               "<em>what the compiler calls</em><br>" +
+               "the <b>" + m.locals.num_buckets + "</b> is not in the definition below, and cannot " +
+               "be \u2014 see the trap";
+      },
+      items: [
+        ["why", "A <strong>default argument</strong>. A caller who does not care about bucket count writes <code>bucket_sort(data)</code> and gets 10; one who does writes <code>bucket_sort(data, 50)</code>. One function, two levels of control."],
+        ["trap", "<strong>The default goes in the declaration ONLY.</strong> Repeating <code>= 10</code> on the definition in the .cpp is a compile error: <em>default argument given for parameter 2</em>. That rule is exactly why the 10 is invisible from the .cpp, and why this line had to be put on screen."],
+        ["syntax", "The substitution happens at the <em>call site</em>, at compile time. The function itself never knows whether the value was passed or defaulted \u2014 by the time its body runs, <code>num_buckets</code> is just 10."],
+        ["note", "10 is a guess, not a derived number. There is no bucket count that is right for every input, which is why it is a knob with a sensible default rather than something computed from the data."]
+      ] },
     sig: { src: "void bucket_sort(vector&lt;int&gt;&amp; data, int num_buckets)",
       what: "Sorts in place like the others, but takes a second parameter: how many buckets to scatter into.",
       items: [
-        ["syntax", "The header declares it as <code>int num_buckets = 10</code>. A default argument belongs in the <strong>declaration</strong> only &mdash; repeating it on the definition is a compile error."],
+        ["syntax", "No <code>= 10</code> on this line. It is on the header line above, and repeating it here would be a compile error &mdash; which is why the 10 looks like it comes from nowhere when you only read the .cpp."],
         ["why", "<code>num_buckets</code> is a tuning knob, and the one thing about this algorithm that is a judgement call rather than arithmetic. Too few and each bucket is large, so the inner sort does all the work; too many and most buckets sit empty."]
       ] },
     guard: { src: "if (data.size() &lt;= 1) return;",
@@ -1098,6 +1115,14 @@ function countingSort(items) {
 function bucketSort(items) {
   var r = new Recorder(items), a = r.a, n = a.length, i;
   var B1 = { tone: "build", text: "Phase 1 \u00b7 How wide is a bucket?", sub: "range \u00f7 bucket count" };
+
+  r.snap('hdr', "<strong>This is where the 10 comes from.</strong> <code>num_buckets</code> has a " +
+         "<em>default argument</em>, and C++ allows it in the declaration only \u2014 which is why " +
+         "the definition below shows a bare <code>int num_buckets</code> and the 10 is nowhere in it. " +
+         "The caller writes <code>bucket_sort(data)</code> and the compiler fills the rest in.",
+         { phase: 0, banner: B1, locals: { num_buckets: NUM_BUCKETS }, stack: [],
+           calc: "bucket_sort(data);\n\u2192 bucket_sort(data, " + NUM_BUCKETS +
+                 ")   the compiler supplies it" });
   r.snap('sig', "<strong>Entering bucket_sort.</strong> Counting sort needed one slot per <em>value</em>. " +
          "This needs one bucket per <em>span</em> of values, which is what lets it survive a wide range.",
          { phase: 0, banner: B1, locals: { "data.size()": n, num_buckets: NUM_BUCKETS }, stack: [],
