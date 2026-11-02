@@ -121,6 +121,23 @@
   /* Deliberately identical to .code div.calc. The yellow is the page's "these
      are this step's real numbers" colour, and using it in both places is what
      connects the band in the code to the explanation underneath it. */
+  /* The note and its numbers, in the left column. Same #f9e2af as the THIS
+     STEP band in the code panel, because it is the same idea at paragraph
+     length -- what is happening on this step, with this run's values. */
+  .nowbox { background:#f9e2af; color:#1e1e2e; border-left:4px solid #b8860b;
+            border-radius:0 8px 8px 0; padding:.6rem .8rem; margin:.7rem 0 0; }
+  .nowbox .nownote { margin:0; font-size:.93rem; line-height:1.55; }
+  .nowbox .nownote code { font-family:Consolas,monospace; font-size:.93em;
+                          background:rgba(0,0,0,.09); border-radius:3px; padding:.03em .3em; }
+  .nowbox .nownums { margin-top:.5rem; padding-top:.5rem; border-top:1px solid rgba(0,0,0,.18);
+                     font-family:Consolas,"Courier New",monospace; font-size:.84rem;
+                     font-weight:600; line-height:1.65; overflow-x:auto; }
+  .nowbox .nownums b { font-weight:800; }
+  .nowbox .nownums em { font-style:normal; background:rgba(0,0,0,.09);
+                        border-radius:3px; padding:.02em .3em; }
+  .nowbox .lt { display:block; font-family:system-ui,sans-serif; font-weight:800;
+                font-size:.62rem; letter-spacing:.06em; text-transform:uppercase;
+                color:#6b4f04; margin-bottom:.2rem; }
   .lineinfo .li-live { background:#f9e2af; color:#1e1e2e; border-left:4px solid #b8860b;
                        border-radius:0 6px 6px 0; padding:.45rem .7rem; margin:0 0 .6rem;
                        font-family:Consolas,"Courier New",monospace; font-size:.84rem;
@@ -1582,6 +1599,19 @@ function phaseTable(run, upto) {
 
 // The breakdown for one line. `shown` is the line actually on screen: the
 // pinned one if there is one, otherwise whatever is executing.
+// The note plus this run's numbers, as one block. They were in opposite
+// columns saying halves of the same thing.
+function nowBox(key, fr) {
+  var ent = LINE_INFO[key] && LINE_INFO[key][fr.line];
+  var nums = "";
+  if (ent && ent.live) {
+    var txt = ent.live(fr.marks, fr.a);
+    if (txt) nums = '<div class="nownums"><span class="lt">with this run\'s numbers</span>' +
+                    txt + '</div>';
+  }
+  return '<div class="nowbox"><p class="nownote">' + fr.note + '</p>' + nums + '</div>';
+}
+
 function lineInfoHtml(key, fr) {
   var table = LINE_INFO[key], executing = fr.line;
   if (!table) return "";
@@ -1592,13 +1622,9 @@ function lineInfoHtml(key, fr) {
   // The live numbers describe the EXECUTING line. If the box is pinned to a
   // different one they belong to something else, so they are dropped rather
   // than shown against the wrong code.
-  var live = "";
-  if (e.live && shown === executing) {
-    var txt = e.live(fr.marks, fr.a);
-    if (txt) live = '<div class="li-live"><span class="lt">with this run\'s numbers</span>' +
-                    txt + '</div>';
-  }
-  return '<div class="lineinfo">' + live +
+  // The numbers moved to the left column's nowBox. Drawing them here too
+  // would say the same thing twice and re-weight the page the way it was.
+  return '<div class="lineinfo">' +
     '<div class="li-head">' +
       '<span class="li-tag' + (pinned ? ' pin' : '') + '">' +
         (pinned ? 'pinned' : 'executing') + '</span>' +
@@ -1729,7 +1755,7 @@ function renderSolo() {
         '<div class="bounds">' + boundsHtml(key, fr) + '</div>' +
         extraHtml(key, fr) + kNote +
         localsHtml(fr) +
-        '<p class="note">' + fr.note + '</p>' +
+        nowBox(key, fr) +
         '<div class="stats"><span>array writes <b>' + fr.writes + '</b></span>' +
           '<span>auxiliary cells <b>' + fr.aux + '</b></span></div>' +
       '</div></div>' +
