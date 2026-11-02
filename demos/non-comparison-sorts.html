@@ -289,6 +289,25 @@
                       background:var(--muted); }
   .hstep li:last-child { margin-bottom:0; }
   .howto .callout { margin-bottom:0; font-size:.83rem; }
+  /* Collapsed steps keep the arc visible without the bulk: you can see there
+     are three and what is coming, but only the one being executed is open. */
+  .hstep.off { background:#fbfcfd; opacity:.72; cursor:pointer; }
+  .hstep.off:hover { opacity:1; border-color:var(--blue); }
+  .hstep.off > h4 { margin:0; font-weight:600; }
+  .hstep.off .hnum { background:var(--rule); }
+  .hstep .peek { margin-left:auto; font-size:.66rem; font-weight:600; color:var(--muted);
+                 text-transform:uppercase; letter-spacing:.05em; }
+  .hstep.on { border-color:var(--blue); box-shadow:0 0 0 2px rgba(37,115,167,.12); }
+  .pseudo { margin:.5rem 0 0; padding:.45rem .6rem; background:#f2f5f8;
+            border-left:3px solid var(--blue); border-radius:0 5px 5px 0;
+            font-family:Consolas,"Courier New",monospace; font-size:.76rem;
+            line-height:1.6; white-space:pre; overflow-x:auto; color:#2c3e50; }
+  .pseudo .pl { display:block; font-family:system-ui,sans-serif; font-size:.6rem;
+                font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+                color:var(--muted); margin-bottom:.15rem; }
+  /* The algorithm-level warning belongs with the conclusions at the bottom,
+     not above the controls where it was the densest thing on screen. */
+  #watch { margin-top:1.1rem; }
   .locals { display:grid; grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));
             gap:.5rem 1.1rem; margin:.6rem 0 0; padding:.55rem .7rem;
             border:1px solid var(--rule); border-radius:8px; background:#fbfcfd; }
@@ -413,6 +432,8 @@
     <span><i class="sw" style="border-style:dashed"></i>not written yet</span>
   </div>
 
+  <div id="watch"></div>
+
   <div class="card" id="whyTwice"></div>
 
   <div class="selftest" id="selftest"></div>
@@ -507,18 +528,27 @@ var FACTS = {
     title: "Counting Sort",
     idea: "Do not compare anything. Make one counter per possible value, tally how many times each appears, then write the sorted array straight out of the tallies.",
     steps: [{ t: "Measure the range, not the array",
+              p: ["min, max &#8592; smallest and largest in data",
+                  "k &#8592; max &#8722; min + 1"],
               b: ["one pass finds <code>min</code> and <code>max</code>",
                   "<code>k = max - min + 1</code> &mdash; how many <em>distinct values</em> could occur",
                   "<strong>k has nothing to do with how many elements there are</strong>",
                   "8 values spread 2..802 still needs 801 counters",
                   "that single fact is what decides if this sort is brilliant or terrible"] },
             { t: "Tally into count[v - min]",
+              p: ["count[0 .. k&#8722;1] &#8592; 0",
+                  "for each val in data:",
+                  "    count[val &#8722; min] &#8592; count[val &#8722; min] + 1"],
               b: ["one counter per possible value, all starting at 0",
                   "for each value <code>v</code>, <code>count[v - min]++</code>",
                   "the <code>- min</code> slides the range down to start at index 0",
                   "without it, <code>{101, 103, 102}</code> indexes <code>count[101]</code> on a 3-slot array",
                   "nothing is compared here &mdash; values are used as <em>addresses</em>"] },
             { t: "Emit straight from the counters",
+              p: ["idx &#8592; 0",
+                  "for i in 0 .. k&#8722;1:",
+                  "    repeat count[i] times:",
+                  "        data[idx] &#8592; i + min;   idx &#8592; idx + 1"],
               b: ["walk the counters left to right, which is value order",
                   "write value <code>i + min</code> exactly <code>count[i]</code> times",
                   "a zero counter writes nothing and costs one check",
@@ -532,18 +562,32 @@ var FACTS = {
     title: "Bucket Sort",
     idea: "Counting sort needs one slot per value, which collapses on a wide range. Bucket sort relaxes that to one bucket per <em>range</em> of values: scatter, sort each small bucket, then gather in order.",
     steps: [{ t: "One bucket per range of values",
+              p: ["min, max &#8592; smallest and largest in data",
+                  "if min == max: return",
+                  "range &#8592; max &#8722; min + 1",
+                  "per   &#8592; ceil(range / num_buckets)"],
               b: ["counting sort needs a slot per <em>value</em>, which a wide range kills",
                   "a bucket covers a <em>span</em> of values instead",
                   "<code>per = ceil(range / num_buckets)</code> is how wide each span is",
                   "all values equal? bail out first &mdash; <code>range</code> would make <code>per</code> zero",
                   "and dividing by zero is the crash this guard exists for"] },
             { t: "Scatter: b = (val - min) / per",
+              p: ["buckets[0 .. num_buckets&#8722;1] &#8592; empty",
+                  "for each val in data:",
+                  "    b &#8592; (val &#8722; min) / per",
+                  "    if b &#8805; num_buckets: b &#8592; num_buckets &#8722; 1",
+                  "    append val to buckets[b]"],
               b: ["integer division maps a value to its bucket number",
                   "same <code>- min</code> trick as counting sort, for the same reason",
                   "<code>push_back</code> grows the bucket, so no size is needed up front",
                   "the maximum lands one bucket too far, so clamp it back",
                   "buckets hold every element &mdash; that is the O(n) extra space"] },
             { t: "Sort each bucket, then gather",
+              p: ["idx &#8592; 0",
+                  "for each bucket in buckets:",
+                  "    sort(bucket)",
+                  "    for each val in bucket:",
+                  "        data[idx] &#8592; val;   idx &#8592; idx + 1"],
               b: ["each bucket is small, so an ordinary comparison sort is cheap",
                   "<strong>this is where bucket sort compares</strong>, unlike the other two",
                   "concatenate the buckets in order and the array is sorted",
@@ -558,18 +602,31 @@ var FACTS = {
     title: "Radix Sort (LSD)",
     idea: "Fix counting sort's range problem from the other side: sort one <em>digit</em> at a time. A digit only has ten possible values, so each pass needs exactly ten counters no matter how large the numbers are.",
     steps: [{ t: "Sort by one digit at a time",
+              p: ["max &#8592; largest in data",
+                  "for exp = 1, 10, 100, &hellip; while max / exp &gt; 0:",
+                  "    counting_sort_by_digit(data, exp)"],
               b: ["counting sort's problem is the range; a digit has only ten values",
                   "so every pass needs exactly <strong>ten</strong> counters, however big the numbers",
                   "the maximum tells you how many digit positions exist",
                   "<code>exp</code> = 1, then 10, then 100 &mdash; least significant first",
                   "<code>(value / exp) % 10</code> pulls out the digit at that position"] },
             { t: "Cumulative counts give positions",
+              p: ["count[0 .. 9] &#8592; 0",
+                  "for i in 0 .. n&#8722;1:",
+                  "    count[(data[i] / exp) mod 10] += 1",
+                  "for i in 1 .. 9:",
+                  "    count[i] &#8592; count[i] + count[i&#8722;1]"],
               b: ["tally the ten digits of this pass",
                   "then <code>count[i] += count[i-1]</code>",
                   "that turns &ldquo;how many have this digit&rdquo; into &ldquo;where its group ends&rdquo;",
                   "so <code>count[d]</code> is now a <em>position</em>, not a tally",
                   "this is the step that makes placement a lookup instead of a search"] },
             { t: "Place backwards, or it breaks",
+              p: ["for i = n&#8722;1 down to 0:",
+                  "    d &#8592; (data[i] / exp) mod 10",
+                  "    output[count[d] &#8722; 1] &#8592; data[i]",
+                  "    count[d] &#8592; count[d] &#8722; 1",
+                  "data &#8592; output"],
               b: ["walk the input from the END to the front",
                   "put each element at <code>output[count[digit] - 1]</code>, then decrement",
                   "<strong>backwards is what keeps equal digits in their existing order</strong>",
@@ -1492,7 +1549,7 @@ var LANES = [
   { key: "bucket",   title: "Bucket Sort" },
   { key: "radix",    title: "Radix Sort" }
 ];
-var state = { mode: "counting", preset: "tight", step: 0, runs: null,
+var state = { peek: null, mode: "counting", preset: "tight", step: 0, runs: null,
               timer: null, pinned: null };
 
 function compute() {
@@ -1728,18 +1785,46 @@ function renderSolo() {
 
   // How it works goes ABOVE the controls, so Play and the presets stay within
   // reach of the array they drive. Beside the stage it pushed them away.
+  // The panel follows the code: the phase being executed is open, the others
+  // collapse to their titles. state.peek lets you look ahead at one of them.
+  var atPhase = fr.marks.phase;
   document.getElementById("howto").innerHTML =
     '<div class="card"><h2>How it works</h2><div class="card-body howto">' +
       '<p class="lead">' + f.idea + '</p>' +
       '<div class="howto-steps">' +
         f.steps.map(function (st, i) {
-          return '<div class="hstep"><h4><span class="hnum">' + (i + 1) + '</span>' +
-                 st.t + '</h4><ul>' +
+          var open = (i === atPhase) || (state.peek === i);
+          if (!open) {
+            return '<div class="hstep off" data-step="' + i + '" role="button" tabindex="0">' +
+                   '<h4><span class="hnum">' + (i + 1) + '</span>' + st.t +
+                   '<span class="peek">show</span></h4></div>';
+          }
+          return '<div class="hstep' + (i === atPhase ? ' on' : '') + '" data-step="' + i + '" ' +
+                 'role="button" tabindex="0"><h4><span class="hnum">' + (i + 1) + '</span>' +
+                 st.t + (i === atPhase ? '<span class="peek">you are here</span>' : '') +
+                 '</h4><ul>' +
                  st.b.map(function (b) { return '<li>' + b + '</li>'; }).join("") +
-                 '</ul></div>';
+                 '</ul>' +
+                 (st.p ? '<div class="pseudo"><span class="pl">in pseudocode</span>' +
+                         st.p.join("\n") + '</div>' : '') +
+                 '</div>';
         }).join("") +
-      '</div><div class="callout warn">' + f.watch + '</div>' +
+      '</div>' +
     '</div></div>';
+  Array.prototype.forEach.call(document.getElementById("howto").querySelectorAll("[data-step]"),
+    function (d) {
+      var i = parseInt(d.getAttribute("data-step"), 10);
+      function toggle() { state.peek = (state.peek === i) ? null : i; render(); }
+      d.addEventListener("click", toggle);
+      d.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter") { ev.preventDefault(); toggle(); }
+      });
+    });
+
+  // The red callout is a conclusion about the algorithm, not about this step.
+  document.getElementById("watch").innerHTML =
+    '<div class="card"><div class="card-body"><div class="callout warn" style="margin:0">' +
+      f.watch + '</div></div></div>';
 
   document.getElementById("stage").innerHTML =
     '<div class="solo">' +
@@ -1814,6 +1899,10 @@ function pinLine(k) {
 }
 
 function renderCompare() {
+  // Compare has no single algorithm, so the last lane's How-it-works and its
+  // warning must not be left sitting above and below the comparison.
+  document.getElementById("howto").innerHTML = "";
+  document.getElementById("watch").innerHTML = "";
   var lanes = LANES.map(function (l) {
     var run = state.runs[l.key];
     var idx = Math.min(state.step, run.frames.length - 1);
@@ -2160,7 +2249,20 @@ function render() {
   renderWhyTwice();
 }
 
-function go(n) { state.step = Math.max(0, Math.min(n, state.maxFrames - 1)); render(); }
+function go(n) {
+  var was = state.runs && state.runs[state.mode] ? framePhase() : null;
+  state.step = Math.max(0, Math.min(n, state.maxFrames - 1));
+  // A step opened to look ahead closes once the code reaches a new phase,
+  // so the panel goes back to following the walk on its own.
+  if (framePhase() !== was) state.peek = null;
+  render();
+}
+function framePhase() {
+  var run = state.runs && state.runs[state.mode];
+  if (!run || !run.frames) return null;
+  var f = run.frames[Math.min(state.step, run.frames.length - 1)];
+  return f ? f.marks.phase : null;
+}
 
 function nextPhase() {
   var run = state.mode === "compare" ? state.runs.counting : state.runs[state.mode];
@@ -2184,7 +2286,9 @@ function togglePlay() {
     go(state.step + 1);
   }, 520);
 }
-function reset() { stop(); state.pinned = null; compute(); render(); }
+// Changing lane or preset drops both kinds of manual override: a pinned
+// line of code, and a How-it-works step opened to look ahead.
+function reset() { stop(); state.pinned = null; state.peek = null; compute(); render(); }
 
 function selfTest() {
   var fails = [], runs = 0, lineCount = 0, keysOf = {};
