@@ -1061,7 +1061,19 @@ var LINE_INFO = {
         ["note", "Tally, accumulate, place. Nearly every bug in radix sort is one of these three phases being merged into another or run in the wrong order."]
       ] },
     t2: { src: "for (int i = 0; i &lt; n; ++i) count[(data[i]/exp) % 10]++;",
-      what: "Counts how many elements have each digit at this position.",
+      what: "One statement that walks the array, works out a digit, and bumps the matching counter.",
+      live: function (m) {
+        // Only on the loop header. The per-element frames already show their
+        // own arithmetic, and repeating this under each would be noise.
+        if (m.locals.i !== null && m.locals.i !== undefined) return "";
+        var e = m.exp, n = m.locals.n;
+        return "n = <b>" + n + "</b>, so this line runs " + n + " times, i = 0 &hellip; " +
+               (n - 1) + "<br>" +
+               "count[&hellip;] is an <em>expression</em> &mdash; a different counter each pass<br>" +
+               "/ " + e + " shifts the digit you want down, % 10 keeps only it<br>" +
+               "the <b>++</b> bumps a counter; nothing in data is moved or compared<br>" +
+               "forward is fine here &mdash; the <em>placement</em> loop is where direction matters";
+      },
       items: [
         ["syntax", "<code>(data[i] / exp) % 10</code> is the whole digit-extraction trick. Dividing by <code>exp</code> shifts the digit you want into the ones place; <code>% 10</code> keeps only that digit. For 170 with <code>exp</code> 10: <code>170 / 10</code> is 17, and <code>17 % 10</code> is <strong>7</strong>."],
         ["why", "Integer division is what makes this work. <code>170 / 100</code> being 1 rather than 1.7 is the feature, not a rounding problem to correct."],
@@ -1562,12 +1574,18 @@ function radixSort(items) {
            { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
              phase: 1, banner: BP, locals: { exp: exp, n: n }, stack: stk.slice(),
              calc: "// 1. tally this digit" });
-    r.snap('t2', "<strong>The tally loop.</strong> One pass over the data, extracting a digit from " +
-           "each value and bumping its counter.",
+    r.snap('t2', "<strong>One statement doing three things.</strong> The loop runs " + n +
+           " times; <code>(data[i] / " + exp + ") % 10</code> works out <em>which</em> counter on " +
+           "every pass, so the subscript is a different number each time; and <code>++</code> " +
+           "bumps that counter. Nothing in <code>data</code> is read for comparison or moved.",
            { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
              phase: 1, banner: BP, locals: { exp: exp, n: n, i: null, digit: null },
              stack: stk.slice(),
-             calc: "for (int i = 0; i < n; ++i) count[(data[i]/exp) % 10]++" });
+             calc: "for (int i = 0; i < " + n + "; ++i)        " + n + " passes, i = 0 .. " +
+                   (n - 1) + "\n" +
+                   "count[(data[i] / " + exp + ") % 10]++   exp = " + exp + ", so the " +
+                   (exp === 1 ? "ones" : exp === 10 ? "tens" : exp === 100 ? "hundreds"
+                              : "exp=" + exp) + " digit" });
     for (i = 0; i < n; i++) {
       var d = Math.floor(a[i].v / exp) % 10;
       count[d]++;
