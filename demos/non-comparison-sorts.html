@@ -655,6 +655,14 @@ var FACTS = {
 var LINE_INFO = {
   counting: {
     sig: { src: "void counting_sort(vector&lt;int&gt;&amp; data)",
+      live: function (m, a) {
+        var d = a.map(function (e) { return e.v; }); var n = d.length;
+        return "data = [" + d.join(", ") + "]   <b>" + n + "</b> elements<br>" +
+               "no element is ever compared with another<br>" +
+               "each value is used as an <em>index</em> into a counter array instead<br>" +
+               "1. count how many of each value &nbsp; 2. walk the counters in order<br>" +
+               "none of it has run yet";
+      },
       what: "Sorts <code>data</code> in place. Nothing is returned &mdash; the caller's vector is the thing that changes.",
       items: [
         ["syntax", "<code>vector&lt;int&gt;&amp;</code> is a <em>reference</em> to the caller's vector: not a copy, and not a pointer. Inside the function, <code>data</code> <strong>is</strong> their vector."],
@@ -678,6 +686,13 @@ var LINE_INFO = {
       ] },
     minmax: { src: "auto [min_it, max_it] = minmax_element(data.begin(), data.end());",
       what: "Finds both extremes in a single walk, because the size of the count array depends on them.",
+      live: function (m, a) {
+        var d = a.map(function (e) { return e.v; }); var n = d.length;
+        return "one pass over all " + n + " values: [" + d.join(", ") + "]<br>" +
+               "returns two <em>iterators</em>, not two numbers<br>" +
+               "min_element then max_element would be <b>two</b> passes for the same answer<br>" +
+               "the values come out on the next line";
+      },
       items: [
         ["syntax", "<code>minmax_element</code> returns a <strong>pair of iterators</strong>, not values. <code>auto [min_it, max_it] = ...</code> is a <em>structured binding</em>: it unpacks the pair into two named iterators on one line."],
         ["why", "One walk, not two. <code>min_element</code> followed by <code>max_element</code> gives the same answer but reads the array twice, and makes 2(n&minus;1) comparisons where this makes at most 3(n&minus;1)/2. The box under this stepper counts both."],
@@ -686,6 +701,12 @@ var LINE_INFO = {
       ] },
     deref: { src: "int min_val = *min_it, max_val = *max_it;",
       what: "Dereferences the two iterators to get the actual values.",
+      live: function (m) {
+        var lo = m.locals.min_val, hi = m.locals.max_val;
+        return "min_val = <b>" + lo + "</b>,  max_val = <b>" + hi + "</b><br>" +
+               "every value in the array lies somewhere in " + lo + " \u2026 " + hi + "<br>" +
+               "that span, not the element count, is what the next line measures";
+      },
       items: [
         ["syntax", "An iterator is pointer-like: <code>*</code> gets the thing it points at. Leaving it off is a compile error, which is the kind of mistake you want."],
         ["note", "This is only safe because the guard above has already ruled out an empty vector. That is the whole reason the guard is the first line of the function."]
@@ -710,6 +731,14 @@ var LINE_INFO = {
       ] },
     alloc: { src: "vector&lt;int&gt; count(k, 0);",
       what: "Allocates the counters: <code>k</code> of them, every one starting at zero.",
+      live: function (m) {
+        var k = m.k, lo = m.base;
+        return "count[0 .. " + (k - 1) + "], every entry 0<br>" +
+               "count[0] stands for the value <b>" + lo + "</b><br>" +
+               "count[" + (k - 1) + "] stands for the value <b>" + (lo + k - 1) + "</b><br>" +
+               "counter <em>i</em> means the value <em>i</em> + " + lo +
+               " \u2014 that mapping is the whole algorithm";
+      },
       items: [
         ["syntax", "The fill constructor &mdash; <code>count(k, 0)</code> means &ldquo;k elements, each 0&rdquo;. It is not <code>count[k]</code>, which is C array syntax and would not compile here."],
         ["trap", "Do not reach for <code>reserve(k)</code>. <code>reserve</code> allocates capacity but creates <strong>no elements</strong>, so <code>count[i]++</code> afterwards writes into memory the vector does not consider its own. It usually appears to work, which is what makes it dangerous."],
@@ -795,6 +824,14 @@ var LINE_INFO = {
         ["note", "Worth contrasting with the 10 on the radix tab, which looks identical and is not. <strong>Radix's ten counters are forced</strong> &mdash; a base-10 digit has exactly ten possible values, and no other number would be correct. Bucket sort's 10 is chosen, and could be anything."]
       ] },
     sig: { src: "void bucket_sort(vector&lt;int&gt;&amp; data, int num_buckets)",
+      live: function (m, a) {
+        var d = a.map(function (e) { return e.v; }); var n = d.length;
+        return "data = [" + d.join(", ") + "]   <b>" + n + "</b> elements<br>" +
+               "num_buckets = <b>" + m.locals.num_buckets + "</b><br>" +
+               "1. work out how wide one bucket has to be<br>" +
+               "2. drop every value into exactly one bucket &nbsp; 3. sort each, then gather<br>" +
+               "none of it has run yet";
+      },
       what: "Sorts in place like the others, but takes a second parameter: how many buckets to scatter into.",
       items: [
         ["syntax", "No <code>= 10</code> on this line. It is on the header line above, and repeating it here would be a compile error &mdash; which is why the 10 looks like it comes from nowhere when you only read the .cpp."],
@@ -816,6 +853,13 @@ var LINE_INFO = {
       ] },
     minmax: { src: "auto [min_it, max_it] = minmax_element(data.begin(), data.end());",
       what: "The span that gets divided into buckets, found in a single walk.",
+      live: function (m, a) {
+        var d = a.map(function (e) { return e.v; }); var n = d.length;
+        return "one pass over all " + n + " values: [" + d.join(", ") + "]<br>" +
+               "returns two <em>iterators</em>, not two numbers<br>" +
+               "the same two facts counting sort needed, for a different purpose: " +
+               "the width of a bucket rather than the size of an array";
+      },
       items: [
         ["why", "Bucket sort needs the extremes for a different reason than counting sort does. Counting sort sizes an array with them; bucket sort uses them to decide which bucket a value falls in."],
         ["syntax", "Same call as counting sort's step 1a: a structured binding unpacking the pair of iterators <code>minmax_element</code> returns."],
@@ -823,12 +867,29 @@ var LINE_INFO = {
       ] },
     deref: { src: "int min_val = *min_it, max_val = *max_it;",
       what: "Dereferences the two iterators to get the actual values.",
+      live: function (m) {
+        var lo = m.locals.min_val, hi = m.locals.max_val;
+        return "min_val = <b>" + lo + "</b>,  max_val = <b>" + hi + "</b><br>" +
+               "the values run from " + lo + " to " + hi + "<br>" +
+               "min_val does double duty below: it sets the span, and it is subtracted " +
+               "from every value so bucket numbering starts at 0";
+      },
       items: [
         ["syntax", "An iterator is pointer-like: <code>*</code> gets the thing it points at."],
         ["trap", "Safe only because the <code>size() &lt;= 1</code> guard already ruled out an empty vector &mdash; on an empty range both iterators are <code>end()</code>, and dereferencing that is undefined behaviour."]
       ] },
     same: { src: "if (min_val == max_val) return;",
       what: "Every element is identical, so the array is already sorted &mdash; and the division below would be by zero.",
+      live: function (m) {
+        var lo = m.locals.min_val, hi = m.locals.max_val;
+        return "min_val == max_val ?   " + lo + " == " + hi + "   \u2192  <b>" +
+               (lo === hi ? "yes" : "no") + "</b><br>" +
+               (lo === hi
+                 ? "every value is identical, so they are already in order \u2014 return"
+                 : "the values differ, so there is a real span to divide up<br>" +
+                   "had they been equal, per would come out 0 and the division below " +
+                   "would crash");
+      },
       items: [
         ["trap", "Write the bucket width as plain integer division, <code>range / num_buckets</code>, and on an all-identical array <code>per</code> becomes <strong>0</strong>. Then <code>(val - min_val) / per</code> divides by zero and the program dies rather than misbehaving."],
         ["why", "<code>BucketSortTest.Duplicates</code> leans on exactly this case. An all-identical array is the degenerate input for any algorithm that divides by a span."],
@@ -836,6 +897,13 @@ var LINE_INFO = {
       ] },
     range: { src: "int range = max_val - min_val + 1;",
       what: "How many distinct values the span covers &mdash; the same <code>k</code> counting sort allocated an entire array for.",
+      live: function (m) {
+        var lo = m.locals.min_val, hi = m.locals.max_val, r = m.locals.range;
+        return hi + " \u2212 " + lo + " + 1 = <b>" + r + "</b> possible values<br>" +
+               "the same + 1 fencepost as counting sort's k, and the same meaning<br>" +
+               "counting sort would allocate <b>" + r + "</b> counters for this input<br>" +
+               "bucket sort divides those " + r + " across its buckets instead";
+      },
       items: [
         ["why", "Bucket sort computes the identical number and then <em>refuses to allocate one slot per value</em>. That refusal is the whole difference between the two algorithms, and it is why bucket sort survives a range of 801 where counting sort chokes on it."],
         ["trap", "The <code>+ 1</code> is inclusive again. Leaving it off here does not crash &mdash; it quietly makes the top bucket's boundary wrong, which is the harder kind of bug to find."]
@@ -1051,6 +1119,14 @@ var LINE_INFO = {
         ["why", "The O(n + 10) extra space is per pass, not cumulative &mdash; pass 3 does not still hold pass 1's scratch. Peak memory is what the comparison tab reports, which is why a four-digit sort costs the same space as a one-digit sort."]
       ] },
     rsig: { src: "void radix_sort(vector&lt;int&gt;&amp; data)",
+      live: function (m, a) {
+        var d = a.map(function (e) { return e.v; }); var n = d.length;
+        return "data = [" + d.join(", ") + "]   <b>" + n + "</b> elements<br>" +
+               "no two elements are ever compared with each other<br>" +
+               "each pass sorts by ONE digit, using that digit as an index<br>" +
+               "1. find how many digit positions &nbsp; 2. one stable pass per position<br>" +
+               "none of it has run yet";
+      },
       what: "The public function. All it does is work out how many digit passes are needed and run them.",
       items: [
         ["why", "Almost nothing happens here, and that is the design: the interesting work is one stable digit sort, and radix sort is that helper called repeatedly. Getting the helper right is the whole task."],
@@ -1058,6 +1134,14 @@ var LINE_INFO = {
       ] },
     rmax: { src: "int max_val = *max_element(..);",
       what: "The largest value, which determines how many digit positions there are.",
+      live: function (m) {
+        var mx = m.locals.max_val, dg = String(mx).length;
+        return "max_val = <b>" + mx + "</b>, which has <b>" + dg + "</b> digit" +
+               (dg === 1 ? "" : "s") + "<br>" +
+               "so " + dg + " pass" + (dg === 1 ? "" : "es") + ", and no more<br>" +
+               "every other value is shorter, and its missing digits read as 0<br>" +
+               "only the LARGEST number decides how much work this is";
+      },
       items: [
         ["why", "Only the maximum matters. Shorter numbers are handled by the fact that their missing digits extract as 0, so there is no need to count digits per element."],
         ["note", "No <code>min_element</code> here, unlike the other two sorts. Radix sort never allocates anything proportional to the value range &mdash; that is the entire point of it."]
