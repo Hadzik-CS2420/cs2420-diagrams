@@ -495,8 +495,9 @@ var CODE = {
     {k:'minmax', t:'  '+K+'auto'+E+' [min_it, max_it] = '+F+'minmax_element'+E+'(..);   '+C+'// ONE walk'+E},
     {k:'deref',  t:'  '+K+'int'+E+' min_val = *min_it, max_val = *max_it;'},
     {k:'same',   t:'  '+K+'if'+E+' (min_val == max_val) '+K+'return'+E+';   '+C+'// all equal: avoid /0'+E},
+    {k:'nbg',    t:'  '+K+'if'+E+' (num_buckets &lt;= '+N+'0'+E+') num_buckets = '+N+'1'+E+';'},
     {k:'range',  t:'  '+K+'int'+E+' range = max_val - min_val + '+N+'1'+E+';'},
-    {k:'per',    t:'  '+K+'int'+E+' per = '+F+'ceil'+E+'(('+K+'double'+E+')range / num_buckets);'},
+    {k:'per',    t:'  '+K+'int'+E+' per = (range + num_buckets - '+N+'1'+E+') / num_buckets;'},
     {k:'alloc',  t:'  vector&lt;vector&lt;'+K+'int'+E+'&gt;&gt; buckets(num_buckets);'},
     {k:'dloop',  t:'  '+K+'for'+E+' ('+K+'int'+E+' val : data) {'},
     {k:'bidx',   t:'    '+K+'int'+E+' b = (val - min_val) / per;'},
@@ -908,19 +909,36 @@ var LINE_INFO = {
         ["why", "Bucket sort computes the identical number and then <em>refuses to allocate one slot per value</em>. That refusal is the whole difference between the two algorithms, and it is why bucket sort survives a range of 801 where counting sort chokes on it."],
         ["trap", "The <code>+ 1</code> is inclusive again. Leaving it off here does not crash &mdash; it quietly makes the top bucket's boundary wrong, which is the harder kind of bug to find."]
       ] },
-    per: { src: "int per = ceil((double)range / num_buckets);",
+    nbg: { src: "if (num_buckets <= 0) num_buckets = 1;",
+      what: "Stops a caller's bucket count from making the next two lines undefined.",
+      live: function (m) {
+        var nb = m.locals.num_buckets;
+        // &lt; -- this string is injected as innerHTML, so a raw "<" would
+        // open a tag and swallow the rest of the line. The calc band below is
+        // esc()'d and wants the opposite.
+        return "num_buckets &lt;= 0 ?   " + nb + " &lt;= 0  \u2192  <b>no</b><br>" +
+               "with 0 buckets, range / num_buckets divides by zero<br>" +
+               "and buckets[b] would index a vector of length 0<br>" +
+               "both are undefined behaviour, so the guard comes first";
+      },
+      items: [
+        ["trap", "<strong>This was a real crash, not a hypothetical.</strong> Built with AddressSanitizer, the version without this line dies on <code>bucket_sort(data, 0)</code> with a SEGV \u2014 the ceiling division produced a value that was cast to <code>int</code> out of range, and the bucket index then ran off a zero-length vector."],
+        ["why", "The header's <code>= 10</code> default protects the caller who says nothing. It does nothing for the caller who computes a bucket count and gets 0, which is exactly the caller most likely to exist."],
+        ["note", "Clamping to 1 rather than returning keeps the function total: every input now has a defined, correct result. One bucket means the whole array goes to <code>std::sort</code>, which is slow but right."]
+      ] },
+    per: { src: "int per = (range + num_buckets - 1) / num_buckets;",
       live: function (m) {
         var r = m.locals.range, nb = m.locals.num_buckets, per = m.locals.per;
-        var exact = r / nb, down = Math.floor(exact);
-        return r + " / " + nb + " = " + (Math.round(exact * 100) / 100) + "<br>" +
-               "round <b>down</b> to " + down + " \u2192 " + nb + " buckets cover only " +
-               (down * nb) + " values, and there are " + r + "<br>" +
-               "round <b>up</b> to " + per + " \u2192 they cover " + (per * nb) +
-               ", which is enough<br>" +
-               "so <b>per = " + per + "</b>  \u2014  covering too much is harmless, too little " +
-               "loses values";
+        var down = Math.floor(r / nb);
+        return "(" + r + " + " + nb + " \u2212 1) / " + nb + "  =  " + (r + nb - 1) + " / " + nb +
+               "  =  <b>" + per + "</b><br>" +
+               "plain " + r + " / " + nb + " would give " + down + ", rounding <em>down</em><br>" +
+               "at " + down + " the " + nb + " buckets cover only " + (down * nb) +
+               " values and there are " + r + "<br>" +
+               "at <b>" + per + "</b> they cover " + (per * nb) +
+               " \u2014 covering too much is harmless, too little loses values";
       },
-      what: "How many values each bucket covers. With a range of 41 over 10 buckets, each bucket owns 5 values.",
+      what: "How many values each bucket covers, rounded <strong>up</strong> so the buckets span the whole range &mdash; and done in integers, with no detour through <code>double</code>.",
       items: [
         ["syntax", "The <code>(double)</code> cast is doing real work. Without it, <code>range / num_buckets</code> is integer division and truncates, so <code>ceil</code> receives an already-rounded-down number and has nothing left to round up."],
         ["why", "Rounding <em>up</em> is deliberate. 41 values over 10 buckets at 4 each covers only 40, and the 41st value has nowhere to go. Rounding up gives 5 each, covering 50 &mdash; a little slack is harmless, a shortfall is not."],
@@ -1360,6 +1378,12 @@ function bucketSort(items) {
                  (mn === mx ? "yes, return now" : "no, keep going") });
   if (mn === mx) { return r; }
   var range = mx - mn + 1;
+  r.snap('nbg', "<strong>The bucket-count guard.</strong> Nothing stops a caller passing 0 \u2014 a " +
+         "count worked out from the input size can reach it on its own \u2014 and with 0 buckets " +
+         "the division below is by zero and <code>buckets[b]</code> indexes an empty vector. " +
+         "Without this line that is a crash, not a wrong answer.",
+         { phase: 0, banner: B1, locals: { num_buckets: NUM_BUCKETS }, stack: [],
+           calc: "num_buckets <= 0 ?   " + NUM_BUCKETS + " <= 0  \u2192  no, leave it alone" });
   r.snap('range', "<strong>range</strong> is how many distinct values could occur \u2014 the same " +
          "quantity counting sort called <code>k</code>, and the same thing that made counting sort " +
          "expensive. Bucket sort divides it up instead of allocating all of it.",
@@ -1805,7 +1829,7 @@ function lineInfoHtml(key, fr) {
     }).join("") + '</ul>' +
     '<p style="margin:.55rem 0 0;font-size:.8rem;color:#6e6e6e">' +
       (pinned ? 'Showing the line you clicked. Unpin to follow execution again.'
-              : 'Click any line above to pin its breakdown while you step.') +
+              : 'Click any line above to jump the walk to it and pin its breakdown.') +
     '</p></div>';
 }
 
@@ -2002,10 +2026,33 @@ function renderSolo() {
   if (clear) clear.addEventListener("click", function () { pinLine(null); });
 }
 
-// Clicking the already-pinned line unpins it, so one control does both.
+// Clicking a line does two things: it pins the breakdown, and it seeks the
+// walk to that line. Clicking the line you are already on just toggles the
+// pin, since there is nowhere to go.
 function pinLine(k) {
   state.pinned = (state.pinned === k) ? null : k;
+  seekToLine(k);
   render();
+}
+
+// The nearest frame for this line in the direction it lies: forward if the
+// line runs later, backward if it already ran. Nearest rather than first,
+// because a line inside a loop has many frames and the useful one is the
+// occurrence next to where you already are.
+function seekToLine(k) {
+  if (!k) return;
+  var run = state.runs && state.runs[state.mode];
+  if (!run || !run.frames) return;
+  var F = run.frames, here = Math.min(state.step, F.length - 1);
+  if (F[here] && F[here].line === k) return;        // already there
+  var i;
+  for (i = here + 1; i < F.length; i++) {
+    if (F[i].line === k) { state.step = i; return; }
+  }
+  for (i = here - 1; i >= 0; i--) {
+    if (F[i].line === k) { state.step = i; return; }
+  }
+  // Never executed -- leave the step alone rather than jumping nowhere.
 }
 
 function renderCompare() {
@@ -2420,9 +2467,21 @@ function selfTest() {
         if (!ent || !ent.live) return;
         try {
           var out = ent.live(fx.marks, fx.a);
-          if (out && /undefined|NaN/.test(out)) {
+          // "undefined behaviour" is legitimate prose here, so require the
+          // bare word. A check that fires on correct text gets ignored.
+          if (out && /\bundefined\b(?!\s+behaviou?r)|\bNaN\b/.test(out)) {
             fails.push(name + "/" + lane + " frame " + xi + ": live() for '" + fx.line +
-                       "' produced " + (/NaN/.test(out) ? "NaN" : "undefined"));
+                       "' produced " + (/\bNaN\b/.test(out) ? "NaN" : "undefined"));
+          }
+          // A live row is innerHTML: a raw "<" opens a tag and eats the text
+          // after it. (The calc band is esc()'d and wants the opposite, which
+          // is why these two are checked separately.)
+          if (out) {
+            var residue = out.replace(/<\/?(?:b|em|br|strong|code|a|span)\b[^>]*>/gi, "");
+            if (/[<>]/.test(residue)) {
+              fails.push(name + "/" + lane + " frame " + xi + ": live() for '" + fx.line +
+                         "' has a raw < or > outside a tag -- use &lt; / &gt;");
+            }
           }
         } catch (err) {
           fails.push(name + "/" + lane + " frame " + xi + ": live() for '" + fx.line +
