@@ -504,7 +504,7 @@ var CODE = {
     {k:'push',   t:'    buckets[b].'+F+'push_back'+E+'(val); }'},
     {k:'idx',    t:'  '+K+'int'+E+' idx = '+N+'0'+E+';'},
     {k:'bloop',  t:'  '+K+'for'+E+' ('+K+'auto'+E+'&amp; bucket : buckets) {'},
-    {k:'sortb',  t:'    '+F+'sort'+E+'(bucket.begin(), bucket.end());'},
+    {k:'sortb',  t:'    '+K+'std'+E+'::'+F+'sort'+E+'(bucket.begin(), bucket.end());'},
     {k:'cloop',  t:'    '+K+'for'+E+' ('+K+'int'+E+' val : bucket) data[idx++] = val; }'},
     {k:'end',    t:'}'}
   ],
@@ -915,7 +915,7 @@ var LINE_INFO = {
         ["why", "Bucket order <em>is</em> the sorted order between buckets. Nothing compares one bucket against another; the mapping already arranged that, the same way counting sort's ascending walk did."],
         ["note", "Not <code>const auto&amp;</code> here, because the next line modifies the bucket. If you add <code>const</code> out of habit, <code>sort</code> will not compile."]
       ] },
-    sortb: { src: "sort(bucket.begin(), bucket.end());",
+    sortb: { src: "std::sort(bucket.begin(), bucket.end());",
       live: function (m) {
         var was = m.beforeArr || [], now = (m.buckets && m.buckets[m.locals.b] || [])
           .map(function (e) { return e.v; });
@@ -930,9 +930,13 @@ var LINE_INFO = {
                            : was.length + " elements, already in order \u2014 compared, " +
                              "but nothing moved"));
       },
-      what: "Sorts one bucket's contents with an ordinary comparison sort.",
+      what: "<code>std::sort</code> from <code>&lt;algorithm&gt;</code> &mdash; the standard library's general-purpose sort. One call puts the whole bucket in order.",
       items: [
-        ["why", "This is the line that makes bucket sort only <em>half</em> a non-comparison sort. The scatter is comparison-free; this is <code>std::sort</code>, which compares. Bucket sort is a divide-and-delegate strategy, not an escape from comparison."],
+        ["syntax", "It takes a <strong>range</strong>, not a container. <code>bucket.begin()</code> and <code>bucket.end()</code> are iterators marking the first element and one past the last &mdash; the same begin/end convention as everywhere else in the STL. That is why one function sorts a <code>vector</code>, a plain array, or any slice of either."],
+        ["why", "<strong>It is one step here because it is library code, and this stepper walks the code you write.</strong> From bucket sort's point of view the call goes out and comes back with the bucket in order; what happens in between is somebody else's function."],
+        ["note", "<strong>It is not a black box, and you have already seen inside it.</strong> In practice <code>std::sort</code> is <em>introsort</em>: quicksort, falling back to <strong>heap sort</strong> when the recursion gets too deep, and insertion sort on very small ranges. Those are exactly the algorithms from CT 14 &mdash; <a href=\"https://hadzik-cs2420.github.io/cs2420-diagrams/demos/efficient-sorts.html\" target=\"_blank\" rel=\"noopener\">that stepper walks quick sort and heap sort line by line</a>."],
+        ["why", "Since C++11 the standard requires O(n log n) in the <strong>worst</strong> case, not just on average. The heap sort fallback is what pays for that: quicksort on its own degrades to O(n&sup2;) on an unlucky run of pivots, and the fallback is what stops it."],
+        ["why", "This is the line that makes bucket sort only <em>half</em> a non-comparison sort. The scatter is comparison-free; this compares. Bucket sort is a divide-and-delegate strategy, not an escape from comparison."],
         ["why", "It is also where the performance assumption lives. If the data spreads evenly each bucket is tiny and this is nearly free; pile everything into one bucket and this single call does the entire sort, at O(n log n)."],
         ["note", "<code>std::sort</code> is <strong>not</strong> stable. <code>std::stable_sort</code> is, and swapping one for the other is the single-word change that makes the whole algorithm stable."]
       ] },
