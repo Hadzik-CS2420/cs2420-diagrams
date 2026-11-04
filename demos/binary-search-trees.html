@@ -509,6 +509,10 @@ function treeSvg(root, mark) {
 // ---------------------------------------------------------------------------
 var CODE = {
   insert: [
+    "void BinarySearchTree::insert(int value) {",
+    "    root_ = insert_(root_, value);   // the helper hands back the root",
+    "}",
+    "",
     "Node* BinarySearchTree::insert_(Node* node, int value) {",
     "    if (!node) return new Node(value);   // empty slot -- the value goes here",
     "",
@@ -590,36 +594,43 @@ CODE.apply = [
 
 var LINE_INFO = {
   insert: {
-    0: { src: "Node* insert_(Node* node, int value)",
+    1: { src: "root_ = insert_(root_, value);",
+      what: "The entire body of the public insert: start the recursion at the root, and assign the result back.",
+      items: [
+        ["why", "This is the assignment every <code>return node</code> is feeding. The outermost call returns the root of the whole tree &mdash; normally the same node that was already there, but on the very first insert it is the brand new node."],
+        ["trap", "Drop the <code>root_ =</code> and the first insert vanishes. The helper allocates the node, returns it, nothing catches it, <code>root_</code> stays <code>nullptr</code> and the tree is still empty &mdash; with no error anywhere."],
+        ["note", "<code>root_</code> and <code>Node*</code> never leave the class. The caller writes <code>bst.insert(50)</code> and never touches a pointer."]
+      ] },
+    4: { src: "Node* insert_(Node* node, int value)",
       what: "Takes the subtree to insert into, and returns that subtree with the value in it.",
       items: [
         ["why", "It returns a <code>Node*</code> rather than <code>void</code> so the caller can <strong>reattach</strong> the result. That is what makes the one-line <code>node->left = insert_(node->left, value)</code> work for both cases &mdash; an existing child comes back unchanged, an empty slot comes back as a brand new node."],
         ["trap", "Write it as <code>void</code> and the new node is created but never attached to anything. The tree stays empty and the leak is silent."]
       ] },
-    1: { src: "if (!node) return new Node(value);",
+    5: { src: "if (!node) return new Node(value);",
       what: "The base case: the recursion has fallen off the bottom, and that empty slot is exactly where the value belongs.",
       items: [
         ["why", "A BST insert never has to search for a place &mdash; the comparisons on the way down <em>are</em> the search. Wherever you fall off is the only legal spot."],
         ["note", "This is the one line that allocates. Every other line just passes pointers around."]
       ] },
-    3: { src: "if (value < node->data)",
+    7: { src: "if (value < node->data)",
       what: "Smaller values live in the left subtree. This is the BST property, applied one node at a time.",
       items: [
         ["why", "One comparison eliminates an entire subtree. On a balanced tree that halves the remaining work, which is where O(log n) comes from."],
         ["trap", "On the <strong>ascending</strong> preset every value is larger than the one before, so this is never true and the tree becomes a straight line to the right. Height 4 for 5 nodes. Same code, O(n) behaviour &mdash; that is what AVL rotations exist to prevent."]
       ] },
-    4: { src: "node->left = insert_(node->left, value);",
+    8: { src: "node->left = insert_(node->left, value);",
       what: "Recurse into the left subtree, and assign the result back.",
       items: [
         ["syntax", "The assignment is not optional. <code>insert_(node->left, value);</code> on its own compiles, runs, allocates the node &mdash; and throws the pointer away."],
         ["note", "For every node on the path except the last, this reassigns a child to the value it already had. Harmless, and it is the price of having one line cover both cases."]
       ] },
-    8: { src: "// value == node->data: duplicate, do nothing",
+    12: { src: "// value == node->data: duplicate, do nothing",
       what: "Neither branch is taken, so the value is silently dropped.",
       items: [
         ["why", "This tree holds a <strong>set</strong>. Inserting 50 twice leaves one 50. That is a design decision, not an oversight &mdash; a tree that allowed duplicates would have to pick a side and stick to it forever."]
       ] },
-    10: { src: "return node;",
+    14: { src: "return node;",
       what: "Hands this node back unchanged so the caller's assignment reattaches it.",
       items: [
         ["why", "Without this the recursion would return garbage up the chain and the assignment on the way out would blank the tree."]
@@ -942,9 +953,9 @@ function vals(nodes) { return nodes.map(function (n) { return n.v; }); }
 // lines 4 and 6 of insert run twice, once making the call and once taking the
 // result back, and the line text is identical both times.
 var STEP_TAG = {
-  insert:    { 0: "entering the call", 1: "the empty slot", 3: "comparing",
-               4: "the left call", 5: "comparing", 6: "the right call",
-               8: "a duplicate", 10: "handing it back" },
+  insert:    { 1: "the public call", 4: "entering the call", 5: "the empty slot",
+               7: "comparing", 8: "the left call", 9: "comparing",
+               10: "the right call", 12: "a duplicate", 14: "handing it back" },
   search:    { 1: "fell off the tree", 2: "found it", 4: "comparing" },
   inorder:   { 0: "entering the call", 1: "the bottom", 2: "down the left",
                3: "visiting this node", 4: "down the right" },
@@ -964,7 +975,7 @@ var STEP_TAG = {
 // the code rather than stored on the frame, so a frame can never claim a phase
 // its highlighted line does not belong to.
 var PHASE_OF = {
-  insert:    { 1: 1, 3: 0, 4: 2, 5: 0, 6: 2, 8: 0, 10: 2 },
+  insert:    { 1: 2, 5: 1, 7: 0, 8: 2, 9: 0, 10: 2, 12: 0, 14: 2 },
   search:    { 1: 2, 2: 0, 3: 1, 4: 1 },
   inorder:   { 0: 2, 1: 0, 2: 1, 3: 1, 4: 1 },
   preorder:  { 0: 2, 1: 0, 2: 1, 3: 1, 4: 1 },
@@ -1005,6 +1016,18 @@ function buildInsert(seq) {
     // The tree once this value exists. Everything on the way DOWN draws the
     // tree as it is now; from the allocation onward the frames draw this one,
     // which is what lets a reattachment show the pointer it just wrote.
+    // insert() being called. Without this the recursion appears from nowhere,
+    // and the return at the end has nothing visible to return INTO.
+    frames.push(F({ tree: clone(root), line: 1, stack: [], path: [],
+      tag: "the public call", phase: 0,
+      calc: "root_ = insert_(root_, " + value + ")\n" +
+            "the right-hand side runs first \u2014 root_ is not assigned until it returns",
+      head: "<strong>insert(" + value + ")</strong> &mdash; the public method, " +
+            "whose whole body is this one line.",
+      why: ["the recursion starts here, at <code>root_</code>",
+            "the assignment waits: nothing is written to <code>root_</code> until the call finishes"],
+      insertingValue: value, depth: 0 }));
+
     var after = insertPlain(clone(root), value);
     var childIn = function (v, left) {
       var n = (function find(x) {
@@ -1018,8 +1041,8 @@ function buildInsert(seq) {
       // signature to the placement with nothing saying a call was made.
       var callText = parent
         ? "node->" + (side === "l" ? "left" : "right")
-        : "root";
-      frames.push(F({ tree: clone(root), line: 0, stack: vals(path), path: vals(path),
+        : "root_";
+      frames.push(F({ tree: clone(root), line: 4, stack: vals(path), path: vals(path),
         hit: node ? node.v : undefined,
         calc: "insert_(" + callText + ", " + value + ")\n" +
               "node = " + (node ? node.v : "nullptr") + ",  value = " + value,
@@ -1027,20 +1050,21 @@ function buildInsert(seq) {
           ? "Called from the line above with <code>" + callText + "</code> &mdash; " +
             (node ? "that child is <strong>" + node.v + "</strong>"
                   : "that child is <code>nullptr</code>")
-          : "<strong>insert(" + value + ")</strong> calls <code>insert_(root, " + value +
-            ")</code>" + (node ? "" : " &mdash; the tree is still empty"),
+          : "Called from the line above with <code>root_</code>" +
+            (node ? " &mdash; the root is <strong>" + node.v + "</strong>"
+                  : " &mdash; which is <code>nullptr</code>, the tree is still empty"),
         why: parent
           ? ["the parameter <code>node</code> is now that child, and the same function runs again",
              "each call only ever looks at one node"]
-          : ["the public <code>insert</code> does nothing but start this off at the root",
-             "<code>node</code> is a parameter, so each call has its own"],
+          : ["<code>node</code> is a parameter, so this call gets its own copy of the root pointer",
+             "every call below this one is the same function on a smaller tree"],
         // No operator yet -- the call has been made, nothing compared. And when
         // the child is null, show the slot so the pill has somewhere to sit.
         carry: { v: value },
         slot: (!node && parent) ? { parent: parent.v, side: side } : null,
         insertingValue: value, depth: depth }));
       if (!node) {
-        frames.push(F({ tree: clone(root), line: 1, stack: path.map(function (n) { return n.v; }),
+        frames.push(F({ tree: clone(root), line: 5, stack: path.map(function (n) { return n.v; }),
           slot: parent ? { parent: parent.v, side: side } : null,
           rootSlot: parent ? undefined : value, path: vals(path),
           calc: "!node   \u2192   new Node(" + value + ")" +
@@ -1057,7 +1081,7 @@ function buildInsert(seq) {
       path.push(node);
       var goLeft = value < node.v, dup = value === node.v;
       var kills = goLeft ? countOf(node.r) : countOf(node.l);
-      frames.push(F({ tree: clone(root), line: dup ? 8 : (goLeft ? 3 : 5),
+      frames.push(F({ tree: clone(root), line: dup ? 12 : (goLeft ? 7 : 9),
         stack: vals(path), hit: node.v, path: vals(path),
         calc: dup
           ? value + " == " + node.v + "   \u2192   already here, neither branch is taken"
@@ -1084,7 +1108,7 @@ function buildInsert(seq) {
       // direction -- not making the call, not taking the result back.
       var cs = goLeft ? "left" : "right";
       var kid = goLeft ? node.l : node.r;
-      frames.push(F({ tree: clone(root), line: goLeft ? 4 : 6,
+      frames.push(F({ tree: clone(root), line: goLeft ? 8 : 10,
         stack: vals(path), hit: node.v, path: vals(path),
         calc: "node->" + cs + " = insert_(node->" + cs + ", " + value + ")\n" +
               node.v + "->" + cs + " is " + (kid ? kid.v : "nullptr") +
@@ -1109,7 +1133,7 @@ function buildInsert(seq) {
       // and that contrast is the point of showing them.
       var got = childIn(node.v, goLeft);
       var changed = got && got.v === value;
-      frames.push(F({ tree: clone(after), line: goLeft ? 4 : 6,
+      frames.push(F({ tree: clone(after), line: goLeft ? 8 : 10,
         stack: vals(path), hit: node.v, path: vals(path), placed: value,
         tag: "taking the result back",
         calc: "the call returned " + (got ? got.v : "nullptr") + "\n" +
@@ -1129,19 +1153,23 @@ function buildInsert(seq) {
              "writing back the same pointer is harmless &mdash; and it is why this function is this short"],
         insertingValue: value, depth: depth }));
 
-      // and this call hands its own subtree up. The outermost one is the
-      // summary frame below, which is where root = insert_(root, value) lands.
-      if (parent) {
-        frames.push(F({ tree: clone(after), line: 10,
-          stack: vals(path), hit: node.v, path: vals(path), placed: value,
-          calc: "return node   \u2192   " + node.v +
-                " goes back to the call that asked for it",
-          head: "<strong>" + node.v + "</strong> returns itself, and the call above " +
-                "reattaches it with the line you just saw.",
-          why: ["<code>return node</code> is what the assignment one level up receives",
-                "the subtree rooted at " + node.v + " is handed back whole"],
-          insertingValue: value, depth: depth }));
-      }
+      // and this call hands its own subtree up. The outermost one returns to
+      // the public insert -- the line the whole chain has been feeding.
+      frames.push(F({ tree: clone(after), line: 14,
+        stack: vals(path), hit: node.v, path: vals(path), placed: value,
+        calc: "return node   \u2192   " + node.v + " goes back to " +
+              (parent ? "the call that asked for it" : "insert(), above the helper"),
+        head: parent
+          ? "<strong>" + node.v + "</strong> returns itself, and the call above " +
+            "reattaches it with the line you just saw."
+          : "<strong>" + node.v + "</strong> is the root, and this is the outermost " +
+            "return &mdash; it goes back to <code>insert</code>.",
+        why: parent
+          ? ["<code>return node</code> is what the assignment one level up receives",
+             "the subtree rooted at " + node.v + " is handed back whole"]
+          : ["no call sits above this one, so it returns to <code>insert</code>",
+             "that is the <code>root_ =</code> line, which is the next step"],
+        insertingValue: value, depth: depth }));
       path.pop();
     })(root, null, null);
 
@@ -1152,19 +1180,20 @@ function buildInsert(seq) {
       return value < n.v ? find(n.l) : find(n.r);
     })(root);
 
-    frames.push(F({ tree: clone(root), line: 10, stack: [], placed: placed ? placed.v : null,
-      tag: "back at the top",
-      calc: "root = insert_(root, " + value + ")\n" +
-            "the outermost call returns the root, and insert() assigns it back",
+    frames.push(F({ tree: clone(root), line: 1, stack: [], placed: placed ? placed.v : null,
+      tag: "back at the top", phase: 2,
+      calc: "root_ = insert_(root_, " + value + ")\n" +
+            "the outermost return landed here \u2014 root_ = " +
+            (root ? root.v : "nullptr"),
       head: "<strong>" + value + "</strong> is in. Height is now " + heightOf(root) +
             ", " + countOf(root) + " node" + (countOf(root) === 1 ? "" : "s") + ".",
-      why: ["this is the last <code>return node</code> &mdash; the one the public <code>insert</code> receives",
+      why: ["the outermost <code>return node</code> returns <em>to this line</em> &mdash; that is where it goes",
             "nothing above the insertion point changed, as every reattachment on the way up showed"],
       insertingValue: value }));
   });
 
   var last = frames[frames.length - 1];
-  frames.push(F({ tree: clone(root), line: 10, stack: [],
+  frames.push(F({ tree: clone(root), line: 2, stack: [], phase: 2, tag: "every value is in",
     head: "Done. " + countOf(root) + " nodes, height <strong>" + heightOf(root) + "</strong>.",
     why: ["in-order on this tree reads " + walk(root, "inorder", []).join(", "),
           heightOf(root) >= seq.length - 1
