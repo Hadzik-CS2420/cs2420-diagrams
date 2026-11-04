@@ -389,6 +389,16 @@ function treeSvg(root, mark) {
   var CW = 62, RH = 66, PAD = 30;
   var W = Math.max(L.cols * CW, 220) + PAD * 2;
   var H = L.rows * RH + PAD * 2;
+
+  // The dashed slot hangs one row below the deepest node and the carry pill
+  // below that, both outside the column grid H and W were measured from. Let
+  // them report their extent so the box grows instead of cropping them.
+  var MINX = 0;
+  function fit(x, y) {
+    if (x + 4 > W) { W = x + 4; }
+    if (y + 4 > H) { H = y + 4; }
+  }
+  function fitL(x) { if (x - 4 < MINX) { MINX = x - 4; } }
   var X = function (p) { return PAD + p.x * CW + CW / 2; };
   var Y = function (p) { return PAD + p.y * RH + 20; };
 
@@ -406,6 +416,11 @@ function treeSvg(root, mark) {
     });
   });
 
+  // Where the carried value is parked. Set by whichever of the slot or the
+  // node loop below matches this frame's mark -- the node wins, since it runs
+  // second, and a frame with both is sitting at a real node.
+  var carryXY = null;
+
   // the empty slot the recursion is currently sitting in, drawn dashed
   if (mark.slot) {
     var par = L.pos.filter(function (q) { return q.v === mark.slot.parent; })[0];
@@ -414,6 +429,8 @@ function treeSvg(root, mark) {
       var sy = Y(par) + RH;
       edges += '<line x1="' + X(par) + '" y1="' + (Y(par) + 16) + '" x2="' + sx +
                '" y2="' + (sy - 16) + '" stroke="#c7cdd1" stroke-width="2" stroke-dasharray="4 3"/>';
+      fit(sx + 16, sy + 16); fitL(sx - 16);
+      if (mark.carry) { carryXY = [sx, sy]; }
       nodes += '<circle cx="' + sx + '" cy="' + sy + '" r="16" fill="#fff" stroke="#c7cdd1" ' +
                'stroke-width="2" stroke-dasharray="4 3"/>' +
                '<text x="' + sx + '" y="' + (sy + 5) + '" text-anchor="middle" fill="#6e6e6e" ' +
@@ -432,6 +449,7 @@ function treeSvg(root, mark) {
                                                           tcol = "#c0392b"; dash = "4 3"; }
     if (mark.hit === p.v)                               { fill = "#fff3e0"; stroke = "#a95c19"; sw = 3; }
     if (mark.placed === p.v)                            { fill = "#f2fbf4"; stroke = "#1c7e45"; sw = 3; }
+    if (mark.carry && mark.hit === p.v) { carryXY = [X(p), Y(p)]; }
     nodes += '<circle cx="' + X(p) + '" cy="' + Y(p) + '" r="17" fill="' + fill +
              '" stroke="' + stroke + '" stroke-width="' + sw + '"' +
              (dash ? ' stroke-dasharray="' + dash + '"' : "") + "/>" +
@@ -449,9 +467,32 @@ function treeSvg(root, mark) {
     }
   });
 
-  return '<svg class="tree" viewBox="0 0 ' + W + " " + H +
+  // The pill itself, offset below the node in the direction of travel, so it
+  // lands on the edge the value is about to follow. Same orange as the
+  // highlighted node, to read as one thing rather than two.
+  var carry = "";
+  if (carryXY && mark.carry) {
+    var ct = String(mark.carry.v) + (mark.carry.tag ? "  " + mark.carry.tag : "");
+    var cw = 16 + ct.length * 7.5, ch = 21;
+    var dx = mark.carry.tag && mark.carry.tag.indexOf("↙") !== -1 ? -31
+           : mark.carry.tag && mark.carry.tag.indexOf("↘") !== -1 ? 31 : 0;
+    // No clamping: a pill shoved flush to the wall stops sitting under the
+    // edge it describes, which is the whole point of where it sits.
+    var cx2 = carryXY[0] + dx;
+    var cy2 = carryXY[1] + 27;
+    fit(cx2 + cw / 2, cy2 + ch); fitL(cx2 - cw / 2);
+    carry = '<rect class="carry" x="' + (cx2 - cw / 2) + '" y="' + cy2 + '" width="' + cw +
+            '" height="' + ch + '" rx="10" fill="#fff3e0" stroke="#a95c19" stroke-width="2"/>' +
+            '<text x="' + cx2 + '" y="' + (cy2 + 15) + '" text-anchor="middle" fill="#c64500" ' +
+            'font-size="12.5" font-weight="700">' + esc(ct) + "</text>";
+  }
+
+  return '<svg class="tree" viewBox="' + MINX + " 0 " + (W - MINX) + " " + H +
     '" role="img" aria-label="the binary search tree, ' + countOf(root) +
-    ' nodes, height ' + heightOf(root) + '">' + edges + nodes + "</svg>";
+    ' nodes, height ' + heightOf(root) +
+    (carryXY && mark.carry
+       ? ", with " + mark.carry.v + " shown beside the node it is being compared with"
+       : "") + '">' + edges + nodes + carry + "</svg>";
 }
 
 // ---------------------------------------------------------------------------
@@ -943,6 +984,10 @@ function buildInsert(seq) {
              "each call only ever looks at one node"]
           : ["the public <code>insert</code> does nothing but start this off at the root",
              "<code>node</code> is a parameter, so each call has its own"],
+        // No operator yet -- the call has been made, nothing compared. And when
+        // the child is null, show the slot so the pill has somewhere to sit.
+        carry: { v: value },
+        slot: (!node && parent) ? { parent: parent.v, side: side } : null,
         insertingValue: value, depth: depth }));
       if (!node) {
         frames.push(F({ tree: clone(root), line: 1, stack: path.map(function (n) { return n.v; }),
@@ -971,6 +1016,7 @@ function buildInsert(seq) {
             (kills === 0 ? "an empty subtree"
                          : kills + " node" + (kills === 1 ? "" : "s") + " without looking at " +
                            (kills === 1 ? "it" : "them")),
+        carry: { v: value, tag: dup ? "=" : (goLeft ? "<  ↙" : ">  ↘") },
         test: dup ? { q: value + " == " + node.v, yes: true, res: "duplicate &mdash; dropped" }
                   : { q: value + (goLeft ? " &lt; " : " &gt; ") + node.v, yes: true,
                       res: "go " + (goLeft ? "left" : "right") },
@@ -1037,6 +1083,7 @@ function buildSearch(root, target) {
       frames.push(F({ tree: clone(root), line: 2, hit: node.v, path: vals(path),
         stack: path.map(function (n) { return n.v; }),
         test: { q: target + " == " + node.v, yes: true, res: "found it" },
+        carry: { v: target, tag: "✔" },
         calc: target + " == " + node.v + "   \u2192   return true\n" +
                 "found in " + comps + " comparison" + (comps === 1 ? "" : "s") +
                 "; nothing below this node was ever read",
@@ -1051,6 +1098,7 @@ function buildSearch(root, target) {
       stack: path.map(function (n) { return n.v; }),
       test: { q: target + (goLeft ? " &lt; " : " &gt; ") + node.v, yes: true,
               res: "go " + (goLeft ? "left" : "right") },
+      carry: { v: target, tag: goLeft ? "<  ↙" : ">  ↘" },
       calc: target + (goLeft ? " < " : " > ") + node.v + "   \u2192   go " +
               (goLeft ? "left" : "right") + "\nthe " + (goLeft ? "right" : "left") +
               " subtree (" + (goLeft ? countOf(node.r) : countOf(node.l)) +
