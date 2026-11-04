@@ -221,6 +221,27 @@
   .selftest .fail { color:var(--red);   font-weight:700; }
   code.inl { background:#eef2f6; padding:.08em .32em; border-radius:4px;
              font-family:Consolas,monospace; font-size:.92em; }
+
+  /* ---- ported verbatim from the CT 15 stepper ---------------------
+     The THIS STEP band, the yellow note box, the phase rail and the
+     two independent column flows. Copied rather than retyped so the
+     steppers cannot drift apart on spacing. */  .nowbox { background:#f9e2af; color:#1e1e2e; border-left:4px solid #b8860b;
+            border-radius:0 8px 8px 0; padding:.6rem .8rem; margin:.7rem 0 0; }  .nowbox .nownote { margin:0; font-size:.93rem; line-height:1.55; }  .nowbox .nownote code { font-family:Consolas,monospace; font-size:.93em;
+                          background:rgba(0,0,0,.09); border-radius:3px; padding:.03em .3em; }  .nowbox .nownums { margin-top:.5rem; padding-top:.5rem; border-top:1px solid rgba(0,0,0,.18);
+                     font-family:Consolas,"Courier New",monospace; font-size:.84rem;
+                     font-weight:600; line-height:1.65; overflow-x:auto; }  .nowbox .nownums b { font-weight:800; }  .nowbox .nownums em { font-style:normal; background:rgba(0,0,0,.09);
+                        border-radius:3px; padding:.02em .3em; }  .nowbox .lt { display:block; font-family:system-ui,sans-serif; font-weight:800;
+                font-size:.62rem; letter-spacing:.06em; text-transform:uppercase;
+                color:#6b4f04; margin-bottom:.2rem; }  .solo > .col { display:flex; flex-direction:column; gap:1.1rem; min-width:0; }  .code div.calc { background:#f9e2af; color:#1e1e2e; font-size:.88rem;
+                   font-weight:600; white-space:pre; cursor:default;
+                   display:flex; align-items:flex-start; gap:.55rem;
+                   padding:.22rem .8rem; margin:.12rem 0;
+                   border-left:4px solid #b8860b; }  .code div.calc > .cv { min-width:0; white-space:pre-wrap;
+                         text-indent:-1.1rem; padding-left:1.1rem; }  .code div.calc.art > .cv { white-space:pre; text-indent:0; padding-left:0; }  .code div.calc::before { content:"THIS STEP"; font-size:.62rem; font-weight:800;
+                           letter-spacing:.06em; color:#6b4f04;
+                           background:rgba(0,0,0,.09); border-radius:3px;
+                           padding:.08em .32em; flex:0 0 auto;
+                           margin-top:.28em; }  .code div.calc:hover { background:#f9e2af; }
 </style>
 </head>
 <body>
@@ -892,7 +913,10 @@ function buildInsert(seq) {
       if (!node) {
         frames.push(F({ tree: clone(root), line: 1, stack: path.map(function (n) { return n.v; }),
           slot: parent ? { parent: parent.v, side: side } : null, path: vals(path),
-          head: "Empty slot reached &mdash; <strong>" + value + "</strong> goes here, " +
+          calc: "!node   \u2192   new Node(" + value + ")" +
+              (parent ? "\n" + (side === "l" ? "left" : "right") + " child of " + parent.v
+                      : "\nthe tree was empty, so this becomes the root"),
+        head: "Empty slot reached &mdash; <strong>" + value + "</strong> goes here, " +
                 (parent ? "as the " + (side === "l" ? "left" : "right") + " child of " + parent.v
                         : "as the root"),
           why: ["<code>!node</code> is true, so this call allocates and returns the new node",
@@ -902,8 +926,16 @@ function buildInsert(seq) {
       }
       path.push(node);
       var goLeft = value < node.v, dup = value === node.v;
+      var kills = goLeft ? countOf(node.r) : countOf(node.l);
       frames.push(F({ tree: clone(root), line: dup ? 8 : (goLeft ? 3 : 5),
         stack: vals(path), hit: node.v, path: vals(path),
+        calc: dup
+          ? value + " == " + node.v + "   \u2192   already here, neither branch is taken"
+          : value + (goLeft ? " < " : " > ") + node.v + "   \u2192   go " +
+            (goLeft ? "left" : "right") + "\none comparison just ruled out " +
+            (kills === 0 ? "an empty subtree"
+                         : kills + " node" + (kills === 1 ? "" : "s") + " without looking at " +
+                           (kills === 1 ? "it" : "them")),
         test: dup ? { q: value + " == " + node.v, yes: true, res: "duplicate &mdash; dropped" }
                   : { q: value + (goLeft ? " &lt; " : " &gt; ") + node.v, yes: true,
                       res: "go " + (goLeft ? "left" : "right") },
@@ -928,6 +960,8 @@ function buildInsert(seq) {
     })(root);
 
     frames.push(F({ tree: clone(root), line: 10, stack: [], placed: placed ? placed.v : null,
+      calc: "return node   \u2190  every call on the way back up hands its subtree\n" +
+            "              to its parent, which reattaches it unchanged",
       head: "<strong>" + value + "</strong> is in. Height is now " + heightOf(root) +
             ", " + countOf(root) + " node" + (countOf(root) === 1 ? "" : "s") + ".",
       why: ["each <code>return node</code> on the way back up lets the parent reattach the subtree",
@@ -953,6 +987,8 @@ function buildSearch(root, target) {
     if (!node) {
       frames.push(F({ tree: clone(root), line: 1, path: vals(path),
         stack: path.map(function (n) { return n.v; }),
+        calc: "!node   \u2192   return false\n" + comps + " comparison" +
+              (comps === 1 ? "" : "s") + " spent, the same a hit here would have cost",
         head: "Fell off the bottom &mdash; <strong>" + target + "</strong> is not in this tree.",
         why: ["<code>!node</code>, so the answer is false",
               "a miss costs the same " + comps + " comparison" + (comps === 1 ? "" : "s") +
@@ -966,6 +1002,9 @@ function buildSearch(root, target) {
       frames.push(F({ tree: clone(root), line: 2, hit: node.v, path: vals(path),
         stack: path.map(function (n) { return n.v; }),
         test: { q: target + " == " + node.v, yes: true, res: "found it" },
+        calc: target + " == " + node.v + "   \u2192   return true\n" +
+                "found in " + comps + " comparison" + (comps === 1 ? "" : "s") +
+                "; nothing below this node was ever read",
         head: "Found <strong>" + target + "</strong> after " + comps + " comparison" +
               (comps === 1 ? "" : "s") + ".",
         why: ["<code>return true</code> unwinds the whole stack at once",
@@ -977,6 +1016,10 @@ function buildSearch(root, target) {
       stack: path.map(function (n) { return n.v; }),
       test: { q: target + (goLeft ? " &lt; " : " &gt; ") + node.v, yes: true,
               res: "go " + (goLeft ? "left" : "right") },
+      calc: target + (goLeft ? " < " : " > ") + node.v + "   \u2192   go " +
+              (goLeft ? "left" : "right") + "\nthe " + (goLeft ? "right" : "left") +
+              " subtree (" + (goLeft ? countOf(node.r) : countOf(node.l)) +
+              " nodes) is now out of the search, unread",
       head: "At " + node.v + ": go " + (goLeft ? "left" : "right"),
       why: ["the " + (goLeft ? "right" : "left") + " subtree is eliminated without being looked at",
             "comparisons so far: " + comps], comps: comps }));
@@ -1050,6 +1093,8 @@ function buildHeight(root) {
   var h = (function go(node) {
     if (!node) {
       snap({ line: 1, path: vals(path),
+        calc: "!node   \u2192   return \u22121\n" +
+              "\u22121 is chosen so a leaf comes out 1 + max(\u22121, \u22121) = 0",
         head: "Empty &mdash; <code>return -1</code>",
         why: ["an empty subtree has height &minus;1, which is what makes a leaf come out 0"] });
       return -1;
@@ -1070,6 +1115,18 @@ function buildHeight(root) {
     labels[node.v] = own;
     path.pop();
     snap({ line: 4, hit: node.v, path: vals(path).concat([node.v]),
+      calc: (function () {
+        // Parenthesise negatives -- "1 + -1" reads as a typo. And a leaf
+        // has no children, so "the edge down to the taller side" would be
+        // describing something that is not there.
+        var n = function (x) { return x < 0 ? "(\u2212" + Math.abs(x) + ")" : String(x); };
+        var top = Math.max(lh, rh);
+        return "1 + max(left, right)\n" +
+               "1 + max(" + n(lh) + ", " + n(rh) + ")  =  1 + " + n(top) + "  =  " + own +
+               "\n" + (lh === -1 && rh === -1
+                  ? node.v + " is a leaf \u2014 no children, so its height is 0"
+                  : "the +1 is the edge from " + node.v + " down to the taller side");
+      })(),
       head: "<strong>" + node.v + "</strong> returns <strong>" + own + "</strong> &mdash; 1 + max(" +
             lh + ", " + rh + ")",
       why: [(lh === rh ? "both sides are " + lh + ", so either one wins"
@@ -1240,7 +1297,23 @@ function esc(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function codeHtml(key, hit) {
+// Index-math art keeps its columns and must not wrap; prose in the band
+// should wrap like prose. These are the characters the art is drawn with.
+function isArt(t) { return /[\u2191\u2502\u2514\u2500]/.test(String(t)); }
+
+// The sentence and, where the frame has them, the worked numbers behind it --
+// one block in the band's colour, because they are the same idea at two
+// lengths. The band in the code panel is anchored to the executing line; this
+// is its prose half.
+function nowBox(f) {
+  var nums = f.live
+    ? '<div class="nownums"><span class="lt">with this run\'s numbers</span>' + f.live + "</div>"
+    : "";
+  return '<div class="nowbox"><p class="nownote">' + f.head + "</p>" + nums + "</div>";
+}
+
+function codeHtml(key, hit, frame) {
+  var calc = frame && frame.calc;
   return '<div class="code" id="code">' + CODE[key].map(function (ln, i) {
     var cls = [];
     if (i === hit) cls.push("hit");
@@ -1249,7 +1322,14 @@ function codeHtml(key, hit) {
     var at = t.indexOf("//");
     if (at !== -1) t = t.slice(0, at) + '<span class="cm">' + t.slice(at) + "</span>";
     return '<div data-line="' + i + '"' + (cls.length ? ' class="' + cls.join(" ") + '"' : "") +
-           ' tabindex="0">' + (t === "" ? "&nbsp;" : t) + "</div>";
+           ' tabindex="0">' + (t === "" ? "&nbsp;" : t) + "</div>" +
+           // The live values go under the line that is executing. esc() is
+           // deliberate: this band is text, not markup, so a calc string must
+           // carry real characters rather than HTML entities.
+           (i === hit && calc
+              ? '<div class="calc' + (isArt(calc) ? " art" : "") + '">' +
+                '<span class="cv">' + esc(calc) + "</span></div>"
+              : "");
   }).join("") + "</div>" + lineInfoHtml(key);
 }
 
@@ -1392,18 +1472,18 @@ function renderSolo() {
                 apply: "inorder_apply with " + FUNCTORS[state.functor].label }[state.mode];
 
   document.getElementById("stage").innerHTML =
-    '<div class="solo"><div>' +
+    '<div class="solo"><div class="col">' +
       '<div class="card"><h2>' + title + " &mdash; " + PRESETS[state.preset].label + " tree</h2>" +
         '<div class="card-body">' + treeSvg(f.tree, f) + chipsHtml(f) + testHtml(f) + "</div></div>" +
       '<div class="card"><h2>What the machine is holding</h2><div class="card-body">' +
         localsHtml(f) + "</div></div>" +
       '<div class="card"><h2>What just happened</h2><div class="card-body">' +
-        '<p class="head">' + f.head + "</p>" +
+        nowBox(f) +
         (f.why && f.why.length ? '<ul class="why">' + f.why.map(function (w) {
           return "<li>" + w + "</li>"; }).join("") + "</ul>" : "") +
       "</div></div>" +
-    "</div><div>" +
-      '<div class="card"><h2>The code</h2><div class="card-body">' + codeHtml(key, f.line) + "</div></div>" +
+    "</div><div class=\"col\">" +
+      '<div class="card"><h2>The code</h2><div class="card-body">' + codeHtml(key, f.line, f) + "</div></div>" +
       '<div class="card"><h2>What it costs</h2><div class="card-body">' + factsHtml(key) + "</div></div>" +
     "</div></div>";
 
