@@ -164,6 +164,9 @@
           font-size:.82rem; line-height:1.55; overflow-x:auto; }
   .code div { padding:.02rem .9rem; white-space:pre; cursor:pointer; }
   .code div:hover { background:#313244; }
+  .code.static div { cursor:default; }
+  .code.static div:hover { background:none; }
+  .code.static div.hit:hover { background:var(--code-hit); }
   .code div.hit { background:var(--code-hit); border-left:3px solid #f9e2af;
                   padding-left:calc(.9rem - 3px); }
   .code div.pin { outline:1px dashed #f9e2af; outline-offset:-2px; }
@@ -198,6 +201,11 @@
   .lane.postorder h2 { background:var(--tint-orange); color:var(--orange); }
   .lane .card-body { padding:.7rem; }
   .lane .mini { font-size:.78rem; color:var(--muted); margin:.5rem 0 0; min-height:2.6rem; }
+  /* A lane is a third of the page, so its listing is smaller and long lines wrap. */
+  .code.lanecode { margin-top:.5rem; font-size:.72rem; }
+  .code.lanecode div:not(.calc) { white-space:pre-wrap; cursor:default;
+                                  padding-left:calc(.7rem + 6ch); padding-right:.5rem; text-indent:-6ch; }
+  .code.lanecode div.hit { padding-left:calc(.7rem + 6ch - 3px); }
 
   .verdict { border-left:5px solid var(--deep); background:var(--tint-purple);
              border-radius:0 8px 8px 0; padding:.9rem 1.1rem; font-size:.88rem; }
@@ -591,7 +599,7 @@ CODE.destroy = [
 
 CODE.apply = [
   "template <typename Functor>",
-  "void BinarySearchTree::inorder_apply_(Node* node, Functor& func) const {",
+  "void inorder_apply_(Node* node, Functor& func) const {",
   "    if (!node) return;",
   "    inorder_apply_(node->left, func);  // 1. left subtree",
   "    func(node->data);                  // 2. the action, whatever it is",
@@ -608,7 +616,7 @@ var LINE_INFO = {
         ["trap", "Drop the <code>root_ =</code> and the first insert vanishes. The helper allocates the node, returns it, nothing catches it, <code>root_</code> stays <code>nullptr</code> and the tree is still empty &mdash; with no error anywhere."],
         ["note", "<code>root_</code> and <code>Node*</code> never leave the class. The caller writes <code>bst.insert(50)</code> and never touches a pointer."]
       ] },
-    4: { src: "Node* insert_(Node* node, int value)",
+    4: { src: "Node* BinarySearchTree::insert_(Node* node, int value) {",
       what: "Takes the subtree to insert into, and returns that subtree with the value in it.",
       items: [
         ["why", "It returns a <code>Node*</code> rather than <code>void</code> so the caller can <strong>reattach</strong> the result. That is what makes the one-line <code>node->left = insert_(node->left, value)</code> work for both cases &mdash; an existing child comes back unchanged, an empty slot comes back as a brand new node."],
@@ -633,7 +641,7 @@ var LINE_INFO = {
         ["why", "One comparison eliminates an entire subtree. On a balanced tree that halves the remaining work, which is where O(log n) comes from."],
         ["trap", "On the <strong>ascending</strong> preset every value is larger than the one before, so this is never true and the tree becomes a straight line to the right. Height 4 for 5 nodes. Same code, O(n) behaviour &mdash; that is what AVL rotations exist to prevent."]
       ] },
-    10: { src: "node->left = insert_(node->left, value);",
+    10: { src: "node->left  = insert_(node->left,  value);",
       what: "Recurse into the left subtree, and assign the result back.",
       items: [
         ["syntax", "The assignment is not optional. <code>insert_(node->left, value);</code> on its own compiles, runs, allocates the node &mdash; and throws the pointer away."],
@@ -669,7 +677,7 @@ var LINE_INFO = {
       ] }
   },
   inorder: {
-    2: { src: "inorder_(node->left);",
+    2: { src: "inorder_(node->left, os);",
       what: "Finish the entire left subtree before this node is printed.",
       items: [["why", "Everything left of a node is smaller than it, so draining that side first is what makes the output sorted."]] },
     3: { src: "os << node->data",
@@ -737,18 +745,163 @@ LINE_INFO.apply = {
       ["syntax", "Call it with a <code class='inl'>SumFunctor</code> and the compiler generates a version of this function for <code class='inl'>SumFunctor</code>; call it with a <code class='inl'>CountFunctor</code> and it generates a second one. That is why the whole definition has to sit in the <strong>.h</strong> file."],
       ["why", "No virtual functions and no inheritance, so there is nothing to look up at run time &mdash; each generated version calls <code class='inl'>operator()</code> directly."]
     ] },
-  1: { src: "Functor& func",
+  1: { src: "void inorder_apply_(Node* node, Functor& func) const {",
     what: "By reference, so the functor you passed in is the one that gets updated.",
     items: [
+      ["note", "There is no <code class='inl'>BinarySearchTree::</code> here, because this is written inside the class in <code class='inl'>BinarySearchTree.h</code>. A template has to be visible wherever it is used."],
       ["why", "A stateful functor keeps its running total in a member. Take it by value and every call updates a copy, the copies are thrown away, and <code class='inl'>sf.total</code> reads 0 no matter how correct the traversal is."]
     ] },
   4: { src: "func(node->data);",
     what: "The one line that differs from inorder_.",
     items: [
       ["note", "<code class='inl'>inorder_</code> has <code class='inl'>os &lt;&lt; node-&gt;data</code> in exactly this slot. Same walk, same order, swappable action."],
-      ["why", "This is the payoff: printing, summing, counting and collecting are now four functors over ONE traversal, instead of four traversals."]
+      ["why", "This is the payoff: printing, summing and counting are now three functors over ONE traversal, instead of three traversals."]
     ] }
 };
+
+// The lines every traversal shares, then the ones that are its own. Clicking a
+// line that has no entry here does nothing, which the page promises it will not.
+function walkLines(order, rule) {
+  var fn = order + "_";
+  return {
+    0: { src: "void BinarySearchTree::" + fn + "(Node* node, std::ostream& os) const {",
+      what: "One call handles one node, and whatever is below it is handed to more calls.",
+      items: [
+        ["why", "This is the private helper. It takes a <code class='inl'>Node*</code> so each call can start somewhere different, which the public <code class='inl'>" + order + "()</code> cannot do: callers never see a node."],
+        ["note", "<code class='inl'>const</code> promises that this function does not change the tree. Walking it only reads."]
+      ] },
+    1: { src: "if (!node) return;",
+      what: "The base case: an empty slot has nothing to visit, so this call simply ends.",
+      items: [
+        ["why", "Every leaf makes two calls on <code class='inl'>nullptr</code>, so a tree of n nodes makes n + 1 of these empty calls. This one line is what stops all of them."],
+        ["trap", "Without it, the next line reads <code class='inl'>node-&gt;left</code> through a null pointer and the program crashes on the first leaf."]
+      ] },
+    5: { src: "}",
+      what: "This call is finished, and control goes back to the line that called it.",
+      items: [
+        ["why", "Nothing is returned, because the output has already been written to <code class='inl'>os</code>. The caller just carries on with its next line: " + rule + "."]
+      ] }
+  };
+}
+function addLines(key, extra) {
+  if (!LINE_INFO[key]) LINE_INFO[key] = {};
+  Object.keys(extra).forEach(function (n) { LINE_INFO[key][n] = extra[n]; });
+}
+addLines("inorder", walkLines("inorder", "the visit if it just finished its left side, or its own closing brace if it just finished its right"));
+addLines("preorder", walkLines("preorder", "the right call if it just finished its left side, or its own closing brace if it just finished its right"));
+addLines("postorder", walkLines("postorder", "the right call if it just finished its left side, or the visit if it just finished its right"));
+addLines("inorder", {
+  4: { src: "inorder_(node->right, os);",
+    what: "Everything to the right is larger, so it comes after this node.",
+    items: [["why", "With the left side and this node already printed, draining the right side finishes this subtree in sorted order."]] }
+});
+addLines("preorder", {
+  3: { src: "preorder_(node->left, os);",
+    what: "This node is already printed, so now its left subtree.",
+    items: [["why", "Each node prints before anything below it, so parents always come out ahead of their children."]] },
+  4: { src: "preorder_(node->right, os);",
+    what: "The left subtree is finished, so now the right.",
+    items: [["note", "Left before right is what makes the output rebuild the same shape: re-inserting it places each node on the same side of its parent."]] }
+});
+addLines("postorder", {
+  2: { src: "postorder_(node->left, os);",
+    what: "Nothing prints here yet. The left subtree has to finish first.",
+    items: [["why", "Post-order holds the visit back until both children are done, so this call does its recursion first."]] },
+  3: { src: "postorder_(node->right, os);",
+    what: "The left subtree is finished, and this node still has to wait for the right.",
+    items: [["trap", "Printing between these two calls would make this in-order. Where that one line sits is the only thing separating the three traversals."]] }
+});
+addLines("height", {
+  0: { src: "int BinarySearchTree::height_(Node* node) const {",
+    what: "Returns the height of the subtree starting at this node.",
+    items: [["why", "It returns an <code class='inl'>int</code> because each caller needs the answer to work out its own. Every node's height is built from its children's."]] },
+  3: { src: "int rh = height_(node->right);",
+    what: "Now measure the right side. One side alone says nothing about the longest path.",
+    items: [["trap", "Stop after the left side and any tree that is taller on the right reports the wrong height, with no crash to warn you."]] },
+  5: { src: "}",
+    what: "Execution never actually reaches this brace, because the line above always returns.",
+    items: [["note", "The step here shows the finished answer: what the outermost call handed back to <code class='inl'>height()</code>."]] }
+});
+addLines("destroy", {
+  0: { src: "void BinarySearchTree::destroy_(Node* node) {",
+    what: "Frees the whole subtree starting at this node.",
+    items: [["why", "The destructor calls this with <code class='inl'>root_</code>. It is not <code class='inl'>const</code>, because unlike the walks it really does change the tree."]] },
+  1: { src: "if (!node) return;",
+    what: "An empty slot has nothing to free, so this call simply ends.",
+    items: [["trap", "Without it, the next line reads <code class='inl'>node-&gt;left</code> through a null pointer and the program crashes on the first leaf. The <code class='inl'>delete</code> is not the problem here: deleting <code class='inl'>nullptr</code> is legal."]] },
+  3: { src: "destroy_(node->right);",
+    what: "The left subtree is gone, and the right one is still only reachable through this node.",
+    items: [["why", "This is why <code class='inl'>delete node</code> has to wait one more line. Free it here and the right subtree leaks."]] },
+  5: { src: "}",
+    what: "This node is freed, and control goes back to the call on its parent.",
+    items: [["note", "The parent still holds a pointer to the freed node, which would normally be dangerous. It is harmless here because nothing reads that pointer again before the parent is freed too."]] }
+});
+addLines("insert", {
+  0: { src: "void BinarySearchTree::insert(int value) {",
+    what: "The public function. Callers hand over a value and never see a node.",
+    items: [["why", "The recursion needs a <code class='inl'>Node*</code> to work on, and <code class='inl'>Node*</code> is private. So this function's only job is to start the helper at the root."]] },
+  2: { src: "}",
+    what: "This insert is finished, and <code class='inl'>root_</code> points at the tree with the value in it.",
+    items: [["note", "A duplicate ends here too, with the tree unchanged. <code class='inl'>insert</code> returns nothing, so the caller cannot tell the difference."]] },
+  7: { src: "}",
+    what: "Closes the base case. Execution never reaches it, because the line above always returns.",
+    items: [["why", "The braces are there for reading, not for the compiler. They keep the test and the allocation as two separate steps, which is what they are."]] },
+  11: { src: "} else if (value > node->data) {",
+    what: "Not smaller, so ask whether it is larger.",
+    items: [
+      ["why", "This is a second test rather than a plain <code class='inl'>else</code> because there is a third possibility: the value is already here."],
+      ["trap", "Write a plain <code class='inl'>else</code> and duplicates go right, so the tree quietly stores copies of a value it should only hold once."]
+    ] },
+  12: { src: "node->right = insert_(node->right, value);",
+    what: "Insert into the right subtree, and store whatever comes back as the right child.",
+    items: [
+      ["why", "Most of the time this writes back the pointer that was already there. It only changes anything on the call just above a new node, but the line cannot know which call that is."],
+      ["trap", "Drop the <code class='inl'>node-&gt;right =</code> and the new node is allocated, returned and lost. Nothing crashes: the value just is not in the tree, and the memory leaks."]
+    ] },
+  13: { src: "}",
+    what: "The end of the three-way choice.",
+    items: [["note", "Control arrives here after a recursive call returns, or straight away for a duplicate. Both paths go on to <code class='inl'>return node</code>."]] },
+  17: { src: "}",
+    what: "End of the helper. Execution never reaches it, because <code class='inl'>return node</code> above always runs first.",
+    items: [["note", "Every path through this function returns a pointer, which is what lets each caller reattach the result."]] }
+});
+addLines("search", {
+  0: { src: "bool BinarySearchTree::search_(Node* node, int value) const {",
+    what: "Answers one question: is this value in the subtree starting here?",
+    items: [["why", "It returns a <code class='inl'>bool</code> because that is all the caller needs, and it is <code class='inl'>const</code> because looking does not change the tree. Compare <code class='inl'>insert_</code>, which returns a <code class='inl'>Node*</code> so it can reattach."]] },
+  5: { src: "return search_(node->left, value);",
+    what: "Search the left subtree, and that answer becomes this call's answer.",
+    items: [
+      ["why", "Nothing is left to do here once the deeper call answers, so its result is simply passed straight back up."],
+      ["trap", "Leave off <code class='inl'>return</code> and the answer is thrown away. The function then runs off its end without returning a value, which is undefined behavior."]
+    ] },
+  6: { src: "} else {",
+    what: "Not equal and not smaller, so the value can only be larger.",
+    items: [["why", "No third test is needed here, because the equal case already returned two lines up. Compare <code class='inl'>insert_</code>, which has to test twice."]] },
+  7: { src: "return search_(node->right, value);",
+    what: "Search the right subtree, and that answer becomes this call's answer.",
+    items: [["note", "Only one of these two calls ever runs. That is why search follows a single path down the tree, while a traversal has to visit every node."]] },
+  8: { src: "}",
+    what: "Closes the if/else. Execution never reaches it, because both branches return.",
+    items: [["note", "Every recursive call in this function is the last thing its branch does."]] },
+  9: { src: "}",
+    what: "End of the function. Execution never reaches it, because every path has already returned.",
+    items: [["note", "Unlike the traversals, nothing happens after a recursive call comes back. Each call just passes the answer up."]] }
+});
+addLines("apply", {
+  2: { src: "if (!node) return;",
+    what: "The base case, exactly as in <code class='inl'>inorder_</code>.",
+    items: [["why", "The functor is only called on real nodes, so an empty slot adds nothing to a sum or a count."]] },
+  3: { src: "inorder_apply_(node->left, func);",
+    what: "Everything smaller goes to the functor first.",
+    items: [["why", "<code class='inl'>func</code> is passed along by reference, so every call in the recursion is updating the same functor object."]] },
+  5: { src: "inorder_apply_(node->right, func);",
+    what: "Everything larger goes to the functor after this node.",
+    items: [["note", "Same as <code class='inl'>inorder_</code>, so the functor always sees the values in sorted order."]] },
+  6: { src: "}",
+    what: "This call is finished, and control goes back to the line that called it.",
+    items: [["why", "Nothing is returned. Any result lives in the functor's members, which is why you read <code class='inl'>sf.total</code> after the call finishes."]] }
+});
 
 // ---------------------------------------------------------------------------
 // GUIDE -- the "How it works" panel, one entry per mode.
@@ -971,19 +1124,21 @@ var STEP_TAG = {
                5: "is this slot empty?", 6: "allocating the node",
                9: "comparing", 10: "the left call", 11: "comparing",
                12: "the right call", 14: "a duplicate", 16: "handing it back" },
-  search:    { 1: "fell off the tree", 2: "found it", 4: "comparing" },
-  inorder:   { 0: "entering the call", 1: "the bottom", 2: "down the left",
-               3: "visiting this node", 4: "down the right" },
-  preorder:  { 0: "entering the call", 1: "the bottom", 2: "visiting this node",
-               3: "down the left", 4: "down the right" },
-  postorder: { 0: "entering the call", 1: "the bottom", 2: "down the left",
-               3: "down the right", 4: "visiting this node" },
-  height:    { 1: "empty subtree", 2: "asking the left", 3: "asking the right",
-               4: "taller side, plus one" },
-  destroy:   { 1: "nothing to free", 2: "freeing the left", 3: "freeing the right",
-               4: "deleting this node" },
-  apply:     { 2: "the bottom", 3: "down the left", 4: "calling the functor",
-               5: "down the right" }
+  search:    { 0: "entering the call", 1: "is there a node here?", 2: "is this the value?",
+               4: "which side?", 5: "the left call", 6: "the other side", 7: "the right call" },
+  inorder:   { 0: "entering the call", 1: "is there a node here?", 2: "down the left",
+               3: "visiting this node", 4: "down the right", 5: "back to the caller" },
+  preorder:  { 0: "entering the call", 1: "is there a node here?", 2: "visiting this node",
+               3: "down the left", 4: "down the right", 5: "back to the caller" },
+  postorder: { 0: "entering the call", 1: "is there a node here?", 2: "down the left",
+               3: "down the right", 4: "visiting this node", 5: "back to the caller" },
+  height:    { 0: "entering the call", 1: "is there a node here?", 2: "asking the left",
+               3: "asking the right", 4: "taller side, plus one", 5: "the answer" },
+  destroy:   { 0: "entering the call", 1: "is there a node here?", 2: "freeing the left",
+               3: "freeing the right", 4: "deleting this node", 5: "back to the caller" },
+  apply:     { 0: "picking the functor", 1: "entering the call", 2: "is there a node here?",
+               3: "down the left", 4: "calling the functor", 5: "down the right",
+               6: "back to the caller" }
 };
 
 // Which How-it-works step each line of each listing belongs to. Derived from
@@ -991,13 +1146,13 @@ var STEP_TAG = {
 // its highlighted line does not belong to.
 var PHASE_OF = {
   insert:    { 1: 2, 5: 1, 6: 1, 9: 0, 10: 2, 11: 0, 12: 2, 14: 0, 16: 2 },
-  search:    { 1: 2, 2: 0, 3: 1, 4: 1 },
-  inorder:   { 0: 2, 1: 0, 2: 1, 3: 1, 4: 1 },
-  preorder:  { 0: 2, 1: 0, 2: 1, 3: 1, 4: 1 },
-  postorder: { 0: 2, 1: 0, 2: 1, 3: 1, 4: 1 },
-  height:    { 1: 0, 2: 1, 3: 1, 4: 2, 5: 2 },
-  destroy:   { 1: 0, 2: 1, 3: 1, 4: 2, 5: 2 },
-  apply:     { 2: 0, 3: 1, 4: 2, 5: 1, 6: 2 }
+  search:    { 0: 0, 1: 0, 2: 0, 4: 1, 5: 1, 6: 1, 7: 1 },
+  inorder:   { 0: 0, 1: 0, 2: 1, 3: 1, 4: 1, 5: 1 },
+  preorder:  { 0: 0, 1: 0, 2: 1, 3: 1, 4: 1, 5: 1 },
+  postorder: { 0: 0, 1: 0, 2: 1, 3: 1, 4: 1, 5: 1 },
+  height:    { 0: 0, 1: 0, 2: 1, 3: 1, 4: 2, 5: 2 },
+  destroy:   { 0: 0, 1: 0, 2: 1, 3: 1, 4: 2, 5: 2 },
+  apply:     { 0: 0, 1: 0, 2: 0, 3: 1, 4: 2, 5: 1, 6: 1 }
 };
 
 // The phase a FRAME is in. Lines 4 and 6 of insert run in both directions and
@@ -1022,6 +1177,7 @@ function buildInsert(seq) {
   var frames = [], root = null;
 
   frames.push(F({ tree: null, line: 0, stack: [],
+    calc: "root_ = nullptr\nthe tree is empty, so the first value will become the root",
     head: "Start with an empty tree. <code>root</code> is <code>nullptr</code>.",
     why: ["every insert below walks down from the root, comparing as it goes"] }));
 
@@ -1225,6 +1381,7 @@ function buildInsert(seq) {
 
   var last = frames[frames.length - 1];
   frames.push(F({ tree: clone(root), line: 2, stack: [], phase: 2, tag: "every value is in",
+    calc: "every insert has returned\n" + countOf(root) + " nodes, height " + heightOf(root),
     head: "Done. " + countOf(root) + " nodes, height <strong>" + heightOf(root) + "</strong>.",
     why: ["in-order on this tree reads " + walk(root, "inorder", []).join(", "),
           heightOf(root) >= seq.length - 1
@@ -1235,102 +1392,212 @@ function buildInsert(seq) {
 }
 
 function buildSearch(root, target) {
-  var frames = [], path = [], found = false, comps = 0;
+  var frames = [], path = [], comps = 0;
+  var plural = function (c) { return c + " comparison" + (c === 1 ? "" : "s"); };
 
-  (function go(node) {
+  function snap(o) {
+    o.tree = clone(root);
+    if (!o.path) o.path = vals(path);
+    if (!o.stack) o.stack = vals(path);
+    o.comps = comps;
+    frames.push(F(o));
+  }
+
+  // Returns the answer, because each call hands it back up through a real line
+  // of code. The last frame is therefore the root's return, carrying the result.
+  (function go(node, parent, side) {
+    var callArg = parent ? "node->" + side : "root_";
+    snap({ line: 0, hit: node ? node.v : undefined,
+      stack: node ? vals(path).concat([node.v]) : nullStack(path),
+      path: node ? vals(path).concat([node.v]) : vals(path),
+      carry: node ? { v: target } : undefined,
+      calc: "search_(" + callArg + ", " + target + ")\n" +
+            "node = " + childName(node) + (parent ? ",  the " + side + " child of " + parent.v : ",  the root"),
+      head: node
+        ? "A new call, on <strong>" + node.v + "</strong>"
+        : "A new call, on <code>nullptr</code> &mdash; " + parent.v + " has no " + side + " child",
+      why: ["each call only ever looks at one node"] });
+
     if (!node) {
-      frames.push(F({ tree: clone(root), line: 1, path: vals(path),
-        stack: path.map(function (n) { return n.v; }),
-        calc: "!node   \u2192   return false\n" + comps + " comparison" +
-              (comps === 1 ? "" : "s") + " spent, the same a hit here would have cost",
+      snap({ line: 1, phase: 2, tag: "fell off the tree", stack: nullStack(path),
+        calc: "!node   →   return false\n" + plural(comps) +
+              " spent, the same a hit here would have cost",
         head: "Fell off the bottom &mdash; <strong>" + target + "</strong> is not in this tree.",
         why: ["<code>!node</code>, so the answer is false",
-              "a miss costs the same " + comps + " comparison" + (comps === 1 ? "" : "s") +
-              " a hit at this depth would have"], comps: comps, done: "miss" }));
-      return;
+              "a miss costs the same " + plural(comps) + " a hit at this depth would have"],
+        done: "miss" });
+      return false;
     }
+
     path.push(node);
+    snap({ line: 1, hit: node.v, carry: { v: target },
+      calc: "!node   →   false, node is " + node.v + "\nso there is a value to compare",
+      head: "<strong>" + node.v + "</strong> is a real node, so keep going",
+      why: ["the guard runs on every call, not only the ones that land on nothing"] });
+
     comps++;
     if (target === node.v) {
-      found = true;
-      frames.push(F({ tree: clone(root), line: 2, hit: node.v, path: vals(path),
-        stack: path.map(function (n) { return n.v; }),
+      snap({ line: 2, hit: node.v, tag: "found it",
         test: { q: target + " == " + node.v, yes: true, res: "found it" },
         carry: { v: target, tag: "✔" },
-        calc: target + " == " + node.v + "   \u2192   return true\n" +
-                "found in " + comps + " comparison" + (comps === 1 ? "" : "s") +
-                "; nothing below this node was ever read",
-        head: "Found <strong>" + target + "</strong> after " + comps + " comparison" +
-              (comps === 1 ? "" : "s") + ".",
-        why: ["<code>return true</code> unwinds the whole stack at once",
-              "nothing below this node was ever looked at"], comps: comps, done: "hit" }));
-      return;
+        calc: target + " == " + node.v + "   →   return true\n" +
+              "found in " + plural(comps) + "; nothing below this node was ever read",
+        head: "Found <strong>" + target + "</strong> after " + plural(comps) + ".",
+        why: ["<code>return true</code> starts the answer back up the stack",
+              "nothing below this node was ever looked at"], done: "hit" });
+      path.pop();
+      return true;
     }
+    snap({ line: 2, hit: node.v,
+      test: { q: target + " == " + node.v, yes: false, res: "not this node" },
+      carry: { v: target },
+      calc: target + " == " + node.v + "   →   false\nnot this node, so choose a side",
+      head: "<strong>" + node.v + "</strong> is not the value",
+      why: ["comparisons so far: " + comps] });
+
     var goLeft = target < node.v;
-    frames.push(F({ tree: clone(root), line: 4, hit: node.v, path: vals(path),
-      stack: path.map(function (n) { return n.v; }),
-      test: { q: target + (goLeft ? " &lt; " : " &gt; ") + node.v, yes: true,
-              res: "go " + (goLeft ? "left" : "right") },
+    var skipped = goLeft ? countOf(node.r) : countOf(node.l);
+    var gone = (goLeft ? "right" : "left") + " subtree (" + skipped + " node" +
+               (skipped === 1 ? "" : "s") + ") is now out of the search, unread";
+    snap({ line: 4, hit: node.v,
+      test: { q: target + " &lt; " + node.v, yes: goLeft, res: goLeft ? "go left" : "no, so not left" },
       carry: { v: target, tag: goLeft ? "<  ↙" : ">  ↘" },
-      calc: target + (goLeft ? " < " : " > ") + node.v + "   \u2192   go " +
-              (goLeft ? "left" : "right") + "\nthe " + (goLeft ? "right" : "left") +
-              " subtree (" + (goLeft ? countOf(node.r) : countOf(node.l)) +
-              " nodes) is now out of the search, unread",
-      head: "At " + node.v + ": go " + (goLeft ? "left" : "right"),
-      why: ["the " + (goLeft ? "right" : "left") + " subtree is eliminated without being looked at",
-            "comparisons so far: " + comps], comps: comps }));
-    go(goLeft ? node.l : node.r);
-  })(root);
+      calc: target + " < " + node.v + "   →   " + (goLeft ? "true" : "false") + "\n" +
+            (goLeft ? "the " + gone : "so the value can only be on the right"),
+      head: goLeft ? "At " + node.v + ": go left" : "At " + node.v + ": not smaller, so not the left side",
+      why: goLeft ? ["the right subtree is eliminated without being looked at"]
+                  : ["the equal case has already been ruled out, so one test is enough"] });
+    if (!goLeft) {
+      snap({ line: 6, hit: node.v, carry: { v: target, tag: ">  ↘" },
+        calc: "else   →   " + target + " is larger than " + node.v + "\nthe " + gone,
+        head: "At " + node.v + ": go right",
+        why: ["the left subtree is eliminated without being looked at"] });
+    }
+
+    var callLine = goLeft ? 5 : 7, nextSide = goLeft ? "left" : "right";
+    var child = goLeft ? node.l : node.r;
+    snap({ line: callLine, hit: node.v, carry: { v: target },
+      calc: "return search_(node->" + nextSide + ", " + target + ")\nnode->" + nextSide + " is " +
+            childName(child) + "   →   a new call on " + childName(child),
+      head: "From <strong>" + node.v + "</strong>, search the " + nextSide + " subtree",
+      why: ["this call has nothing left to do except pass the answer back"] });
+    var answer = go(child, node, nextSide);
+
+    var word = answer ? "true" : "false";
+    snap({ line: callLine, hit: node.v, phase: answer ? 0 : 2, tag: "handing the answer back",
+      calc: "search_(" + childName(child) + ", " + target + ") returned " + word + "\n" +
+            (parent ? "so the call on " + node.v + " returns " + word + " to the call on " + parent.v
+                    : "so search() returns " + word),
+      head: parent
+        ? "<strong>" + word + "</strong> passes back through " + node.v
+        : "<code>search(" + target + ")</code> returns <strong>" + word + "</strong>, after " + plural(comps),
+      why: ["no work happens on the way back up: each call just passes the answer along"],
+      done: answer ? "hit" : "miss" });
+    path.pop();
+    return answer;
+  })(root, null, null);
 
   return frames;
 }
 
-function buildTraversal(root, order) {
-  var frames = [], out = [], path = [];
+// A call that lands on nullptr is still a call, so it gets its own entry on the
+// stack rather than being reported as the parent.
+function childName(n) { return n ? String(n.v) : "nullptr"; }
+function nullStack(path) { return vals(path).concat(["nullptr"]); }
 
-  var visitLine = { inorder: 3, preorder: 2, postorder: 4 };
-  (function go(node) {
+// Every line of the listing that runs gets a step: the call arriving, the guard,
+// both recursive calls, the visit, and the closing brace on the way back up.
+function buildTraversal(root, order) {
+  var frames = [], out = [], path = [], fn = order + "_";
+  var LINE = { inorder:   { left: 2, visit: 3, right: 4 },
+               preorder:  { visit: 2, left: 3, right: 4 },
+               postorder: { left: 2, right: 3, visit: 4 } }[order];
+  var SAY = {
+    inorder:   { left:  "in-order finishes the whole left side before printing anything here",
+                 right: "this node is already printed; everything to its right is larger" },
+    preorder:  { left:  "this node is already printed, so everything below prints after it",
+                 right: "the left side is finished; the right side is all that remains" },
+    postorder: { left:  "nothing prints here yet; both children have to finish first",
+                 right: "still nothing printed here; the right subtree has to finish too" }
+  }[order];
+
+  function snap(o) {
+    o.tree = clone(root);
+    o.out = out.slice();
+    o.done = out.slice();
+    if (!o.stack) o.stack = vals(path);
+    if (!o.path) o.path = vals(path);
+    frames.push(F(o));
+  }
+
+  (function go(node, parent, side) {
+    var callArg = parent ? "node->" + side : "root_";
+    snap({ line: 0, hit: node ? node.v : undefined,
+      stack: node ? vals(path).concat([node.v]) : nullStack(path),
+      path: node ? vals(path).concat([node.v]) : vals(path),
+      calc: fn + "(" + callArg + ", os)\n" +
+            "node = " + childName(node) + (parent ? ",  the " + side + " child of " + parent.v : ",  the root"),
+      head: node
+        ? "A new call, on <strong>" + node.v + "</strong>"
+        : "A new call, on <code>nullptr</code> &mdash; " + parent.v + " has no " + side + " child",
+      why: ["every node is reached by one call, and so is every empty slot below it"] });
     if (!node) {
-      frames.push(F({ tree: clone(root), line: 1, out: out.slice(), path: vals(path),
-        stack: path.map(function (n) { return n.v; }),
-        head: "Empty &mdash; <code>return</code>, and back up to the caller.",
-        why: ["the base case does nothing at all; it just stops the recursion"] }));
+      snap({ line: 1, stack: nullStack(path),
+        calc: "!node   →   true, node is nullptr\nreturn, back to the call on " + parent.v,
+        head: "Empty &mdash; <code>return</code>, and back up to <strong>" + parent.v + "</strong>",
+        why: ["the base case does nothing at all; it just stops the recursion"] });
       return;
     }
     path.push(node);
-    if (order === "preorder") {
+    snap({ line: 1, hit: node.v,
+      calc: "!node   →   false, node is " + node.v + "\nso the rest of this call runs",
+      head: "<strong>" + node.v + "</strong> is a real node, so keep going",
+      why: ["the guard runs on every call, not only the ones that land on nothing"] });
+
+    function visit() {
       out.push(node.v);
-      frames.push(F({ tree: clone(root), line: 2, out: out.slice(), hit: node.v,
-        path: vals(path), done: out.slice(), stack: vals(path),
-        head: "Visit <strong>" + node.v + "</strong> &mdash; before either subtree",
-        why: ["pre-order prints on the way <em>in</em>"] }));
+      snap({ line: LINE.visit, hit: node.v, done: out.slice(),
+        calc: "os << node->data << \" \"\nprints " + node.v + ",  output is now: " + out.join(" "),
+        head: "Visit <strong>" + node.v + "</strong> &mdash; " +
+              (order === "inorder" ? "its whole left side is finished"
+               : order === "preorder" ? "before either subtree" : "both subtrees are done"),
+        why: [order === "inorder" ? "everything printed so far is smaller than " + node.v
+              : order === "preorder" ? "pre-order prints on the way <em>in</em>"
+              : "every child of " + node.v + " was printed before it"] });
     }
-    go(node.l);
-    if (order === "inorder") {
-      out.push(node.v);
-      frames.push(F({ tree: clone(root), line: 3, out: out.slice(), hit: node.v,
-        path: vals(path), done: out.slice(), stack: vals(path),
-        head: "Visit <strong>" + node.v + "</strong> &mdash; its whole left side is finished",
-        why: ["everything printed so far is smaller than " + node.v] }));
+    function down(sideName) {
+      var child = sideName === "left" ? node.l : node.r;
+      snap({ line: LINE[sideName], hit: node.v,
+        calc: fn + "(node->" + sideName + ", os)\nnode->" + sideName + " is " + childName(child) +
+              "   →   a new call on " + childName(child),
+        head: "From <strong>" + node.v + "</strong>, down the " + sideName,
+        why: [SAY[sideName]] });
+      go(child, node, sideName);
     }
-    go(node.r);
-    if (order === "postorder") {
-      out.push(node.v);
-      frames.push(F({ tree: clone(root), line: 4, out: out.slice(), hit: node.v,
-        path: vals(path), done: out.slice(), stack: vals(path),
-        head: "Visit <strong>" + node.v + "</strong> &mdash; both subtrees are done",
-        why: ["every child of " + node.v + " was printed before it"] }));
+
+    if (order === "preorder") visit();
+    down("left");
+    if (order === "inorder") visit();
+    down("right");
+    if (order === "postorder") visit();
+
+    if (parent) {
+      snap({ line: 5, hit: node.v, phase: 1,
+        calc: fn + "(" + node.v + ", os) is finished\nback to the call on " + parent.v,
+        head: "<strong>" + node.v + "</strong> is finished &mdash; back up to <strong>" + parent.v + "</strong>",
+        why: ["the whole subtree under " + node.v + " has now been visited"] });
     }
     path.pop();
-  })(root);
+  })(root, null, null);
 
-  frames.push(F({ tree: clone(root), line: 0, out: out.slice(), done: out.slice(), stack: [],
+  snap({ line: 5, phase: 2, tag: "every node visited", stack: [], path: [],
+    calc: fn + "(root_, os) is finished\noutput: " + out.join(" "),
     head: "Done &mdash; " + out.join(", "),
     why: [order === "inorder"
             ? "sorted, because in-order reads a BST left to right"
             : order === "preorder"
               ? "root first &mdash; re-inserting this sequence rebuilds the identical tree"
-              : "children always before parents &mdash; this is the order a destructor must use"] }));
+              : "children always before parents &mdash; this is the order a destructor must use"] });
   return frames;
 }
 
@@ -1341,46 +1608,64 @@ function buildHeight(root) {
 
   function snap(o) {
     o.tree = clone(root);
-    o.stack = vals(path);
+    if (!o.stack) o.stack = vals(path);
     o.labels = JSON.parse(JSON.stringify(labels));
     frames.push(F(o));
   }
 
-  var h = (function go(node) {
+  var h = (function go(node, parent, side) {
+    var callArg = parent ? "node->" + side : "root_";
+    snap({ line: 0, hit: node ? node.v : undefined,
+      stack: node ? vals(path).concat([node.v]) : nullStack(path),
+      path: node ? vals(path).concat([node.v]) : vals(path),
+      calc: "height_(" + callArg + ")\n" +
+            "node = " + childName(node) + (parent ? ",  the " + side + " child of " + parent.v : ",  the root"),
+      head: node
+        ? "A new call, on <strong>" + node.v + "</strong>"
+        : "A new call, on <code>nullptr</code> &mdash; " + parent.v + " has no " + side + " child",
+      why: ["nothing can be returned yet; this call only just started"] });
     if (!node) {
-      snap({ line: 1, path: vals(path),
-        calc: "!node   \u2192   return \u22121\n" +
-              "\u22121 is chosen so a leaf comes out 1 + max(\u22121, \u22121) = 0",
+      snap({ line: 1, path: vals(path), stack: nullStack(path),
+        calc: "!node   →   return −1\n" +
+              "−1 is chosen so a leaf comes out 1 + max(−1, −1) = 0",
         head: "Empty &mdash; <code>return -1</code>",
         why: ["an empty subtree has height &minus;1, which is what makes a leaf come out 0"] });
       return -1;
     }
     path.push(node);
+    snap({ line: 1, hit: node.v, path: vals(path),
+      calc: "!node   →   false, node is " + node.v + "\nso this call has to measure its children",
+      head: "<strong>" + node.v + "</strong> is a real node, so keep going",
+      why: ["the guard runs on every call, not only the ones that land on nothing"] });
     snap({ line: 2, hit: node.v, path: vals(path),
+      calc: "int lh = height_(node->left)\nnode->left is " + childName(node.l) +
+            "   →   a new call on " + childName(node.l),
       head: "At <strong>" + node.v + "</strong> &mdash; ask the left subtree first",
       why: [node.v + " cannot know its own height until both children have reported"] });
-    var lh = go(node.l);
+    var lh = go(node.l, node, "left");
 
+    var num = function (x) { return x < 0 ? "−" + Math.abs(x) : String(x); };
     snap({ line: 3, hit: node.v, path: vals(path),
+      calc: "int rh = height_(node->right)\nlh came back " + num(lh) + ",  node->right is " +
+            childName(node.r) + "   →   a new call on " + childName(node.r),
       head: "Left of <strong>" + node.v + "</strong> came back <strong>" + lh +
             "</strong> &mdash; now the right",
       why: ["one side is not enough; height is the longest path, so both must be measured"] });
-    var rh = go(node.r);
+    var rh = go(node.r, node, "right");
 
     var own = 1 + Math.max(lh, rh);
     labels[node.v] = own;
-    path.pop();
-    snap({ line: 4, hit: node.v, path: vals(path).concat([node.v]),
+    snap({ line: 4, hit: node.v, path: vals(path),
       calc: (function () {
         // Parenthesise negatives -- "1 + -1" reads as a typo. And a leaf
         // has no children, so "the edge down to the taller side" would be
         // describing something that is not there.
-        var n = function (x) { return x < 0 ? "(\u2212" + Math.abs(x) + ")" : String(x); };
+        var n = function (x) { return x < 0 ? "(−" + Math.abs(x) + ")" : String(x); };
         var top = Math.max(lh, rh);
         return "1 + max(left, right)\n" +
                "1 + max(" + n(lh) + ", " + n(rh) + ")  =  1 + " + n(top) + "  =  " + own +
                "\n" + (lh === -1 && rh === -1
-                  ? node.v + " is a leaf \u2014 no children, so its height is 0"
+                  ? node.v + " is a leaf — no children, so its height is 0"
                   : "the +1 is the edge from " + node.v + " down to the taller side");
       })(),
       head: "<strong>" + node.v + "</strong> returns <strong>" + own + "</strong> &mdash; 1 + max(" +
@@ -1389,10 +1674,12 @@ function buildHeight(root) {
                        : "the " + (lh > rh ? "left" : "right") + " side is taller, at " +
                          Math.max(lh, rh) + " &mdash; the shorter side is ignored entirely"),
             "the +1 is the edge from " + node.v + " down to that taller side"] });
+    path.pop();
     return own;
-  })(root);
+  })(root, null, null);
 
   snap({ line: 5, path: [],
+    calc: "height_(root_) returned " + h + "\nso height() returns " + h,
     head: "Height is <strong>" + h + "</strong>",
     why: [h === countOf(root) - 1
             ? "that is n&minus;1 &mdash; this tree is a spine, and every operation on it is O(n)"
@@ -1407,38 +1694,66 @@ function buildDestroy(root) {
 
   function snap(o) {
     o.tree = clone(root);
-    o.stack = vals(path);
+    if (!o.stack) o.stack = vals(path);
     o.freed = freed.slice();
     frames.push(F(o));
   }
 
-  (function go(node) {
+  (function go(node, parent, side) {
+    var callArg = parent ? "node->" + side : "root_";
+    snap({ line: 0, hit: node ? node.v : undefined,
+      stack: node ? vals(path).concat([node.v]) : nullStack(path),
+      path: node ? vals(path).concat([node.v]) : vals(path),
+      calc: "destroy_(" + callArg + ")\n" +
+            "node = " + childName(node) + (parent ? ",  the " + side + " child of " + parent.v : ",  the root"),
+      head: node
+        ? "A new call, on <strong>" + node.v + "</strong>"
+        : "A new call, on <code>nullptr</code> &mdash; " + parent.v + " has no " + side + " child",
+      why: ["nothing is deleted on the way down; that all happens on the way back up"] });
     if (!node) {
-      snap({ line: 1, path: vals(path),
+      snap({ line: 1, path: vals(path), stack: nullStack(path),
+        calc: "!node   →   true, node is nullptr\nreturn, back to the call on " + parent.v,
         head: "Empty &mdash; <code>return</code>, nothing to free",
         why: ["<code>delete nullptr</code> would be legal, but there is no node here to delete"] });
       return;
     }
     path.push(node);
+    snap({ line: 1, hit: node.v, path: vals(path),
+      calc: "!node   →   false, node is " + node.v + "\nso there is something to free",
+      head: "<strong>" + node.v + "</strong> is a real node, so keep going",
+      why: ["the guard runs on every call, not only the ones that land on nothing"] });
     snap({ line: 2, hit: node.v, path: vals(path),
+      calc: "destroy_(node->left)\nnode->left is " + childName(node.l) +
+            "   →   a new call on " + childName(node.l),
       head: "At <strong>" + node.v + "</strong> &mdash; go left before freeing anything",
       why: ["if " + node.v + " were deleted now, both of its child pointers would go with it"] });
-    go(node.l);
+    go(node.l, node, "left");
 
     snap({ line: 3, hit: node.v, path: vals(path),
+      calc: "destroy_(node->right)\nnode->right is " + childName(node.r) +
+            "   →   a new call on " + childName(node.r),
       head: "Left of <strong>" + node.v + "</strong> is freed &mdash; now the right",
       why: ["still not safe to delete " + node.v + ": its right subtree is only reachable through it"] });
-    go(node.r);
+    go(node.r, node, "right");
 
     freed.push(node.v);
-    path.pop();
-    snap({ line: 4, hit: node.v, path: vals(path),
+    snap({ line: 4, hit: node.v, path: vals(path).slice(0, -1),
+      calc: "delete node\nfrees " + node.v + ",  freed so far: " + freed.join(" "),
       head: "<code>delete</code> <strong>" + node.v + "</strong> &mdash; both children are gone",
       why: ["nothing below " + node.v + " is reachable through it any more, so nothing leaks",
             freed.length + " of " + countOf(root) + " nodes freed"] });
-  })(root);
+    if (parent) {
+      snap({ line: 5, path: vals(path).slice(0, -1),
+        calc: "destroy_(" + node.v + ") is finished\nback to the call on " + parent.v,
+        head: "Back up to <strong>" + parent.v + "</strong>",
+        why: ["the pointer to " + node.v + " still sits in " + parent.v + ", but " + parent.v +
+              " is about to be freed too, so nothing reads it again"] });
+    }
+    path.pop();
+  })(root, null, null);
 
   snap({ line: 5, path: [],
+    calc: "destroy_(root_) is finished\nfreed " + freed.length + " of " + countOf(root) + " nodes",
     head: "All " + countOf(root) + " nodes freed",
     why: ["the order was " + freed.join(", ") + " &mdash; the same order post-order traversal prints",
           "a parent is never freed before its children, which is the whole point"] });
@@ -1447,17 +1762,36 @@ function buildDestroy(root) {
 
 // inorder_apply with a functor. Same walk as in-order; only the action differs.
 var FUNCTORS = {
-  print: { label: "PrintFunctor", kind: "stateless",
+  // code is Functors.h, and hot is the lines operator() runs on each visit.
+  print: { label: "PrintFunctor", kind: "stateless", hot: [2],
+           code: ["struct PrintFunctor {",
+                  "    void operator()(int value) {",
+                  "        std::cout << value << \" \";",
+                  "    }",
+                  "};"],
            init: function () { return { out: [] }; },
            step: function (st, v) { st.out.push(v); },
            show: function (st) { return st.out.length ? st.out.join(" ") : "&mdash;"; },
            chip: "printed", state: function () { return "no members &mdash; nothing to carry"; } },
-  sum:   { label: "SumFunctor", kind: "stateful",
+  sum:   { label: "SumFunctor", kind: "stateful", hot: [3],
+           code: ["struct SumFunctor {",
+                  "    int total = 0;",
+                  "    void operator()(int value) {",
+                  "        total += value;",
+                  "    }",
+                  "};"],
            init: function () { return { total: 0 }; },
            step: function (st, v) { st.total += v; },
            show: function (st) { return String(st.total); },
            chip: "total", state: function (st) { return "total = " + st.total; } },
-  count: { label: "CountFunctor", kind: "stateful",
+  count: { label: "CountFunctor", kind: "stateful", hot: [3, 4],
+           code: ["struct CountFunctor {",
+                  "    int count = 0;",
+                  "    void operator()(int value) {",
+                  "        (void)value;  // unused \u2014 we only care about the count",
+                  "        count++;",
+                  "    }",
+                  "};"],
            init: function () { return { count: 0 }; },
            step: function (st) { st.count += 1; },
            show: function (st) { return String(st.count); },
@@ -1469,39 +1803,81 @@ function buildApply(root, which) {
 
   function snap(o) {
     o.tree = clone(root);
-    o.stack = vals(path);
+    if (!o.stack) o.stack = vals(path);
     o.done = seen.slice();
     o.functor = { label: fn.label, kind: fn.kind, chip: fn.chip,
                   value: fn.show(st), state: fn.state(st) };
     frames.push(F(o));
   }
 
-  (function go(node) {
+  snap({ line: 0, path: [],
+    calc: "Functor = " + fn.label + "\nthe compiler generates this version of the function",
+    head: "<code>Functor</code> becomes <strong>" + fn.label + "</strong>",
+    why: ["the walk below is written once, and works for any type that can be called with an int"] });
+
+  (function go(node, parent, side) {
+    var callArg = parent ? "node->" + side : "root_";
+    snap({ line: 1, hit: node ? node.v : undefined,
+      stack: node ? vals(path).concat([node.v]) : nullStack(path),
+      path: node ? vals(path).concat([node.v]) : vals(path),
+      calc: "inorder_apply_(" + callArg + ", func)\n" +
+            "node = " + childName(node) + (parent ? ",  the " + side + " child of " + parent.v : ",  the root"),
+      head: node
+        ? "A new call, on <strong>" + node.v + "</strong>"
+        : "A new call, on <code>nullptr</code> &mdash; " + parent.v + " has no " + side + " child",
+      why: ["<code>func</code> is passed by reference, so every call shares one functor"] });
     if (!node) {
-      snap({ line: 2, path: vals(path),
+      snap({ line: 2, path: vals(path), stack: nullStack(path),
+        calc: "!node   →   true, node is nullptr\nreturn, back to the call on " + parent.v,
         head: "Empty &mdash; <code>return</code>",
         why: ["the functor is not called here; only real nodes get the action"] });
       return;
     }
     path.push(node);
+    snap({ line: 2, hit: node.v, path: vals(path),
+      calc: "!node   →   false, node is " + node.v + "\nso the rest of this call runs",
+      head: "<strong>" + node.v + "</strong> is a real node, so keep going",
+      why: ["the guard runs on every call, not only the ones that land on nothing"] });
     snap({ line: 3, hit: node.v, path: vals(path),
+      calc: "inorder_apply_(node->left, func)\nnode->left is " + childName(node.l) +
+            "   →   a new call on " + childName(node.l),
       head: "At <strong>" + node.v + "</strong> &mdash; left subtree first",
       why: ["in-order, so everything smaller than " + node.v + " is handed over before it is"] });
-    go(node.l);
+    go(node.l, node, "left");
 
+    var before = fn.show(st);
     fn.step(st, node.v);
     seen.push(node.v);
     snap({ line: 4, hit: node.v, path: vals(path),
+      calc: "func(node->data)   →   func(" + node.v + ")\n" +
+            (which === "print" ? "std::cout << " + node.v
+             : which === "sum" ? "total += " + node.v + "   →   total goes " + before + " to " + fn.show(st)
+             : "count++   →   count goes " + before + " to " + fn.show(st)),
       head: "<code>func(" + node.v + ")</code> &mdash; " + fn.label + " now reads " + fn.show(st),
       why: [which === "print"
               ? "PrintFunctor writes the value and keeps nothing; every call is the same"
               : "the functor was passed by reference, so this change outlives the call",
             "this is the ONE line that differs from inorder_"] });
-    go(node.r);
-    path.pop();
-  })(root);
 
-  snap({ line: 6, path: [],
+    snap({ line: 5, hit: node.v, path: vals(path),
+      calc: "inorder_apply_(node->right, func)\nnode->right is " + childName(node.r) +
+            "   →   a new call on " + childName(node.r),
+      head: "From <strong>" + node.v + "</strong>, down the right",
+      why: ["everything to the right of " + node.v + " is larger, so it is handed over afterwards"] });
+    go(node.r, node, "right");
+
+    if (parent) {
+      snap({ line: 6, hit: node.v, path: vals(path), phase: 1,
+        calc: "inorder_apply_(" + node.v + ", func) is finished\nback to the call on " + parent.v,
+        head: "<strong>" + node.v + "</strong> is finished &mdash; back up to <strong>" + parent.v + "</strong>",
+        why: ["the whole subtree under " + node.v + " has now been handed to the functor"] });
+    }
+    path.pop();
+  })(root, null, null);
+
+  snap({ line: 6, path: [], phase: 2, tag: "every value handed over", stack: [],
+    calc: "inorder_apply_(root_, func) is finished\n" + fn.label + " ends on " +
+          (which === "print" ? seen.join(" ") : fn.show(st)),
     head: fn.label + " finished with <strong>" + fn.show(st) + "</strong>",
     why: ["the traversal never changed &mdash; only what happens at line 5 did",
           which === "print"
@@ -1585,12 +1961,12 @@ function nowBox(f) {
   return '<div class="nowbox"><p class="nownote">' + f.head + "</p>" + nums + "</div>";
 }
 
-function codeHtml(key, hit, frame) {
+function codeRows(key, hit, frame, pinned) {
   var calc = frame && frame.calc;
-  return '<div class="code" id="code">' + CODE[key].map(function (ln, i) {
+  return CODE[key].map(function (ln, i) {
     var cls = [];
     if (i === hit) cls.push("hit");
-    if (state.pinned === i) cls.push("pin");
+    if (pinned === i) cls.push("pin");
     var t = esc(ln);
     var at = t.indexOf("//");
     if (at !== -1) t = t.slice(0, at) + '<span class="cm">' + t.slice(at) + "</span>";
@@ -1603,7 +1979,25 @@ function codeHtml(key, hit, frame) {
               ? '<div class="calc' + (isArt(calc) ? " art" : "") + '">' +
                 '<span class="cv">' + esc(calc) + "</span></div>"
               : "");
-  }).join("") + "</div>" + lineInfoHtml(key);
+  }).join("");
+}
+
+// The functor inorder_apply_ is calling, from Functors.h. Its body lights up on
+// the step that calls it, so func(node->data) visibly lands somewhere.
+function functorCard(f) {
+  var fn = FUNCTORS[state.functor];
+  var calling = f.line === 4;
+  return '<div class="card"><h2>The functor it calls &mdash; ' + fn.label + ", in Functors.h</h2>" +
+    '<div class="card-body"><div class="code static">' + fn.code.map(function (ln, i) {
+      var t = esc(ln), at = t.indexOf("//");
+      if (at !== -1) t = t.slice(0, at) + '<span class="cm">' + t.slice(at) + "</span>";
+      return "<div" + (calling && fn.hot.indexOf(i) !== -1 ? ' class="hit"' : "") + ">" + t + "</div>";
+    }).join("") + "</div></div></div>";
+}
+
+function codeHtml(key, hit, frame) {
+  return '<div class="code" id="code">' + codeRows(key, hit, frame, state.pinned) + "</div>" +
+         lineInfoHtml(key);
 }
 
 function lineInfoHtml(key) {
@@ -1755,6 +2149,7 @@ function soloHtml(f, key, title) {
     "</div><div class=\"col\">" +
       '<div class="card"><h2>The code</h2><div class="card-body"' + fix("code") + ">" +
         codeHtml(key, f.line, f) + "</div></div>" +
+      (key === "apply" ? functorCard(f) : "") +
       '<div class="card"><h2>What it costs</h2><div class="card-body">' + factsHtml(key) + "</div></div>" +
     '</div><div class="col railcol">' + railHtml(f) + "</div></div>";
 }
@@ -1763,8 +2158,24 @@ function soloHtml(f, key, title) {
 // tallest each panel reaches. Cheap enough to redo whenever the answer can
 // change -- mode, preset or window width -- and nowhere near a per-step cost.
 function measureRun() {
-  if (state.mode === "compare") { state.mh = null; return; }
   var stage = document.getElementById("stage");
+  if (state.mode === "compare") {
+    if (!stage.offsetWidth) return;
+    var laneGhost = document.createElement("div");
+    laneGhost.style.cssText = "position:absolute;left:-99999px;top:0;visibility:hidden;width:" +
+                              stage.offsetWidth + "px";
+    document.body.appendChild(laneGhost);
+    var tallest = 0;
+    for (var step = 0; step < state.maxFrames; step++) {
+      laneGhost.innerHTML = '<div class="lanes">' + lanesHtml(step, null) + "</div>";
+      Array.prototype.forEach.call(laneGhost.querySelectorAll(".lane"), function (l) {
+        tallest = Math.max(tallest, l.offsetHeight);
+      });
+    }
+    document.body.removeChild(laneGhost);
+    state.mh = { lane: tallest };
+    return;
+  }
   var run = state.runs[state.mode], key = codeKey();
   if (!run || !stage.offsetWidth) return;
 
@@ -1806,22 +2217,30 @@ function renderSolo() {
   wireRail();
 }
 
-function renderCompare() {
-  var orders = [
-    { k: "inorder",   n: "In-order",   cls: "inorder",   use: "sorted output" },
-    { k: "preorder",  n: "Pre-order",  cls: "preorder",  use: "copy a tree" },
-    { k: "postorder", n: "Post-order", cls: "postorder", use: "delete a tree" }
-  ];
-  var atEnd = orders.every(function (o) { return state.step >= state.runs[o.k].length - 1; });
+var COMPARE_ORDERS = [
+  { k: "inorder",   n: "In-order",   cls: "inorder",   use: "sorted output" },
+  { k: "preorder",  n: "Pre-order",  cls: "preorder",  use: "copy a tree" },
+  { k: "postorder", n: "Post-order", cls: "postorder", use: "delete a tree" }
+];
 
-  var lanes = orders.map(function (o) {
-    var f = frameAt(o.k, state.step);
-    return '<div class="lane ' + o.cls + '"><h2>' + o.n + "</h2><div class='card-body'>" +
+function lanesHtml(step, minHeight) {
+  var fix = minHeight ? ' style="min-height:' + minHeight + 'px"' : "";
+  return COMPARE_ORDERS.map(function (o) {
+    var f = frameAt(o.k, step);
+    return '<div class="lane ' + o.cls + '"' + fix + "><h2>" + o.n + "</h2><div class='card-body'>" +
       treeSvg(f.tree, f) +
       '<div class="chips"><span class="chip out">' +
         (f.out && f.out.length ? f.out.join(", ") : "&mdash;") + "</span></div>" +
+      '<div class="code lanecode">' + codeRows(o.k, f.line, f, null) + "</div>" +
       '<p class="mini">' + f.head + "</p></div></div>";
   }).join("");
+}
+
+function renderCompare() {
+  var orders = COMPARE_ORDERS;
+  var atEnd = orders.every(function (o) { return state.step >= state.runs[o.k].length - 1; });
+
+  var lanes = lanesHtml(state.step, state.mh && state.mh.lane);
 
   var verdict = "";
   if (atEnd) {
@@ -1913,7 +2332,10 @@ function extraControls() {
 
 function render() {
   extraControls();
-  if (!state.mh && state.mode !== "compare") { renderSolo(); measureRun(); }
+  if (!state.mh) {
+    if (state.mode === "compare") renderCompare(); else renderSolo();
+    measureRun();
+  }
   if (state.mode === "compare") renderCompare(); else renderSolo();
 
   var g = GUIDE[state.mode];
@@ -2110,6 +2532,65 @@ document.addEventListener("keydown", function (e) {
           fails.push(name + "/" + pair[0] + ": frame points at line " + f.line);
       });
     });
+
+    // Search must step on every line that can run. Across all of a tree's values
+    // and one miss that covers both sides; the two closing braces cannot be reached.
+    var searchSeen = {};
+    seq.concat([99]).forEach(function (v) {
+      buildSearch(root, v).forEach(function (f) { searchSeen[f.line] = 1; });
+    });
+    runs++;
+    CODE.search.forEach(function (ln, i) {
+      if (ln.trim() && i !== 8 && i !== 9 && !searchSeen[i] &&
+          (i !== 5 || name !== "ascending"))   // nothing in this tree is ever left of a node
+        fails.push(name + "/search: line " + i + " is never stepped on");
+    });
+
+    // Insert and Search: every step has a band, and every line opens a breakdown
+    // that quotes that line. Their duplicate branch never runs on these trees, so
+    // this does not ask for every line to be stepped on.
+    [["insert", ins], ["search", buildSearch(root, 99)], ["search", buildSearch(root, seq[0])]]
+      .forEach(function (pair) {
+        runs++;
+        pair[1].forEach(function (f, i) {
+          if (!f.calc) fails.push(name + "/" + pair[0] + " frame " + i + ": no THIS STEP band");
+        });
+        CODE[pair[0]].forEach(function (ln, i) {
+          if (!ln.trim()) return;
+          var info = LINE_INFO[pair[0]] && LINE_INFO[pair[0]][i];
+          if (!info || !info.src || !info.what || !info.items || !info.items.length)
+            fails.push(name + "/" + pair[0] + ": line " + i + " has no breakdown");
+          else if (ln.indexOf(info.src) === -1)
+            fails.push(name + "/" + pair[0] + ": breakdown for line " + i + " quotes other code");
+        });
+      });
+
+    // On these tabs every line of the listing has to be stepped on, and every
+    // step has to say what it is doing with this run's numbers.
+    [["height", hf], ["destroy", df]]
+      .concat(Object.keys(FUNCTORS).map(function (k) { return ["apply", buildApply(root, k)]; }))
+      .concat(["inorder", "preorder", "postorder"].map(function (o) {
+        return [o, buildTraversal(root, o)];
+      })).forEach(function (pair) {
+        var seen = {};
+        runs++;
+        pair[1].forEach(function (f, i) {
+          seen[f.line] = 1;
+          if (!f.calc) fails.push(name + "/" + pair[0] + " frame " + i + ": no THIS STEP band");
+          else if (/&[a-zA-Z]+;|&#x?[0-9A-Fa-f]+;/.test(f.calc))
+            fails.push(name + "/" + pair[0] + " frame " + i + ": HTML entity in the band");
+          else if (/\bundefined\b|\bNaN\b/.test(f.calc))
+            fails.push(name + "/" + pair[0] + " frame " + i + ": bad value in the band");
+        });
+        CODE[pair[0]].forEach(function (ln, i) {
+          if (ln.trim() && !seen[i]) fails.push(name + "/" + pair[0] + ": line " + i + " is never stepped on");
+          var info = LINE_INFO[pair[0]] && LINE_INFO[pair[0]][i];
+          if (ln.trim() && (!info || !info.src || !info.what || !info.items || !info.items.length))
+            fails.push(name + "/" + pair[0] + ": line " + i + " has no breakdown");
+          else if (ln.trim() && ln.indexOf(info.src) === -1)
+            fails.push(name + "/" + pair[0] + ": breakdown for line " + i + " quotes other code");
+        });
+      });
   });
 
   document.getElementById("selftest").innerHTML = fails.length === 0
@@ -2120,8 +2601,10 @@ document.addEventListener("keydown", function (e) {
       "search finds every value present and misses one that is not, every height badge matches " +
       "a plain recursive height, the destructor frees every node exactly once and never before " +
       "its children, all three functors see every value in order and end on the right answer, " +
-      "every step highlights a real line of code, and every step maps to a " +
-      "How-it-works phase that exists."
+      "every step highlights a real line of code, every step on every tab has a THIS STEP band, " +
+      "every line of every listing opens a breakdown of that line, every line of the traversal, " +
+      "height, destructor and functor listings is stepped on, and every step maps " +
+      "to a How-it-works phase that exists."
     : '<span class="fail">&#x2716; Self-check FAILED (' + fails.length + ")</span>: " +
       fails.slice(0, 6).join("; ");
 })();
