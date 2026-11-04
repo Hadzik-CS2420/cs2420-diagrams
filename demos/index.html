@@ -3,13 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CS 2420 — Sorting Algorithm Steppers</title>
+<title>CS 2420 — Algorithm Steppers</title>
 <style>
   :root {
     --ink:#2c3e50; --muted:#555555; --rule:#d8dee6;
     --green:#1c7e45; --blue:#2573a7; --deep:#4527a0; --teal:#00695c;
     --tint-green:#f2fbf4; --tint-blue:#eaf2f8; --tint-purple:#ede7f6;
     --tint-teal:#e0f2f1;
+      --tint-orange:#fff3e0;
   }
   * { box-sizing:border-box; }
   body { margin:0; padding:2rem 1.25rem 3rem;
@@ -31,6 +32,7 @@
   .card.b h2 { background:var(--tint-green); }
   .card.c h2 { background:var(--tint-purple); }
   .card.d h2 { background:var(--tint-teal); }
+    .card.e h2 { background:var(--tint-orange); }
   .card .body { padding:.9rem 1rem 1.1rem; flex:1; display:flex; flex-direction:column; }
   .card p { margin:0 0 .75rem; font-size:.93rem; }
   .card ul { margin:0 0 1rem; padding-left:1.15rem; font-size:.88rem; color:var(--muted); }
@@ -58,7 +60,7 @@
 <div class="wrap">
 
 <header>
-  <h1>CS 2420 — Sorting Algorithm Steppers</h1>
+  <h1>CS 2420 — Algorithm Steppers</h1>
   <p class="sub">Interactive teaching tools · Data Structures &amp; Algorithms · Weber State University</p>
 </header>
 
@@ -134,6 +136,21 @@
             number every time</li>
       </ul>
       <a class="open" href="minmax-stepper.html">Open the stepper</a>
+    </div>
+  </div>
+
+  <div class="card e">
+    <h2>Binary Search Trees</h2>
+    <div class="body">
+      <p>Insert, search, the three traversals, height and destruction &mdash; every one of them
+      recursive, and every one doing its real work on the way back <em>up</em>.</p>
+      <ul>
+        <li>The tree redrawn after each step, with the node being visited highlighted</li>
+        <li>The call stack beside it, so you can see where "on the way back up" happens</li>
+        <li>In-order, pre-order and post-order on the same tree, one at a time</li>
+        <li>A functor applied through <code>inorder_apply</code> &mdash; print, sum, count</li>
+      </ul>
+      <a class="open" href="binary-search-trees.html">Open the stepper</a>
     </div>
   </div>
 

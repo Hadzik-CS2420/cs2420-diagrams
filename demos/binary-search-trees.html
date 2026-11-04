@@ -1,0 +1,1765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CT 16 Stepper — Insert, Search, Traversals</title>
+<style>
+  :root {
+    --ink:#2c3e50; --muted:#6e6e6e; --rule:#d8dee6;
+    --green:#1c7e45; --blue:#2573a7; --orange:#a95c19;
+    --red:#c0392b; --purple:#8e44ad; --deep:#4527a0; --teal:#00695c;
+    --tint-green:#f2fbf4; --tint-blue:#eaf2f8; --tint-orange:#fff3e0;
+    --tint-red:#fce4ec; --tint-purple:#ede7f6; --tint-teal:#e0f2f1;
+    --code-bg:#1e1e2e; --code-fg:#cdd6f4; --code-dim:#9399b2; --code-hit:#45475a;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:1.5rem 1.25rem 3rem;
+         font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+         color:var(--ink); background:#fff; line-height:1.5; }
+  .wrap { max-width:1280px; margin:0 auto; }
+  h1 { font-size:1.35rem; margin:0 0 .2rem; }
+  .sub { color:var(--muted); font-size:.9rem; margin:0 0 1.1rem; }
+
+  /* ---- How it works, variables, callouts ----------------------------
+     Same components as ct15-non-comparison-sorts' stepper, so the two read
+     the same way. Copied rather than retyped, for the same reason. */
+  .howto .lead { margin:0 0 .7rem; font-size:.9rem; }
+  .howto-steps { display:grid; gap:.7rem; margin:0 0 .7rem;
+                 grid-template-columns:repeat(auto-fit,minmax(16rem,1fr)); }
+  .hstep { background:#f7f9fb; border:1px solid var(--rule); border-radius:8px;
+           padding:.55rem .7rem .6rem; }
+  .hstep > h4 { margin:0 0 .4rem; font-size:.84rem; display:flex; gap:.45rem;
+                align-items:center; color:var(--ink); }
+  .hnum { flex:0 0 auto; width:1.3rem; height:1.3rem; border-radius:50%;
+          background:var(--deep); color:#fff; font-size:.7rem; font-weight:700;
+          display:flex; align-items:center; justify-content:center; }
+  .hstep ul { margin:0; padding:0; list-style:none; }
+  .hstep li { position:relative; padding-left:.85rem; margin-bottom:.22rem;
+              font-size:.8rem; line-height:1.45; }
+  .hstep li::before { content:""; position:absolute; left:.2rem; top:.52em;
+                      width:.3rem; height:.3rem; border-radius:50%;
+                      background:var(--muted); }
+  .hstep li:last-child { margin-bottom:0; }
+  /* Collapsed steps keep the arc visible without the bulk: you can see how
+     many there are and what is coming, but only the one being executed is
+     open. state.peek lets you look ahead at one of the others. */
+  .hstep.off { background:#fbfcfd; opacity:.72; cursor:pointer; }
+  .hstep.off:hover { opacity:1; border-color:var(--blue); }
+  .hstep.off > h4 { margin:0; font-weight:600; }
+  .hstep.off .hnum { background:var(--rule); }
+  .hstep .peek { margin-left:auto; font-size:.66rem; font-weight:600; color:var(--muted);
+                 text-transform:uppercase; letter-spacing:.05em; }
+  .hstep.on { border-color:var(--blue); box-shadow:0 0 0 2px rgba(37,115,167,.12); }
+  .pseudo { margin:.5rem 0 0; padding:.45rem .6rem; background:#f2f5f8;
+            border-left:3px solid var(--blue); border-radius:0 5px 5px 0;
+            font-family:Consolas,"Courier New",monospace; font-size:.76rem;
+            line-height:1.6; white-space:pre; overflow-x:auto; color:#2c3e50; }
+  .pseudo .pl { display:block; font-family:system-ui,sans-serif; font-size:.6rem;
+                font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+                color:var(--muted); margin-bottom:.15rem; }
+  .callout { font-size:.82rem; padding:.6rem .8rem; border-radius:6px; margin-top:.7rem;
+             background:var(--tint-purple); border:1px solid #d1c4e9; color:var(--deep); }
+  .callout.warn { background:var(--tint-red); border-color:#f5c6cb; color:var(--red); }
+  /* The algorithm-level warning belongs with the conclusions at the bottom,
+     not above the controls where it would be the densest thing on screen. */
+  #watch { margin-top:1.1rem; }
+  #howto { margin-bottom:1.1rem; }
+  .locals { display:grid; grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));
+            gap:.5rem 1.1rem; margin:.6rem 0 0; padding:.55rem .7rem;
+            border:1px solid var(--rule); border-radius:8px; background:#fbfcfd; }
+  .locals h5 { margin:0 0 .3rem; font-size:.68rem; font-weight:700; color:var(--muted);
+               text-transform:uppercase; letter-spacing:.06em; }
+  .locals .lv { display:flex; align-items:baseline; gap:.45rem; font-size:.79rem;
+                line-height:1.5; }
+  .locals .ln { font-family:Consolas,monospace; font-weight:650; color:var(--ink);
+                min-width:4.6rem; }
+  .locals .lval { font-family:Consolas,monospace; font-weight:700;
+                  color:var(--blue); background:var(--tint-blue);
+                  border:1px solid rgba(37,115,167,.3); border-radius:999px;
+                  padding:.02rem .45rem; min-width:1.6rem; text-align:center; }
+  .locals .lval.pend { color:var(--muted); background:#f0f2f5;
+                       border-color:var(--rule); font-weight:600; }
+  .locals .lat { color:var(--muted); font-size:.75rem; }
+  .locals .stackline .ln { font-weight:600; color:var(--teal); min-width:0; }
+  .locals .stackline.here .lat { color:var(--ink); font-weight:600; }
+
+  /* ---- tabs ---- */
+  .tabs { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:1rem;
+          border-bottom:2px solid var(--rule); padding-bottom:.6rem; }
+  .tabs button { font:inherit; font-size:.9rem; font-weight:600; padding:.45rem 1rem;
+                 border:1px solid var(--rule); border-radius:7px 7px 0 0;
+                 background:#f7f9fb; color:var(--muted); cursor:pointer; }
+  .tabs button:hover { color:var(--ink); }
+  .tabs button.on { background:#fff; color:var(--ink); border-bottom-color:#fff; }
+  .tabs button[data-mode="insert"].on    { border-top:3px solid var(--blue);   color:var(--blue); }
+  .tabs button[data-mode="search"].on    { border-top:3px solid var(--green);  color:var(--green); }
+  .tabs button[data-mode="traverse"].on  { border-top:3px solid var(--orange); color:var(--orange); }
+  .tabs button[data-mode="compare"].on   { border-top:3px solid var(--deep);   color:var(--deep); }
+  .tabs button[data-mode="height"].on    { border-top:3px solid var(--deep);   color:var(--deep); }
+  .tabs button[data-mode="destroy"].on   { border-top:3px solid var(--red);    color:var(--red); }
+  .tabs button[data-mode="apply"].on     { border-top:3px solid var(--purple); color:var(--purple); }
+  .tabs .spacer { flex:1; }
+  .tabs .step-hint { align-self:center; font-size:.76rem; color:var(--muted); }
+
+  /* ---- controls ---- */
+  .panel { border:1px solid var(--rule); border-radius:10px;
+           padding:.85rem 1rem; margin-bottom:1.1rem; background:#fcfdfe; }
+  .row { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+  .row + .row { margin-top:.6rem; }
+  .lbl { font-size:.73rem; text-transform:uppercase; letter-spacing:.05em;
+         color:var(--muted); min-width:7.5rem; }
+  button.ctl { font:inherit; font-size:.86rem; padding:.38rem .8rem;
+               border:1px solid var(--rule); border-radius:6px;
+               background:#fff; color:var(--ink); cursor:pointer; }
+  button.ctl:hover:not(:disabled) { border-color:var(--blue); color:var(--blue); }
+  button.ctl:disabled { opacity:.4; cursor:default; }
+  button.ctl.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+  button.ctl.primary { background:var(--deep); border-color:var(--deep); color:#fff; }
+  .count { font-variant-numeric:tabular-nums; font-size:.84rem; color:var(--muted); margin-left:auto; }
+
+  /* ---- layout ---- */
+  .solo { display:grid; grid-template-columns:1.05fr .95fr; gap:1.1rem; align-items:start; }
+  @media (max-width:1040px) { .solo { grid-template-columns:1fr; } }
+  .card { border:1px solid var(--rule); border-radius:10px; overflow:hidden; margin-bottom:1.1rem; }
+  .card > h2 { font-size:.92rem; margin:0; padding:.5rem .85rem;
+               border-bottom:1px solid var(--rule); background:#f7f9fb; }
+  .card-body { padding:.85rem; }
+
+  /* ---- the tree ---- */
+  svg.tree { width:100%; height:auto; display:block; }
+  svg.tree text { font-family:"Segoe UI",system-ui,sans-serif; font-size:15px; font-weight:600; }
+  svg.tree text.sub { font-size:10px; font-weight:400; fill:#6e6e6e; }
+
+  .legend { font-size:.72rem; color:var(--muted); margin:.5rem 0 0; }
+  .legend span { display:inline-block; margin-right:.9rem; }
+  .sw { display:inline-block; width:.75rem; height:.75rem; border-radius:50%;
+        border:2px solid var(--rule); vertical-align:-2px; margin-right:.25rem; }
+
+  /* ---- state ---- */
+  .chips { display:flex; flex-wrap:wrap; gap:.5rem; margin:.8rem 0 0; }
+  .chip { font-size:.8rem; padding:.3rem .65rem; border-radius:999px;
+          border:1px solid var(--rule); background:#fff; font-variant-numeric:tabular-nums; }
+  .chip.cur  { border-color:var(--orange); color:var(--orange); background:var(--tint-orange); }
+  .chip.out  { border-color:var(--teal);   color:var(--teal);   background:var(--tint-teal); }
+  .chip.ok   { border-color:var(--green);  color:var(--green);  background:var(--tint-green); }
+  .chip.no   { border-color:var(--red);    color:var(--red);    background:var(--tint-red); }
+
+  .test { margin:.75rem 0 0; font-size:.9rem; padding:.55rem .8rem; border-radius:8px;
+          border:1px solid var(--rule); background:#fbfcfd; }
+  .test .q { font-family:Consolas,monospace; font-weight:700; }
+  .test .yes { color:var(--green); font-weight:700; }
+  .test .no  { color:var(--muted); font-weight:700; }
+
+  /* ---- call stack ---- */
+  .stack { margin:.8rem 0 0; font-size:.78rem; font-family:Consolas,monospace; }
+  .stack div { padding:.16rem .5rem; border-left:3px solid var(--rule); margin-bottom:.1rem;
+               background:#fbfcfd; }
+  .stack div.top { border-left-color:var(--orange); background:var(--tint-orange);
+                   font-weight:700; }
+  .stack .none { color:var(--muted); font-style:italic; border-left-color:transparent;
+                 background:none; font-family:inherit; }
+
+  /* ---- narration ---- */
+  .head { font-size:.98rem; font-weight:600; margin:0 0 .4rem; }
+  .why { margin:0; padding-left:1.1rem; font-size:.86rem; }
+  .why li { margin-bottom:.22rem; }
+
+  /* ---- code ---- */
+  .code { background:var(--code-bg); color:var(--code-fg); border-radius:8px;
+          padding:.6rem 0; font-family:Consolas,"Courier New",monospace;
+          font-size:.82rem; line-height:1.55; overflow-x:auto; }
+  .code div { padding:.02rem .9rem; white-space:pre; cursor:pointer; }
+  .code div:hover { background:#313244; }
+  .code div.hit { background:var(--code-hit); border-left:3px solid #f9e2af;
+                  padding-left:calc(.9rem - 3px); }
+  .code div.pin { outline:1px dashed #f9e2af; outline-offset:-2px; }
+  .code .cm { color:var(--code-dim); }
+
+  .lineinfo { border:1px solid var(--rule); border-left:4px solid var(--deep);
+              border-radius:0 8px 8px 0; padding:.6rem .85rem; margin:.7rem 0 0;
+              background:#fcfcfd; font-size:.83rem; }
+  .lineinfo h4 { margin:0 0 .35rem; font-size:.84rem; font-family:Consolas,monospace;
+                 color:var(--deep); }
+  .li-items { margin:.3rem 0 0; padding-left:1.05rem; }
+  .li-items li { margin-bottom:.22rem; }
+  .li-kind { display:inline-block; font-size:.66rem; text-transform:uppercase;
+             letter-spacing:.04em; padding:.03rem .32rem; border-radius:3px;
+             margin-right:.3rem; vertical-align:1px; }
+  .k-why    { background:var(--tint-blue);   color:var(--blue); }
+  .k-trap   { background:var(--tint-red);    color:var(--red); }
+  .k-note   { background:var(--tint-green);  color:var(--green); }
+  .k-syntax { background:var(--tint-purple); color:var(--deep); }
+
+  .facts { font-size:.8rem; margin:0; }
+  .facts dt { font-weight:600; float:left; width:8rem; clear:left; color:var(--muted); }
+  .facts dd { margin:0 0 .3rem 8rem; }
+
+  /* ---- compare lanes ---- */
+  .lanes { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; }
+  @media (max-width:1040px) { .lanes { grid-template-columns:1fr; } }
+  .lane { border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
+  .lane h2 { font-size:.9rem; margin:0; padding:.5rem .85rem; border-bottom:1px solid var(--rule); }
+  .lane.inorder h2   { background:var(--tint-green);  color:var(--green); }
+  .lane.preorder h2  { background:var(--tint-blue);   color:var(--blue); }
+  .lane.postorder h2 { background:var(--tint-orange); color:var(--orange); }
+  .lane .card-body { padding:.7rem; }
+  .lane .mini { font-size:.78rem; color:var(--muted); margin:.5rem 0 0; min-height:2.6rem; }
+
+  .verdict { border-left:5px solid var(--deep); background:var(--tint-purple);
+             border-radius:0 8px 8px 0; padding:.9rem 1.1rem; font-size:.88rem; }
+  .verdict p { margin:0 0 .55rem; }
+  .verdict p:last-child { margin:0; }
+  table.v { width:100%; border-collapse:collapse; font-size:.83rem; margin:.3rem 0 .8rem; }
+  table.v th, table.v td { border:1px solid var(--rule); padding:.35rem .55rem; text-align:left; }
+  table.v th { background:#f5f7f9; }
+  .mono { font-family:Consolas,monospace; }
+
+  .selftest { margin-top:1.2rem; font-size:.78rem; color:var(--muted);
+              border-top:1px solid var(--rule); padding-top:.6rem; }
+  .selftest .ok   { color:var(--green); font-weight:600; }
+  .selftest .fail { color:var(--red);   font-weight:700; }
+  code.inl { background:#eef2f6; padding:.08em .32em; border-radius:4px;
+             font-family:Consolas,monospace; font-size:.92em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Binary search trees &mdash; insert it, find it, walk it</h1>
+  <p class="sub">CS 2420 &middot; Module 7 &middot; CT 16. Every function here is <strong>recursive</strong>,
+     so each step shows the call stack beside the tree. <strong>Click any line of code</strong> for a
+     breakdown of it.</p>
+
+  <div class="tabs" id="tabs">
+    <button data-mode="insert">1 &middot; Insert</button>
+    <button data-mode="search">2 &middot; Search</button>
+    <button data-mode="traverse">3 &middot; Traversals</button>
+    <button data-mode="compare">4 &middot; All three traversals</button>
+    <button data-mode="height">5 &middot; Height</button>
+    <button data-mode="destroy">6 &middot; Destructor</button>
+    <button data-mode="apply">7 &middot; Functors</button>
+    <span class="spacer"></span>
+    <span class="step-hint">&larr; &rarr; arrow keys step &middot; space plays</span>
+  </div>
+
+  <div id="howto"></div>
+
+  <div class="panel">
+    <div class="row">
+      <span class="lbl">Insert order</span>
+      <button class="ctl" data-preset="balanced">50 30 70 20 40 60 80</button>
+      <button class="ctl" data-preset="ascending">10 20 30 40 50</button>
+      <button class="ctl" data-preset="mixed">42 15 73 28 91 5 64</button>
+      <span class="count" id="treeNote"></span>
+    </div>
+    <div class="row" id="extraRow"></div>
+    <div class="row">
+      <span class="lbl">Step</span>
+      <button class="ctl" id="first">&laquo; First</button>
+      <button class="ctl" id="prev">&lsaquo; Prev</button>
+      <button class="ctl primary" id="play">&#9654; Play</button>
+      <button class="ctl" id="next">Next &rsaquo;</button>
+      <button class="ctl" id="last">Last &raquo;</button>
+      <button class="ctl" id="nextPhase">Next phase &raquo;&raquo;</button>
+      <span class="count" id="frameCount"></span>
+    </div>
+  </div>
+
+  <div id="stage"></div>
+
+  <p class="legend">
+    <span><i class="sw" style="border-color:#a95c19;background:#fff3e0"></i>the node being looked at</span>
+    <span><i class="sw" style="border-color:#2573a7;background:#eaf2f8"></i>on the path taken</span>
+    <span><i class="sw" style="border-color:#1c7e45;background:#f2fbf4"></i>just placed, or visited</span>
+    <span><i class="sw" style="border-style:dashed"></i>the empty slot the recursion fell into</span>
+    <span><i class="sw" style="border-color:#c0392b;background:#fdf0ee;border-style:dashed"></i>freed, in the destructor</span>
+    <span><i class="sw" style="border-color:#4527a0;background:#4527a0"></i>a value the recursion returned</span>
+  </p>
+
+  <div id="watch"></div>
+
+  <div class="selftest" id="selftest"></div>
+</div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// Fixed insert orders. Nothing random: the same preset always builds the same
+// tree, so a number on screen in class is the number that will be there again.
+// ---------------------------------------------------------------------------
+var PRESETS = {
+  balanced:  { label: "balanced",  seq: [50, 30, 70, 20, 40, 60, 80] },
+  ascending: { label: "ascending", seq: [10, 20, 30, 40, 50] },
+  mixed:     { label: "mixed",     seq: [42, 15, 73, 28, 91, 5, 64] }
+};
+
+// ---------------------------------------------------------------------------
+// Tree helpers. A node is {v, l, r}; null is an empty slot.
+// ---------------------------------------------------------------------------
+function clone(n) { return n ? { v: n.v, l: clone(n.l), r: clone(n.r) } : null; }
+
+function insertPlain(root, v) {
+  if (!root) return { v: v, l: null, r: null };
+  if (v < root.v) root.l = insertPlain(root.l, v);
+  else if (v > root.v) root.r = insertPlain(root.r, v);
+  return root;
+}
+
+function buildTree(seq) {
+  var root = null;
+  seq.forEach(function (v) { root = insertPlain(root, v); });
+  return root;
+}
+
+function heightOf(n) { return n ? 1 + Math.max(heightOf(n.l), heightOf(n.r)) : -1; }
+function countOf(n) { return n ? 1 + countOf(n.l) + countOf(n.r) : 0; }
+
+function walk(n, order, out) {
+  if (!n) return out;
+  if (order === "preorder") out.push(n.v);
+  walk(n.l, order, out);
+  if (order === "inorder") out.push(n.v);
+  walk(n.r, order, out);
+  if (order === "postorder") out.push(n.v);
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Drawing. x comes from in-order position, y from depth -- the standard layout,
+// and the one that makes "in-order reads left to right" visible rather than
+// asserted.
+// ---------------------------------------------------------------------------
+function layout(root) {
+  var pos = [], i = 0;
+  (function place(n, d) {
+    if (!n) return;
+    place(n.l, d + 1);
+    pos.push({ v: n.v, x: i++, y: d, node: n });
+    place(n.r, d + 1);
+  })(root, 0);
+  var byNode = new Map();
+  pos.forEach(function (p) { byNode.set(p.node, p); });
+  return { pos: pos, byNode: byNode, cols: i, rows: heightOf(root) + 1 };
+}
+
+function treeSvg(root, mark) {
+  mark = mark || {};
+  if (!root) {
+    return '<svg class="tree" viewBox="0 0 400 60" role="img" aria-label="an empty tree">' +
+      '<text x="200" y="34" text-anchor="middle" fill="#6e6e6e" font-weight="400">' +
+      'the tree is empty &#x2014; root is nullptr</text></svg>';
+  }
+  var L = layout(root);
+  var CW = 62, RH = 66, PAD = 30;
+  var W = Math.max(L.cols * CW, 220) + PAD * 2;
+  var H = L.rows * RH + PAD * 2;
+  var X = function (p) { return PAD + p.x * CW + CW / 2; };
+  var Y = function (p) { return PAD + p.y * RH + 20; };
+
+  var edges = "", nodes = "";
+  L.pos.forEach(function (p) {
+    ["l", "r"].forEach(function (side) {
+      var c = p.node[side];
+      if (!c) return;
+      var cp = L.byNode.get(c);
+      var on = mark.path && mark.path.indexOf(p.v) !== -1 &&
+               mark.path.indexOf(c.v) !== -1;
+      edges += '<line x1="' + X(p) + '" y1="' + (Y(p) + 16) + '" x2="' + X(cp) +
+               '" y2="' + (Y(cp) - 16) + '" stroke="' + (on ? "#2573a7" : "#c7cdd1") +
+               '" stroke-width="' + (on ? 3 : 2) + '"/>';
+    });
+  });
+
+  // the empty slot the recursion is currently sitting in, drawn dashed
+  if (mark.slot) {
+    var par = L.pos.filter(function (q) { return q.v === mark.slot.parent; })[0];
+    if (par) {
+      var sx = X(par) + (mark.slot.side === "l" ? -CW / 2 : CW / 2);
+      var sy = Y(par) + RH;
+      edges += '<line x1="' + X(par) + '" y1="' + (Y(par) + 16) + '" x2="' + sx +
+               '" y2="' + (sy - 16) + '" stroke="#c7cdd1" stroke-width="2" stroke-dasharray="4 3"/>';
+      nodes += '<circle cx="' + sx + '" cy="' + sy + '" r="16" fill="#fff" stroke="#c7cdd1" ' +
+               'stroke-width="2" stroke-dasharray="4 3"/>' +
+               '<text x="' + sx + '" y="' + (sy + 5) + '" text-anchor="middle" fill="#6e6e6e" ' +
+               'font-weight="400">?</text>';
+    }
+  }
+
+  L.pos.forEach(function (p) {
+    var fill = "#fff", stroke = "#c7cdd1", tcol = "#2c3e50", sw = 2, dash = null;
+    // Marks are matched by VALUE, never by object identity: the frame carries a
+    // clone of the tree, so a node from the live tree would never be === to the
+    // one being drawn. Values are unique in a BST, which is what makes this work.
+    if (mark.path && mark.path.indexOf(p.v) !== -1)     { fill = "#eaf2f8"; stroke = "#2573a7"; }
+    if (mark.done && mark.done.indexOf(p.v) !== -1)     { fill = "#f2fbf4"; stroke = "#1c7e45"; }
+    if (mark.freed && mark.freed.indexOf(p.v) !== -1)   { fill = "#fdf0ee"; stroke = "#c0392b";
+                                                          tcol = "#c0392b"; dash = "4 3"; }
+    if (mark.hit === p.v)                               { fill = "#fff3e0"; stroke = "#a95c19"; sw = 3; }
+    if (mark.placed === p.v)                            { fill = "#f2fbf4"; stroke = "#1c7e45"; sw = 3; }
+    nodes += '<circle cx="' + X(p) + '" cy="' + Y(p) + '" r="17" fill="' + fill +
+             '" stroke="' + stroke + '" stroke-width="' + sw + '"' +
+             (dash ? ' stroke-dasharray="' + dash + '"' : "") + "/>" +
+             '<text x="' + X(p) + '" y="' + (Y(p) + 5) + '" text-anchor="middle" fill="' +
+             tcol + '">' + p.v + "</text>";
+
+    // A badge beside the node, for a value the recursion has worked out about it
+    // -- the height it returned, say. Keyed by value, like every other mark.
+    if (mark.labels && mark.labels[p.v] !== undefined) {
+      var bx = X(p) + 13, by = Y(p) - 23;
+      nodes += '<rect x="' + bx + '" y="' + by + '" width="26" height="17" rx="4" ' +
+               'fill="#4527a0" stroke="#fff" stroke-width="1.5"/>' +
+               '<text x="' + (bx + 13) + '" y="' + (by + 12.5) + '" text-anchor="middle" ' +
+               'fill="#fff" font-size="11">' + mark.labels[p.v] + "</text>";
+    }
+  });
+
+  return '<svg class="tree" viewBox="0 0 ' + W + " " + H +
+    '" role="img" aria-label="the binary search tree, ' + countOf(root) +
+    ' nodes, height ' + heightOf(root) + '">' + edges + nodes + "</svg>";
+}
+
+// ---------------------------------------------------------------------------
+// Code panes
+// ---------------------------------------------------------------------------
+var CODE = {
+  insert: [
+    "Node* BinarySearchTree::insert_(Node* node, int value) {",
+    "    if (!node) return new Node(value);   // empty slot -- the value goes here",
+    "",
+    "    if (value < node->data) {",
+    "        node->left  = insert_(node->left,  value);   // go left, reattach",
+    "    } else if (value > node->data) {",
+    "        node->right = insert_(node->right, value);   // go right, reattach",
+    "    }",
+    "    // value == node->data: duplicate, do nothing",
+    "",
+    "    return node;   // hand this node back so the parent can reattach it",
+    "}"
+  ],
+  search: [
+    "bool BinarySearchTree::search_(Node* node, int value) const {",
+    "    if (!node) return false;             // fell off the tree -- not here",
+    "    if (value == node->data) return true;",
+    "",
+    "    if (value < node->data) {",
+    "        return search_(node->left, value);",
+    "    } else {",
+    "        return search_(node->right, value);",
+    "    }",
+    "}"
+  ],
+  inorder: [
+    "void BinarySearchTree::inorder_(Node* node, std::ostream& os) const {",
+    "    if (!node) return;",
+    "    inorder_(node->left, os);",
+    "    os << node->data << \" \";          // visit BETWEEN the two sides",
+    "    inorder_(node->right, os);",
+    "}"
+  ],
+  preorder: [
+    "void BinarySearchTree::preorder_(Node* node, std::ostream& os) const {",
+    "    if (!node) return;",
+    "    os << node->data << \" \";          // visit BEFORE both sides",
+    "    preorder_(node->left, os);",
+    "    preorder_(node->right, os);",
+    "}"
+  ],
+  postorder: [
+    "void BinarySearchTree::postorder_(Node* node, std::ostream& os) const {",
+    "    if (!node) return;",
+    "    postorder_(node->left, os);",
+    "    postorder_(node->right, os);",
+    "    os << node->data << \" \";          // visit AFTER both sides",
+    "}"
+  ]
+};
+
+CODE.height = [
+  "int BinarySearchTree::height_(Node* node) const {",
+  "    if (!node) return -1;              // base case",
+  "    int lh = height_(node->left);      // 1. left subtree",
+  "    int rh = height_(node->right);     // 2. right subtree",
+  "    return 1 + std::max(lh, rh);       // 3. taller side, plus this edge",
+  "}"
+];
+
+CODE.destroy = [
+  "void BinarySearchTree::destroy_(Node* node) {",
+  "    if (!node) return;                 // base case",
+  "    destroy_(node->left);              // 1. free the left subtree",
+  "    destroy_(node->right);             // 2. free the right subtree",
+  "    delete node;                       // 3. only now is this node safe",
+  "}"
+];
+
+CODE.apply = [
+  "template <typename Functor>",
+  "void BinarySearchTree::inorder_apply_(Node* node, Functor& func) const {",
+  "    if (!node) return;",
+  "    inorder_apply_(node->left, func);  // 1. left subtree",
+  "    func(node->data);                  // 2. the action, whatever it is",
+  "    inorder_apply_(node->right, func); // 3. right subtree",
+  "}"
+];
+
+var LINE_INFO = {
+  insert: {
+    0: { src: "Node* insert_(Node* node, int value)",
+      what: "Takes the subtree to insert into, and returns that subtree with the value in it.",
+      items: [
+        ["why", "It returns a <code>Node*</code> rather than <code>void</code> so the caller can <strong>reattach</strong> the result. That is what makes the one-line <code>node->left = insert_(node->left, value)</code> work for both cases &mdash; an existing child comes back unchanged, an empty slot comes back as a brand new node."],
+        ["trap", "Write it as <code>void</code> and the new node is created but never attached to anything. The tree stays empty and the leak is silent."]
+      ] },
+    1: { src: "if (!node) return new Node(value);",
+      what: "The base case: the recursion has fallen off the bottom, and that empty slot is exactly where the value belongs.",
+      items: [
+        ["why", "A BST insert never has to search for a place &mdash; the comparisons on the way down <em>are</em> the search. Wherever you fall off is the only legal spot."],
+        ["note", "This is the one line that allocates. Every other line just passes pointers around."]
+      ] },
+    3: { src: "if (value < node->data)",
+      what: "Smaller values live in the left subtree. This is the BST property, applied one node at a time.",
+      items: [
+        ["why", "One comparison eliminates an entire subtree. On a balanced tree that halves the remaining work, which is where O(log n) comes from."],
+        ["trap", "On the <strong>ascending</strong> preset every value is larger than the one before, so this is never true and the tree becomes a straight line to the right. Height 4 for 5 nodes. Same code, O(n) behaviour &mdash; that is what AVL rotations exist to prevent."]
+      ] },
+    4: { src: "node->left = insert_(node->left, value);",
+      what: "Recurse into the left subtree, and assign the result back.",
+      items: [
+        ["syntax", "The assignment is not optional. <code>insert_(node->left, value);</code> on its own compiles, runs, allocates the node &mdash; and throws the pointer away."],
+        ["note", "For every node on the path except the last, this reassigns a child to the value it already had. Harmless, and it is the price of having one line cover both cases."]
+      ] },
+    8: { src: "// value == node->data: duplicate, do nothing",
+      what: "Neither branch is taken, so the value is silently dropped.",
+      items: [
+        ["why", "This tree holds a <strong>set</strong>. Inserting 50 twice leaves one 50. That is a design decision, not an oversight &mdash; a tree that allowed duplicates would have to pick a side and stick to it forever."]
+      ] },
+    10: { src: "return node;",
+      what: "Hands this node back unchanged so the caller's assignment reattaches it.",
+      items: [
+        ["why", "Without this the recursion would return garbage up the chain and the assignment on the way out would blank the tree."]
+      ] }
+  },
+  search: {
+    1: { src: "if (!node) return false;",
+      what: "Fell off the bottom of the tree. The value is not here.",
+      items: [
+        ["why", "A failed search costs exactly as many comparisons as a successful one at the same depth &mdash; you only learn the answer by reaching the bottom."]
+      ] },
+    2: { src: "if (value == node->data) return true;",
+      what: "Found it. Stop; nothing below matters.",
+      items: [
+        ["note", "Checked before the two branches, so a hit at the root costs one comparison no matter how big the tree is."]
+      ] },
+    4: { src: "if (value < node->data)",
+      what: "Choose a side. The other subtree is now eliminated.",
+      items: [
+        ["why", "This is the whole reason a BST beats a list. One comparison discards everything on the other side &mdash; on a balanced tree, half the remaining nodes."],
+        ["trap", "It only works if the tree obeys the BST property everywhere. One misplaced node and search silently returns false for a value that <em>is</em> in the tree."]
+      ] }
+  },
+  inorder: {
+    2: { src: "inorder_(node->left);",
+      what: "Finish the entire left subtree before this node is printed.",
+      items: [["why", "Everything left of a node is smaller than it, so draining that side first is what makes the output sorted."]] },
+    3: { src: "os << node->data",
+      what: "Visit this node, between its two subtrees.",
+      items: [
+        ["note", "Move this line above the left call and you have pre-order; move it below the right call and you have post-order. The three traversals differ by <strong>one line's position</strong> and nothing else."],
+        ["why", "In-order on a BST prints sorted output. That is not a coincidence &mdash; it is the BST property read left to right."],
+        ["syntax", "Write to <code class='inl'>os</code>, not <code class='inl'>std::cout</code>. The stream arrives as a parameter, so the <em>caller</em> decides where the output lands &mdash; the console, a file, or a string. <code class='inl'>inorder()</code> defaults it to <code class='inl'>std::cout</code>, which is why <code class='inl'>bst.inorder()</code> still just prints."]
+      ] }
+  },
+  preorder: {
+    2: { src: "os << node->data",
+      what: "Visit this node before either subtree.",
+      items: [
+        ["note", "The root comes out first, which is why pre-order is what you use to <strong>copy</strong> a tree: insert the output in order and you rebuild the identical shape."]
+      ] }
+  },
+  postorder: {
+    4: { src: "os << node->data",
+      what: "Visit this node only after both subtrees are finished.",
+      items: [
+        ["why", "Children are always done before their parent, which is exactly the order you need to <strong>delete</strong> a tree. The destructor uses post-order for that reason &mdash; free a parent first and you have lost the pointers to its children."]
+      ] }
+  }
+};
+
+LINE_INFO.height = {
+  1: { src: "if (!node) return -1;",
+    what: "An empty subtree has height &minus;1. This is the whole reason the arithmetic works.",
+    items: [
+      ["why", "A leaf has two empty children, so it comes out as <code class='inl'>1 + max(-1, -1)</code> = <strong>0</strong>. Height counts <em>edges</em>, and a leaf has none below it."],
+      ["note", "Return 0 here instead and every height in the tree is one too big &mdash; a leaf would claim height 1. It compiles, it runs, and every height test fails."]
+    ] },
+  2: { src: "int lh = height_(node->left);",
+    what: "Go all the way down the left side before this node can say anything about itself.",
+    items: [
+      ["why", "A node cannot know its own height until both children have reported theirs. That is what makes this a post-order computation, the same shape as the destructor."]
+    ] },
+  4: { src: "return 1 + std::max(lh, rh);",
+    what: "The taller side wins, and the +1 is the edge from this node down to it.",
+    items: [
+      ["why", "Height is the LONGEST root-to-leaf path, so the shorter side is irrelevant &mdash; <code class='inl'>max</code>, never a sum and never an average."],
+      ["syntax", "<code class='inl'>std::max</code> comes from <code class='inl'>&lt;algorithm&gt;</code>, which the header already includes."]
+    ] }
+};
+
+LINE_INFO.destroy = {
+  2: { src: "destroy_(node->left);",
+    what: "Free everything below before touching this node.",
+    items: [
+      ["why", "<code class='inl'>delete node</code> first and the pointers to both children go with it &mdash; the entire subtree is unreachable and leaked. Post-order is not a stylistic choice here, it is the only safe order."]
+    ] },
+  4: { src: "delete node;",
+    what: "Both children are gone, so this node is finally safe to free.",
+    items: [
+      ["note", "Same visit order as post-order traversal. The destructor is post-order traversal, with <code class='inl'>delete</code> where the print would be."],
+      ["why", "Nothing resets the pointer afterwards, and nothing needs to: the parent's own <code class='inl'>delete</code> is coming, and <code class='inl'>root_</code> dies with the object."]
+    ] }
+};
+
+LINE_INFO.apply = {
+  0: { src: "template <typename Functor>",
+    what: "The functor's type is a blank the compiler fills in at the call site.",
+    items: [
+      ["syntax", "Call it with a <code class='inl'>SumFunctor</code> and the compiler generates a version of this function for <code class='inl'>SumFunctor</code>; call it with a <code class='inl'>CountFunctor</code> and it generates a second one. That is why the whole definition has to sit in the <strong>.h</strong> file."],
+      ["why", "No virtual functions and no inheritance, so there is nothing to look up at run time &mdash; each generated version calls <code class='inl'>operator()</code> directly."]
+    ] },
+  1: { src: "Functor& func",
+    what: "By reference, so the functor you passed in is the one that gets updated.",
+    items: [
+      ["why", "A stateful functor keeps its running total in a member. Take it by value and every call updates a copy, the copies are thrown away, and <code class='inl'>sf.total</code> reads 0 no matter how correct the traversal is."]
+    ] },
+  4: { src: "func(node->data);",
+    what: "The one line that differs from inorder_.",
+    items: [
+      ["note", "<code class='inl'>inorder_</code> has <code class='inl'>os &lt;&lt; node-&gt;data</code> in exactly this slot. Same walk, same order, swappable action."],
+      ["why", "This is the payoff: printing, summing, counting and collecting are now four functors over ONE traversal, instead of four traversals."]
+    ] }
+};
+
+// ---------------------------------------------------------------------------
+// GUIDE -- the "How it works" panel, one entry per mode.
+//
+// Same shape as ct15-non-comparison-sorts' FACTS: a lead `idea`, numbered
+// `steps` (title, bullets, optional pseudocode), and a `watch` warning that is
+// about the ALGORITHM rather than the current step. Every frame carries a
+// `phase` index into steps, so the panel opens the step being executed and
+// collapses the rest.
+// ---------------------------------------------------------------------------
+var GUIDE = {
+  insert: {
+    idea: "Walk down from the root comparing as you go. The comparisons that find the place ARE the insert -- there is no separate search.",
+    steps: [
+      { t: "Compare, and pick a side",
+        p: ["if value < node->data:  go left",
+            "else if value > node->data: go right",
+            "else: duplicate, do nothing"],
+        b: ["one comparison per level, so the walk costs O(height)",
+            "equal means the value is already here &mdash; this tree holds a <strong>set</strong>",
+            "nothing is moved or rearranged on the way down"] },
+      { t: "Fall off the tree, and build there",
+        p: ["if node is null:", "    return new Node(value)"],
+        b: ["the empty slot is the answer &mdash; the walk stops when there is nowhere left to go",
+            "this is the only line that allocates",
+            "a new value <strong>always</strong> becomes a leaf"] },
+      { t: "Reattach on the way back up",
+        p: ["node->left  = insert_(node->left,  value)",
+            "node->right = insert_(node->right, value)",
+            "return node"],
+        b: ["each call returns the subtree it just worked on, and the parent assigns it back",
+            "for every node except the last this reassigns a child to the value it already had",
+            "that is what lets the function work without parent pointers or <code>Node**</code>"] }
+    ],
+    watch: "<strong>The assignment is not optional.</strong> Writing <code>insert_(node-&gt;left, value);</code> on its own compiles and runs, and the new node is created and then immediately leaked &mdash; nothing ever points at it. The tree looks unchanged and the only symptom is a test that says the value is not there."
+  },
+
+  search: {
+    idea: "The same walk as insert, but the answer is whether you land on the value or fall off the tree.",
+    steps: [
+      { t: "Check this node first",
+        p: ["if value == node->data: return true"],
+        b: ["a hit at the root costs exactly one comparison, whatever the tree size",
+            "checked before either branch, so it is never reached twice"] },
+      { t: "Eliminate half, then recurse",
+        p: ["if value < node->data: return search_(node->left,  value)",
+            "else:                 return search_(node->right, value)"],
+        b: ["one comparison discards an entire subtree without looking at it",
+            "that is binary search, on a linked structure instead of an array",
+            "O(log n) balanced, O(n) on a spine &mdash; try the ascending preset"] },
+      { t: "Falling off means not found",
+        p: ["if node is null: return false"],
+        b: ["the nullptr base case is the only thing that reports a miss",
+            "a miss costs the same as a hit at the same depth &mdash; no extra work"] }
+    ],
+    watch: "<strong>Forget the nullptr base case and every value that IS in the tree still comes back true.</strong> Only the misses crash or lie, which is why the tests search for values that were never inserted, and from three different directions: between two existing values, below the smallest, and above the largest."
+  },
+
+  traverse: {
+    idea: "One walk, three orders. The recursion is identical every time; only the position of the visit line changes.",
+    steps: [
+      { t: "Stop at the bottom",
+        p: ["if node is null: return"],
+        b: ["every traversal needs this and nothing else as its base case",
+            "it does no work at all &mdash; it just stops the recursion",
+            "both children of every leaf come through here, so it runs often"] },
+      { t: "Visit -- before, between, or after",
+        p: ["inorder_(node->left,  os)",
+            "os << node->data << \" \"",
+            "inorder_(node->right, os)"],
+        b: ["both subtrees are always visited, left before right, in all three orders",
+            "<strong>before</strong> both calls gives pre-order, root first",
+            "<strong>between</strong> them gives in-order, which on a BST is sorted",
+            "<strong>after</strong> both gives post-order, children before parents",
+            "one line, moved; that is the entire difference between the three"] },
+      { t: "The order is the result",
+        b: ["in-order comes out sorted &mdash; the BST property read left to right",
+            "pre-order can be re-inserted to rebuild the identical tree",
+            "post-order finishes every child first, so it is the order to delete in",
+            "all three are O(n): every node, exactly once"] }
+    ],
+    watch: "<strong>Write to <code>os</code>, not <code>std::cout</code>.</strong> The stream arrives as a parameter so the caller chooses the destination &mdash; the console, a file, or a string. The public method defaults it to <code>std::cout</code>, which is why <code>bst.inorder()</code> still just prints, and why the tests can read the output back without hijacking the console."
+  },
+
+  compare: {
+    idea: "The same tree, walked three ways at once. Watch the outputs diverge even though the recursion never changes.",
+    steps: [
+      { t: "In-order -- sorted", b: ["left, node, right", "on a BST this is ascending order, every time", "the quickest check that the BST property actually holds"] },
+      { t: "Pre-order -- root first", b: ["node, left, right", "re-inserting this sequence rebuilds the identical tree", "use it to copy or serialise"] },
+      { t: "Post-order -- root last", b: ["left, right, node", "every child is finished before its parent", "the only safe order to delete in"] }
+    ],
+    watch: "<strong>All three are O(n) and all three visit every node exactly once.</strong> Choosing between them is never about speed &mdash; it is about what you need to be true when you reach a node: everything smaller already done (in-order), nothing yet (pre-order), or both children finished (post-order)."
+  },
+
+  height: {
+    idea: "A node cannot answer until both of its children have. Height is computed on the way back UP, not on the way down.",
+    steps: [
+      { t: "An empty subtree is -1",
+        p: ["if node is null: return -1"],
+        b: ["&minus;1, not 0 &mdash; this is the whole reason the arithmetic works",
+            "a leaf then comes out as <code>1 + max(-1, -1)</code> = <strong>0</strong>",
+            "height counts <em>edges</em>, and a leaf has none below it"] },
+      { t: "Ask both children",
+        p: ["lh = height_(node->left)", "rh = height_(node->right)"],
+        b: ["both sides, always &mdash; the longest path could be on either",
+            "this is where the recursion descends; nothing is decided yet",
+            "the same post-order shape the destructor uses"] },
+      { t: "Taller side, plus this edge",
+        p: ["return 1 + max(lh, rh)"],
+        b: ["<code>max</code>, never a sum and never an average",
+            "the shorter side is discarded entirely",
+            "the +1 is the edge from this node down to its tallest child"] }
+    ],
+    watch: "<strong>Return 0 for the empty subtree instead of &minus;1 and every height is one too big.</strong> It compiles, it runs, a leaf claims height 1, and every single height test fails. The badge on each node here is what that node's own call returned, so you can see the error enter at the leaves and propagate up."
+  },
+
+  destroy: {
+    idea: "Post-order, and only post-order. Free a parent first and you have lost the pointers to everything under it.",
+    steps: [
+      { t: "Nothing to free",
+        p: ["if node is null: return"],
+        b: ["<code>delete nullptr</code> would be legal, but there is no node here"] },
+      { t: "Free both subtrees first",
+        p: ["destroy_(node->left)", "destroy_(node->right)"],
+        b: ["the left subtree is only reachable through this node, so it must go first",
+            "then the right, for the same reason",
+            "the node itself is still alive at this point, and has to be"] },
+      { t: "Now this node is safe",
+        p: ["delete node"],
+        b: ["both child pointers have already been followed and freed",
+            "nothing below is reachable through this node any more, so nothing leaks",
+            "the free order is exactly post-order traversal's visit order"] }
+    ],
+    watch: "<strong>Move <code>delete node</code> to the top and the program still runs.</strong> That is the trap: it frees the root, the two child pointers go with it, and every node below is leaked with no error anywhere. The leak is invisible without a sanitiser &mdash; which is why the order, not the deleting, is the lesson."
+  },
+
+  apply: {
+    idea: "The traversal is written once; what happens at each node is supplied by the caller as a functor. <code>Functor</code> is a blank the compiler fills in at the call site &mdash; click the <code>template</code> line for how that works.",
+    steps: [
+      { t: "Stop at the bottom",
+        p: ["if node is null: return"],
+        b: ["the same base case every traversal has",
+            "the functor is <strong>not</strong> called here &mdash; only real nodes get the action"] },
+      { t: "Walk exactly as in-order does",
+        p: ["inorder_apply_(node->left,  func)",
+            "...",
+            "inorder_apply_(node->right, func)"],
+        b: ["identical recursion to <code>inorder_</code> &mdash; left, visit, right",
+            "so values arrive in sorted order, same as <code>inorder()</code>",
+            "<code>func</code> is handed down unchanged, so every call shares one functor"] },
+      { t: "Call the functor at the visit",
+        p: ["func(node->data)"],
+        b: ["the one line that differs from <code>inorder_</code>",
+            "<code>PrintFunctor</code> prints it, <code>SumFunctor</code> adds it, <code>CountFunctor</code> ignores it and counts",
+            "four behaviours from one traversal, instead of four traversals"] }
+    ],
+    watch: "<strong><code>Functor&amp; func</code> &mdash; the ampersand is load-bearing.</strong> A stateful functor keeps its running total in a member. Take it by value and every call updates a copy that is then thrown away, so <code>sf.total</code> reads 0 no matter how correct your traversal is. Switch to SumFunctor and step it: the total only survives because the functor is a reference."
+  }
+};
+
+var FACTS = {
+  insert: [
+    ["Cost", "O(h) &mdash; one comparison per level, where h is the height"],
+    ["Balanced", "h is about log&#8322;n, so 7 nodes cost 3 comparisons"],
+    ["Worst case", "sorted input gives h = n&minus;1, and insert degrades to O(n)"],
+    ["Allocates", "exactly one node, on the base case"],
+    ["Scored by", "<code class=\"inl\">BSTInsert</code> &mdash; 6 points"]
+  ],
+  search: [
+    ["Cost", "O(h), the same walk as insert"],
+    ["Hit or miss", "both cost the same at the same depth"],
+    ["Worst case", "O(n) on a degenerate tree &mdash; try the ascending preset"],
+    ["Scored by", "<code class=\"inl\">BSTSearch</code> &mdash; 3 points"]
+  ],
+  height: [
+    ["Cost", "O(n) &mdash; it has to ask every node, even to measure one path"],
+    ["Shape", "post-order: both children report before the parent can answer"],
+    ["Empty", "&minus;1, by convention, so a leaf comes out 0"],
+    ["Why it matters", "every other operation costs O(height), so this IS the cost model"],
+    ["Scored by", "<code class=\"inl\">BSTHeight</code> &mdash; 6 points"]
+  ],
+  destroy: [
+    ["Cost", "O(n) &mdash; one delete per node"],
+    ["Shape", "post-order, and only post-order"],
+    ["If you get it wrong", "delete the parent first and every node below it leaks"],
+    ["Called by", "the destructor, once, on <code class=\"inl\">root_</code>"],
+    ["Scored by", "nothing directly &mdash; it is provided for you"]
+  ],
+  apply: [
+    ["Cost", "O(n), same as any traversal"],
+    ["Overhead", "none at run time &mdash; the compiler generates a version per functor type"],
+    ["State", "the functor is taken by reference, so its members survive the walk"],
+    ["Lives in", "the .h file, because templates must be visible where they are used"],
+    ["Scored by", "nothing &mdash; provided, but it only works once your traversal is right"]
+  ],
+  traverse: [
+    ["Cost", "O(n) &mdash; every node, exactly once, whichever order"],
+    ["In-order", "sorted output, for a BST"],
+    ["Pre-order", "root first &mdash; use it to copy a tree"],
+    ["Post-order", "children before parents &mdash; use it to delete one"],
+    ["Scored by", "<code class=\"inl\">BSTTraversal</code> &mdash; 12 points"]
+  ]
+};
+
+// ---------------------------------------------------------------------------
+// Frame builders
+// ---------------------------------------------------------------------------
+function F(o) { return o; }
+
+// Node objects never survive into a frame -- clone(root) makes new ones -- so
+// every mark travels as a value. See the comment in treeSvg.
+function vals(nodes) { return nodes.map(function (n) { return n.v; }); }
+
+// Which How-it-works step each line of each listing belongs to. Derived from
+// the code rather than stored on the frame, so a frame can never claim a phase
+// its highlighted line does not belong to.
+var PHASE_OF = {
+  insert:    { 1: 1, 3: 0, 4: 2, 5: 0, 6: 2, 8: 0, 10: 2 },
+  search:    { 1: 2, 2: 0, 3: 1, 4: 1 },
+  inorder:   { 0: 2, 1: 0, 2: 1, 3: 1, 4: 1 },
+  preorder:  { 0: 2, 1: 0, 2: 1, 3: 1, 4: 1 },
+  postorder: { 0: 2, 1: 0, 2: 1, 3: 1, 4: 1 },
+  height:    { 1: 0, 2: 1, 3: 1, 4: 2, 5: 2 },
+  destroy:   { 1: 0, 2: 1, 3: 1, 4: 2, 5: 2 },
+  apply:     { 2: 0, 3: 1, 4: 2, 5: 1, 6: 2 }
+};
+
+function phaseOf(key, line) {
+  var m = PHASE_OF[key];
+  if (!m) return 0;
+  return m[line] === undefined ? 0 : m[line];
+}
+
+// The listing a mode reads from -- traversals pick theirs by order.
+function codeKey() {
+  return state.mode === "traverse" ? state.order : state.mode;
+}
+
+function buildInsert(seq) {
+  var frames = [], root = null;
+
+  frames.push(F({ tree: null, line: 0, stack: [],
+    head: "Start with an empty tree. <code>root</code> is <code>nullptr</code>.",
+    why: ["every insert below walks down from the root, comparing as it goes"] }));
+
+  seq.forEach(function (value) {
+    var path = [], depth = 0;
+
+    (function descend(node, parent, side) {
+      if (!node) {
+        frames.push(F({ tree: clone(root), line: 1, stack: path.map(function (n) { return n.v; }),
+          slot: parent ? { parent: parent.v, side: side } : null, path: vals(path),
+          head: "Empty slot reached &mdash; <strong>" + value + "</strong> goes here, " +
+                (parent ? "as the " + (side === "l" ? "left" : "right") + " child of " + parent.v
+                        : "as the root"),
+          why: ["<code>!node</code> is true, so this call allocates and returns the new node",
+                "the comparisons on the way down <em>were</em> the search &mdash; there is only one legal slot"],
+          insertingValue: value, depth: depth }));
+        return;
+      }
+      path.push(node);
+      var goLeft = value < node.v, dup = value === node.v;
+      frames.push(F({ tree: clone(root), line: dup ? 8 : (goLeft ? 3 : 5),
+        stack: vals(path), hit: node.v, path: vals(path),
+        test: dup ? { q: value + " == " + node.v, yes: true, res: "duplicate &mdash; dropped" }
+                  : { q: value + (goLeft ? " &lt; " : " &gt; ") + node.v, yes: true,
+                      res: "go " + (goLeft ? "left" : "right") },
+        head: dup ? "<strong>" + value + "</strong> is already here &mdash; nothing happens"
+                  : "At " + node.v + ": " + value + " is " + (goLeft ? "smaller" : "larger") +
+                    ", so go " + (goLeft ? "left" : "right"),
+        why: dup ? ["neither branch is taken, so the value is dropped. This tree is a set"]
+                 : ["one comparison, and the entire " + (goLeft ? "right" : "left") +
+                    " subtree is eliminated",
+                    "this is level " + depth + " of the descent"],
+        insertingValue: value, depth: depth }));
+      if (dup) return;
+      depth++;
+      descend(goLeft ? node.l : node.r, node, goLeft ? "l" : "r");
+    })(root, null, null);
+
+    root = insertPlain(root, value);
+    var placed = (function find(n) {
+      if (!n) return null;
+      if (n.v === value) return n;
+      return value < n.v ? find(n.l) : find(n.r);
+    })(root);
+
+    frames.push(F({ tree: clone(root), line: 10, stack: [], placed: placed ? placed.v : null,
+      head: "<strong>" + value + "</strong> is in. Height is now " + heightOf(root) +
+            ", " + countOf(root) + " node" + (countOf(root) === 1 ? "" : "s") + ".",
+      why: ["each <code>return node</code> on the way back up lets the parent reattach the subtree",
+            "nothing above the insertion point changed"],
+      insertingValue: value }));
+  });
+
+  var last = frames[frames.length - 1];
+  frames.push(F({ tree: clone(root), line: 10, stack: [],
+    head: "Done. " + countOf(root) + " nodes, height <strong>" + heightOf(root) + "</strong>.",
+    why: ["in-order on this tree reads " + walk(root, "inorder", []).join(", "),
+          heightOf(root) >= seq.length - 1
+            ? "this tree is a <strong>straight line</strong> &mdash; every insert went the same way, so it behaves like a linked list"
+            : "height " + heightOf(root) + " for " + countOf(root) +
+              " nodes, so a search costs at most " + (heightOf(root) + 1) + " comparisons"] }));
+  return frames;
+}
+
+function buildSearch(root, target) {
+  var frames = [], path = [], found = false, comps = 0;
+
+  (function go(node) {
+    if (!node) {
+      frames.push(F({ tree: clone(root), line: 1, path: vals(path),
+        stack: path.map(function (n) { return n.v; }),
+        head: "Fell off the bottom &mdash; <strong>" + target + "</strong> is not in this tree.",
+        why: ["<code>!node</code>, so the answer is false",
+              "a miss costs the same " + comps + " comparison" + (comps === 1 ? "" : "s") +
+              " a hit at this depth would have"], comps: comps, done: "miss" }));
+      return;
+    }
+    path.push(node);
+    comps++;
+    if (target === node.v) {
+      found = true;
+      frames.push(F({ tree: clone(root), line: 2, hit: node.v, path: vals(path),
+        stack: path.map(function (n) { return n.v; }),
+        test: { q: target + " == " + node.v, yes: true, res: "found it" },
+        head: "Found <strong>" + target + "</strong> after " + comps + " comparison" +
+              (comps === 1 ? "" : "s") + ".",
+        why: ["<code>return true</code> unwinds the whole stack at once",
+              "nothing below this node was ever looked at"], comps: comps, done: "hit" }));
+      return;
+    }
+    var goLeft = target < node.v;
+    frames.push(F({ tree: clone(root), line: 4, hit: node.v, path: vals(path),
+      stack: path.map(function (n) { return n.v; }),
+      test: { q: target + (goLeft ? " &lt; " : " &gt; ") + node.v, yes: true,
+              res: "go " + (goLeft ? "left" : "right") },
+      head: "At " + node.v + ": go " + (goLeft ? "left" : "right"),
+      why: ["the " + (goLeft ? "right" : "left") + " subtree is eliminated without being looked at",
+            "comparisons so far: " + comps], comps: comps }));
+    go(goLeft ? node.l : node.r);
+  })(root);
+
+  return frames;
+}
+
+function buildTraversal(root, order) {
+  var frames = [], out = [], path = [];
+
+  var visitLine = { inorder: 3, preorder: 2, postorder: 4 };
+  (function go(node) {
+    if (!node) {
+      frames.push(F({ tree: clone(root), line: 1, out: out.slice(), path: vals(path),
+        stack: path.map(function (n) { return n.v; }),
+        head: "Empty &mdash; <code>return</code>, and back up to the caller.",
+        why: ["the base case does nothing at all; it just stops the recursion"] }));
+      return;
+    }
+    path.push(node);
+    if (order === "preorder") {
+      out.push(node.v);
+      frames.push(F({ tree: clone(root), line: 2, out: out.slice(), hit: node.v,
+        path: vals(path), done: out.slice(), stack: vals(path),
+        head: "Visit <strong>" + node.v + "</strong> &mdash; before either subtree",
+        why: ["pre-order prints on the way <em>in</em>"] }));
+    }
+    go(node.l);
+    if (order === "inorder") {
+      out.push(node.v);
+      frames.push(F({ tree: clone(root), line: 3, out: out.slice(), hit: node.v,
+        path: vals(path), done: out.slice(), stack: vals(path),
+        head: "Visit <strong>" + node.v + "</strong> &mdash; its whole left side is finished",
+        why: ["everything printed so far is smaller than " + node.v] }));
+    }
+    go(node.r);
+    if (order === "postorder") {
+      out.push(node.v);
+      frames.push(F({ tree: clone(root), line: 4, out: out.slice(), hit: node.v,
+        path: vals(path), done: out.slice(), stack: vals(path),
+        head: "Visit <strong>" + node.v + "</strong> &mdash; both subtrees are done",
+        why: ["every child of " + node.v + " was printed before it"] }));
+    }
+    path.pop();
+  })(root);
+
+  frames.push(F({ tree: clone(root), line: 0, out: out.slice(), done: out.slice(), stack: [],
+    head: "Done &mdash; " + out.join(", "),
+    why: [order === "inorder"
+            ? "sorted, because in-order reads a BST left to right"
+            : order === "preorder"
+              ? "root first &mdash; re-inserting this sequence rebuilds the identical tree"
+              : "children always before parents &mdash; this is the order a destructor must use"] }));
+  return frames;
+}
+
+// Height is worked out on the way back UP: a node cannot answer until both of
+// its children have. The badge on each node is the value that call returned.
+function buildHeight(root) {
+  var frames = [], path = [], labels = {};
+
+  function snap(o) {
+    o.tree = clone(root);
+    o.stack = vals(path);
+    o.labels = JSON.parse(JSON.stringify(labels));
+    frames.push(F(o));
+  }
+
+  var h = (function go(node) {
+    if (!node) {
+      snap({ line: 1, path: vals(path),
+        head: "Empty &mdash; <code>return -1</code>",
+        why: ["an empty subtree has height &minus;1, which is what makes a leaf come out 0"] });
+      return -1;
+    }
+    path.push(node);
+    snap({ line: 2, hit: node.v, path: vals(path),
+      head: "At <strong>" + node.v + "</strong> &mdash; ask the left subtree first",
+      why: [node.v + " cannot know its own height until both children have reported"] });
+    var lh = go(node.l);
+
+    snap({ line: 3, hit: node.v, path: vals(path),
+      head: "Left of <strong>" + node.v + "</strong> came back <strong>" + lh +
+            "</strong> &mdash; now the right",
+      why: ["one side is not enough; height is the longest path, so both must be measured"] });
+    var rh = go(node.r);
+
+    var own = 1 + Math.max(lh, rh);
+    labels[node.v] = own;
+    path.pop();
+    snap({ line: 4, hit: node.v, path: vals(path).concat([node.v]),
+      head: "<strong>" + node.v + "</strong> returns <strong>" + own + "</strong> &mdash; 1 + max(" +
+            lh + ", " + rh + ")",
+      why: [(lh === rh ? "both sides are " + lh + ", so either one wins"
+                       : "the " + (lh > rh ? "left" : "right") + " side is taller, at " +
+                         Math.max(lh, rh) + " &mdash; the shorter side is ignored entirely"),
+            "the +1 is the edge from " + node.v + " down to that taller side"] });
+    return own;
+  })(root);
+
+  snap({ line: 5, path: [],
+    head: "Height is <strong>" + h + "</strong>",
+    why: [h === countOf(root) - 1
+            ? "that is n&minus;1 &mdash; this tree is a spine, and every operation on it is O(n)"
+            : "every badge is what that node's call returned; the root's is the tree's height",
+          "search, insert and remove all cost O(height), so this number is the cost model"] });
+  return frames;
+}
+
+// The destructor, which is post-order traversal with delete where print goes.
+function buildDestroy(root) {
+  var frames = [], path = [], freed = [];
+
+  function snap(o) {
+    o.tree = clone(root);
+    o.stack = vals(path);
+    o.freed = freed.slice();
+    frames.push(F(o));
+  }
+
+  (function go(node) {
+    if (!node) {
+      snap({ line: 1, path: vals(path),
+        head: "Empty &mdash; <code>return</code>, nothing to free",
+        why: ["<code>delete nullptr</code> would be legal, but there is no node here to delete"] });
+      return;
+    }
+    path.push(node);
+    snap({ line: 2, hit: node.v, path: vals(path),
+      head: "At <strong>" + node.v + "</strong> &mdash; go left before freeing anything",
+      why: ["if " + node.v + " were deleted now, both of its child pointers would go with it"] });
+    go(node.l);
+
+    snap({ line: 3, hit: node.v, path: vals(path),
+      head: "Left of <strong>" + node.v + "</strong> is freed &mdash; now the right",
+      why: ["still not safe to delete " + node.v + ": its right subtree is only reachable through it"] });
+    go(node.r);
+
+    freed.push(node.v);
+    path.pop();
+    snap({ line: 4, hit: node.v, path: vals(path),
+      head: "<code>delete</code> <strong>" + node.v + "</strong> &mdash; both children are gone",
+      why: ["nothing below " + node.v + " is reachable through it any more, so nothing leaks",
+            freed.length + " of " + countOf(root) + " nodes freed"] });
+  })(root);
+
+  snap({ line: 5, path: [],
+    head: "All " + countOf(root) + " nodes freed",
+    why: ["the order was " + freed.join(", ") + " &mdash; the same order post-order traversal prints",
+          "a parent is never freed before its children, which is the whole point"] });
+  return frames;
+}
+
+// inorder_apply with a functor. Same walk as in-order; only the action differs.
+var FUNCTORS = {
+  print: { label: "PrintFunctor", kind: "stateless",
+           init: function () { return { out: [] }; },
+           step: function (st, v) { st.out.push(v); },
+           show: function (st) { return st.out.length ? st.out.join(" ") : "&mdash;"; },
+           chip: "printed", state: function () { return "no members &mdash; nothing to carry"; } },
+  sum:   { label: "SumFunctor", kind: "stateful",
+           init: function () { return { total: 0 }; },
+           step: function (st, v) { st.total += v; },
+           show: function (st) { return String(st.total); },
+           chip: "total", state: function (st) { return "total = " + st.total; } },
+  count: { label: "CountFunctor", kind: "stateful",
+           init: function () { return { count: 0 }; },
+           step: function (st) { st.count += 1; },
+           show: function (st) { return String(st.count); },
+           chip: "count", state: function (st) { return "count = " + st.count; } }
+};
+
+function buildApply(root, which) {
+  var fn = FUNCTORS[which], st = fn.init(), frames = [], path = [], seen = [];
+
+  function snap(o) {
+    o.tree = clone(root);
+    o.stack = vals(path);
+    o.done = seen.slice();
+    o.functor = { label: fn.label, kind: fn.kind, chip: fn.chip,
+                  value: fn.show(st), state: fn.state(st) };
+    frames.push(F(o));
+  }
+
+  (function go(node) {
+    if (!node) {
+      snap({ line: 2, path: vals(path),
+        head: "Empty &mdash; <code>return</code>",
+        why: ["the functor is not called here; only real nodes get the action"] });
+      return;
+    }
+    path.push(node);
+    snap({ line: 3, hit: node.v, path: vals(path),
+      head: "At <strong>" + node.v + "</strong> &mdash; left subtree first",
+      why: ["in-order, so everything smaller than " + node.v + " is handed over before it is"] });
+    go(node.l);
+
+    fn.step(st, node.v);
+    seen.push(node.v);
+    snap({ line: 4, hit: node.v, path: vals(path),
+      head: "<code>func(" + node.v + ")</code> &mdash; " + fn.label + " now reads " + fn.show(st),
+      why: [which === "print"
+              ? "PrintFunctor writes the value and keeps nothing; every call is the same"
+              : "the functor was passed by reference, so this change outlives the call",
+            "this is the ONE line that differs from inorder_"] });
+    go(node.r);
+    path.pop();
+  })(root);
+
+  snap({ line: 6, path: [],
+    head: fn.label + " finished with <strong>" + fn.show(st) + "</strong>",
+    why: ["the traversal never changed &mdash; only what happens at line 5 did",
+          which === "print"
+            ? "same output as inorder(), reached without rewriting the walk"
+            : "a plain function could not do this without a global; the functor carries it in a member"] });
+  return frames;
+}
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+var state = { mode: "insert", preset: "balanced", step: 0, target: null,
+              order: "inorder", functor: "sum", pinned: null, peek: null,
+              runs: {}, maxFrames: 1, timer: null };
+
+function compute() {
+  var seq = PRESETS[state.preset].seq;
+  var root = buildTree(seq);
+  if (state.target === null || seq.indexOf(state.target) === -1 && state.target !== -1) {
+    state.target = seq[seq.length - 1];
+  }
+  state.tree = root;
+  state.runs = {
+    insert: buildInsert(seq),
+    search: buildSearch(root, state.target),
+    traverse: buildTraversal(root, state.order),
+    inorder: buildTraversal(root, "inorder"),
+    preorder: buildTraversal(root, "preorder"),
+    postorder: buildTraversal(root, "postorder"),
+    height: buildHeight(root),
+    destroy: buildDestroy(root),
+    apply: buildApply(root, state.functor)
+  };
+  state.maxFrames = state.mode === "compare"
+    ? Math.max(state.runs.inorder.length, state.runs.preorder.length, state.runs.postorder.length)
+    : state.runs[state.mode].length;
+  if (state.step >= state.maxFrames) state.step = state.maxFrames - 1;
+}
+
+function frameAt(key, step) {
+  var r = state.runs[key];
+  return r[Math.min(step, r.length - 1)];
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function codeHtml(key, hit) {
+  return '<div class="code" id="code">' + CODE[key].map(function (ln, i) {
+    var cls = [];
+    if (i === hit) cls.push("hit");
+    if (state.pinned === i) cls.push("pin");
+    var t = esc(ln);
+    var at = t.indexOf("//");
+    if (at !== -1) t = t.slice(0, at) + '<span class="cm">' + t.slice(at) + "</span>";
+    return '<div data-line="' + i + '"' + (cls.length ? ' class="' + cls.join(" ") + '"' : "") +
+           ' tabindex="0">' + (t === "" ? "&nbsp;" : t) + "</div>";
+  }).join("") + "</div>" + lineInfoHtml(key);
+}
+
+function lineInfoHtml(key) {
+  var n = state.pinned;
+  var info = LINE_INFO[key] && LINE_INFO[key][n];
+  if (!info) {
+    return '<p class="legend" style="margin-top:.5rem">Click a line of code for a breakdown of it.</p>';
+  }
+  return '<div class="lineinfo"><h4>' + esc(info.src) + "</h4><p style='margin:0'>" + info.what +
+    "</p><ul class='li-items'>" + info.items.map(function (it) {
+      return '<li><span class="li-kind k-' + it[0] + '">' + it[0] + "</span>" + it[1] + "</li>";
+    }).join("") + "</ul></div>";
+}
+
+function chipsHtml(f) {
+  var out = [];
+  if (f.insertingValue !== undefined) out.push('<span class="chip cur">inserting <b>' + f.insertingValue + "</b></span>");
+  if (f.comps !== undefined) out.push('<span class="chip">comparisons <b>' + f.comps + "</b></span>");
+  if (f.done === "hit") out.push('<span class="chip ok">found</span>');
+  if (f.done === "miss") out.push('<span class="chip no">not found</span>');
+  if (f.out) out.push('<span class="chip out">output: <b>' + (f.out.length ? f.out.join(", ") : "&mdash;") + "</b></span>");
+  if (f.freed) out.push('<span class="chip no">freed <b>' + f.freed.length + "</b></span>");
+  if (f.functor) {
+    out.push('<span class="chip cur">' + f.functor.label + " <b>" + f.functor.kind + "</b></span>");
+    out.push('<span class="chip out">' + f.functor.chip + ": <b>" + f.functor.value + "</b></span>");
+  }
+  return out.length ? '<div class="chips">' + out.join("") + "</div>" : "";
+}
+
+function testHtml(f) {
+  if (!f.test) return "";
+  return '<div class="test"><span class="q">' + f.test.q + "</span> &rarr; " + f.test.res + "</div>";
+}
+
+// Variables in scope beside the call stack. Every value here is read off the
+// frame, so it is what the code would actually be holding at this line.
+function localsHtml(f) {
+  var rows = [];
+  function add(name, val, note, pend) {
+    rows.push('<div class="lv"><span class="ln">' + name + '</span>' +
+      '<span class="lval' + (pend ? " pend" : "") + '">' + val + "</span>" +
+      (note ? '<span class="lat">' + note + "</span>" : "") + "</div>");
+  }
+
+  // An empty stack means no call is in progress -- the opening or closing
+  // frame -- which is not the same thing as a call that landed on nullptr.
+  var inCall = !!(f.stack && f.stack.length);
+  var here = inCall ? f.stack[f.stack.length - 1] : null;
+  add("node", inCall ? here : "&mdash;",
+      inCall ? "the call that is executing" : "no call in progress", !inCall);
+
+  if (f.insertingValue !== undefined) add("value", f.insertingValue, "being inserted");
+  if (state.mode === "search") add("value", state.target, "being looked for");
+  if (f.comps !== undefined) add("comparisons", f.comps, "so far");
+  if (f.labels && here !== null && f.labels[here] !== undefined)
+    add("return", f.labels[here], "this call's height");
+  if (f.out) add("output", f.out.length ? f.out.join(" ") : "&mdash;", "written so far");
+  if (f.freed) add("freed", f.freed.length, "nodes deleted");
+  if (f.functor) add(f.functor.label, f.functor.value, f.functor.state);
+
+  var stack = '<div class="lv stackline"><span class="ln">root_</span>' +
+              '<span class="lat">the tree</span></div>';
+  if (f.stack) {
+    f.stack.forEach(function (v, d) {
+      var last = d === f.stack.length - 1;
+      stack += '<div class="lv stackline' + (last ? " here" : "") + '" ' +
+               'style="padding-left:' + (0.7 + d * 0.7) + 'rem">' +
+               '<span class="ln">&#x21B3;</span><span class="lat">node ' + v +
+               (last ? " &larr; here" : "") + "</span></div>";
+    });
+  }
+  return '<div class="locals"><div><h5>Variables in scope</h5>' + rows.join("") + "</div>" +
+         '<div><h5>Call stack</h5>' + stack + "</div></div>";
+}
+
+// How it works: the phase being executed is open, the rest collapse to titles.
+function howtoHtml() {
+  var g = GUIDE[state.mode];
+  if (!g) return "";
+  var f = frameAt(state.mode, state.step);
+  var at = state.mode === "compare" ? null : phaseOf(codeKey(), f.line);
+  return '<div class="card"><h2>How it works</h2><div class="card-body howto">' +
+    '<p class="lead">' + g.idea + "</p>" +
+    '<div class="howto-steps">' + g.steps.map(function (st, i) {
+      var open = (i === at) || (state.peek === i);
+      if (!open) {
+        return '<div class="hstep off" data-step="' + i + '" role="button" tabindex="0">' +
+               '<h4><span class="hnum">' + (i + 1) + "</span>" + st.t +
+               '<span class="peek">show</span></h4></div>';
+      }
+      return '<div class="hstep' + (i === at ? " on" : "") + '" data-step="' + i + '" ' +
+             'role="button" tabindex="0"><h4><span class="hnum">' + (i + 1) + "</span>" +
+             st.t + (i === at ? '<span class="peek">you are here</span>' : "") + "</h4><ul>" +
+             st.b.map(function (b) { return "<li>" + b + "</li>"; }).join("") + "</ul>" +
+             (st.p ? '<div class="pseudo"><span class="pl">in pseudocode</span>' +
+                     st.p.map(esc).join("\n") + "</div>" : "") +
+             "</div>";
+    }).join("") + "</div></div></div>";
+}
+
+function wireHowto() {
+  var root = document.getElementById("howto");
+  Array.prototype.forEach.call(root.querySelectorAll("[data-step]"), function (d) {
+    var i = parseInt(d.getAttribute("data-step"), 10);
+    function toggle() { state.peek = (state.peek === i) ? null : i; render(); }
+    d.addEventListener("click", toggle);
+    d.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") { ev.preventDefault(); toggle(); }
+    });
+  });
+}
+
+// Jump to the first frame belonging to a later How-it-works step.
+function nextPhase() {
+  if (state.mode === "compare") { go(state.maxFrames - 1); return; }
+  var key = codeKey();
+  var here = phaseOf(key, frameAt(state.mode, state.step).line);
+  for (var i = state.step + 1; i < state.maxFrames; i++) {
+    if (phaseOf(key, frameAt(state.mode, i).line) !== here) { go(i); return; }
+  }
+  go(state.maxFrames - 1);
+}
+
+function factsHtml(key) {
+  var k = key === "inorder" || key === "preorder" || key === "postorder" ? "traverse" : key;
+  if (state.mode === "height" || state.mode === "destroy" || state.mode === "apply") k = state.mode;
+  if (!FACTS[k]) return "";
+  return '<dl class="facts">' + FACTS[k].map(function (p) {
+    return "<dt>" + p[0] + "</dt><dd>" + p[1] + "</dd>";
+  }).join("") + "</dl>";
+}
+
+function renderSolo() {
+  var key = state.mode === "traverse" ? state.order : state.mode;
+  var f = frameAt(state.mode, state.step);
+  var title = { insert: "Insert", search: "Search for " + state.target,
+                traverse: state.order.replace("order", "-order"),
+                height: "Height", destroy: "Destructor",
+                apply: "inorder_apply with " + FUNCTORS[state.functor].label }[state.mode];
+
+  document.getElementById("stage").innerHTML =
+    '<div class="solo"><div>' +
+      '<div class="card"><h2>' + title + " &mdash; " + PRESETS[state.preset].label + " tree</h2>" +
+        '<div class="card-body">' + treeSvg(f.tree, f) + chipsHtml(f) + testHtml(f) + "</div></div>" +
+      '<div class="card"><h2>What the machine is holding</h2><div class="card-body">' +
+        localsHtml(f) + "</div></div>" +
+      '<div class="card"><h2>What just happened</h2><div class="card-body">' +
+        '<p class="head">' + f.head + "</p>" +
+        (f.why && f.why.length ? '<ul class="why">' + f.why.map(function (w) {
+          return "<li>" + w + "</li>"; }).join("") + "</ul>" : "") +
+      "</div></div>" +
+    "</div><div>" +
+      '<div class="card"><h2>The code</h2><div class="card-body">' + codeHtml(key, f.line) + "</div></div>" +
+      '<div class="card"><h2>What it costs</h2><div class="card-body">' + factsHtml(key) + "</div></div>" +
+    "</div></div>";
+
+  wireCode(key);
+}
+
+function renderCompare() {
+  var orders = [
+    { k: "inorder",   n: "In-order",   cls: "inorder",   use: "sorted output" },
+    { k: "preorder",  n: "Pre-order",  cls: "preorder",  use: "copy a tree" },
+    { k: "postorder", n: "Post-order", cls: "postorder", use: "delete a tree" }
+  ];
+  var atEnd = orders.every(function (o) { return state.step >= state.runs[o.k].length - 1; });
+
+  var lanes = orders.map(function (o) {
+    var f = frameAt(o.k, state.step);
+    return '<div class="lane ' + o.cls + '"><h2>' + o.n + "</h2><div class='card-body'>" +
+      treeSvg(f.tree, f) +
+      '<div class="chips"><span class="chip out">' +
+        (f.out && f.out.length ? f.out.join(", ") : "&mdash;") + "</span></div>" +
+      '<p class="mini">' + f.head + "</p></div></div>";
+  }).join("");
+
+  var verdict = "";
+  if (atEnd) {
+    var rows = orders.map(function (o) {
+      var r = state.runs[o.k];
+      return "<tr><td>" + o.n + "</td><td class='mono'>" +
+        r[r.length - 1].out.join(", ") + "</td><td>" + o.use + "</td></tr>";
+    }).join("");
+    verdict =
+      '<div class="card"><h2>Same tree, same nodes, three orders</h2><div class="card-body">' +
+      "<table class='v'><thead><tr><th>Traversal</th><th>Output</th><th>What it is for</th>" +
+      "</tr></thead><tbody>" + rows + "</tbody></table>" +
+      '<div class="verdict">' +
+      "<p>All three visit <strong>every node exactly once</strong>, so all three are " +
+      "<strong>O(n)</strong>. They differ by <em>one line's position</em> &mdash; whether " +
+      "<code class='inl'>os &lt;&lt; node-&gt;data</code> sits before, between, or after the two " +
+      "recursive calls.</p>" +
+      "<p>In-order comes out <strong>sorted</strong>, and that is the BST property read left to " +
+      "right rather than a separate fact to memorise. Pre-order gives you the root first, so " +
+      "re-inserting that sequence rebuilds the identical tree. Post-order finishes every child " +
+      "before its parent, which is the only safe order to <strong>delete</strong> in &mdash; free " +
+      "a parent first and you have thrown away the pointers to its children.</p>" +
+      "</div></div></div>";
+  }
+
+  document.getElementById("stage").innerHTML =
+    '<div class="lanes">' + lanes + "</div>" +
+    (verdict ? '<div style="margin-top:1.1rem">' + verdict + "</div>" : "");
+}
+
+function wireCode(key) {
+  var code = document.getElementById("code");
+  if (!code) return;
+  Array.prototype.forEach.call(code.children, function (d) {
+    d.addEventListener("click", function () {
+      var n = parseInt(d.getAttribute("data-line"), 10);
+      state.pinned = (state.pinned === n) ? null : n;
+      render();
+    });
+  });
+}
+
+function extraControls() {
+  var row = document.getElementById("extraRow");
+  if (state.mode === "search") {
+    var seq = PRESETS[state.preset].seq;
+    var choices = [seq[seq.length - 1], seq[0], -1];
+    row.innerHTML = '<span class="lbl">Look for</span>' + choices.map(function (c) {
+      return '<button class="ctl' + (state.target === c ? " on" : "") + '" data-target="' + c +
+        '">' + (c === -1 ? "99 (not in the tree)" : c) + "</button>";
+    }).join("");
+    Array.prototype.forEach.call(row.querySelectorAll("[data-target]"), function (b) {
+      b.addEventListener("click", function () {
+        stopPlay();
+        var t = parseInt(b.getAttribute("data-target"), 10);
+        state.target = t === -1 ? 99 : t;
+        state.step = 0; compute(); render();
+      });
+    });
+  } else if (state.mode === "traverse") {
+    row.innerHTML = '<span class="lbl">Order</span>' +
+      ["inorder", "preorder", "postorder"].map(function (o) {
+        return '<button class="ctl' + (state.order === o ? " on" : "") + '" data-order="' + o +
+          '">' + o.replace("order", "-order") + "</button>";
+      }).join("");
+    Array.prototype.forEach.call(row.querySelectorAll("[data-order]"), function (b) {
+      b.addEventListener("click", function () {
+        stopPlay(); state.order = b.getAttribute("data-order");
+        state.step = 0; state.pinned = null; compute(); render();
+      });
+    });
+  } else if (state.mode === "apply") {
+    row.innerHTML = '<span class="lbl">Functor</span>' +
+      ["print", "sum", "count"].map(function (k) {
+        return '<button class="ctl' + (state.functor === k ? " on" : "") + '" data-functor="' + k +
+          '">' + FUNCTORS[k].label + "</button>";
+      }).join("") +
+      '<span class="count">the walk is identical &mdash; only line 5 changes</span>';
+    Array.prototype.forEach.call(row.querySelectorAll("[data-functor]"), function (b) {
+      b.addEventListener("click", function () {
+        stopPlay(); state.functor = b.getAttribute("data-functor");
+        state.step = 0; state.pinned = null; compute(); render();
+      });
+    });
+  } else {
+    row.innerHTML = "";
+  }
+}
+
+function render() {
+  extraControls();
+  if (state.mode === "compare") renderCompare(); else renderSolo();
+
+  document.getElementById("howto").innerHTML = howtoHtml();
+  wireHowto();
+  var g = GUIDE[state.mode];
+  document.getElementById("watch").innerHTML = g
+    ? '<div class="card"><div class="card-body"><div class="callout warn" style="margin:0">' +
+      g.watch + "</div></div></div>"
+    : "";
+
+  var t = state.tree;
+  document.getElementById("treeNote").textContent =
+    countOf(t) + " nodes, height " + heightOf(t);
+  document.getElementById("frameCount").textContent =
+    "step " + (state.step + 1) + " of " + state.maxFrames;
+  document.getElementById("first").disabled = state.step === 0;
+  document.getElementById("prev").disabled = state.step === 0;
+  document.getElementById("next").disabled = state.step >= state.maxFrames - 1;
+  document.getElementById("last").disabled = state.step >= state.maxFrames - 1;
+  document.getElementById("nextPhase").disabled = state.step >= state.maxFrames - 1;
+
+  Array.prototype.forEach.call(document.querySelectorAll("#tabs [data-mode]"), function (b) {
+    b.classList.toggle("on", b.getAttribute("data-mode") === state.mode);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function (b) {
+    b.classList.toggle("on", b.getAttribute("data-preset") === state.preset);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Controls
+// ---------------------------------------------------------------------------
+function go(n) { state.step = Math.max(0, Math.min(n, state.maxFrames - 1)); render(); }
+function stopPlay() {
+  if (state.timer) { clearInterval(state.timer); state.timer = null; }
+  document.getElementById("play").innerHTML = "&#9654; Play";
+}
+function togglePlay() {
+  if (state.timer) { stopPlay(); return; }
+  document.getElementById("play").innerHTML = "&#10073;&#10073; Pause";
+  state.timer = setInterval(function () {
+    if (state.step >= state.maxFrames - 1) { stopPlay(); return; }
+    go(state.step + 1);
+  }, 850);
+}
+
+document.getElementById("first").addEventListener("click", function () { stopPlay(); go(0); });
+document.getElementById("prev").addEventListener("click", function () { stopPlay(); go(state.step - 1); });
+document.getElementById("next").addEventListener("click", function () { stopPlay(); go(state.step + 1); });
+document.getElementById("last").addEventListener("click", function () { stopPlay(); go(state.maxFrames - 1); });
+document.getElementById("play").addEventListener("click", togglePlay);
+document.getElementById("nextPhase").addEventListener("click", function () {
+  stopPlay(); nextPhase();
+});
+
+Array.prototype.forEach.call(document.querySelectorAll("#tabs [data-mode]"), function (b) {
+  b.addEventListener("click", function () {
+    stopPlay(); state.mode = b.getAttribute("data-mode"); state.peek = null;
+    if (history.replaceState) history.replaceState(null, "", "#" + state.mode);
+    else location.hash = state.mode;
+    state.step = 0; state.pinned = null; compute(); render();
+  });
+});
+Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function (b) {
+  b.addEventListener("click", function () {
+    stopPlay(); state.preset = b.getAttribute("data-preset");
+    state.step = 0; state.target = null; state.pinned = null; compute(); render();
+  });
+});
+document.addEventListener("keydown", function (e) {
+  // A focused code line handles its own Enter; everything else is navigation.
+  var onCodeLine = e.target && e.target.parentNode && e.target.parentNode.classList &&
+                   e.target.parentNode.classList.contains("code");
+  if (e.key === "ArrowRight") { stopPlay(); go(state.step + 1); }
+  else if (e.key === "ArrowLeft") { stopPlay(); go(state.step - 1); }
+  else if (e.key === " " && !onCodeLine) { e.preventDefault(); togglePlay(); }
+});
+
+// ---------------------------------------------------------------------------
+// Self-check. Runs every preset through every mode and verifies the stepper
+// agrees with a plain implementation -- so a green bar means the demonstration
+// on screen is a correct one, not merely a pretty one.
+// ---------------------------------------------------------------------------
+(function selftest() {
+  var fails = [], runs = 0;
+
+  Object.keys(PRESETS).forEach(function (name) {
+    var seq = PRESETS[name].seq;
+    var root = buildTree(seq);
+    var sorted = seq.slice().sort(function (a, b) { return a - b; });
+
+    // in-order on a BST must be sorted
+    var ino = walk(root, "inorder", []);
+    if (ino.join() !== sorted.join()) fails.push(name + ": in-order not sorted");
+
+    // every traversal must emit every node exactly once
+    ["inorder", "preorder", "postorder"].forEach(function (o) {
+      var fr = buildTraversal(root, o);
+      var out = fr[fr.length - 1].out;
+      runs++;
+      if (out.length !== seq.length) fails.push(name + "/" + o + ": " + out.length + " of " + seq.length + " nodes");
+      if (out.slice().sort(function (a, b) { return a - b; }).join() !== sorted.join())
+        fails.push(name + "/" + o + ": wrong node set");
+      if (out.join() !== walk(root, o, []).join())
+        fails.push(name + "/" + o + ": stepper disagrees with a plain walk");
+    });
+
+    // insert frames must end on the finished tree
+    var ins = buildInsert(seq);
+    runs++;
+    var endTree = ins[ins.length - 1].tree;
+    if (walk(endTree, "inorder", []).join() !== sorted.join())
+      fails.push(name + "/insert: final tree wrong");
+
+    // search must find everything in the tree and nothing outside it
+    seq.forEach(function (v) {
+      var fr = buildSearch(root, v);
+      runs++;
+      if (fr[fr.length - 1].done !== "hit") fails.push(name + "/search " + v + ": should hit");
+    });
+    var miss = buildSearch(root, 99);
+    runs++;
+    if (miss[miss.length - 1].done !== "miss") fails.push(name + "/search 99: should miss");
+
+    // height must agree with a plain recursive height, and the root's badge
+    // must be the tree's height
+    var hf = buildHeight(root);
+    runs++;
+    var last = hf[hf.length - 1];
+    if (last.labels[root.v] !== heightOf(root))
+      fails.push(name + "/height: root badge " + last.labels[root.v] + ", expected " + heightOf(root));
+    Object.keys(last.labels).forEach(function (v) {
+      var n = (function find(x) {
+        return !x ? null : (x.v === +v ? x : (find(x.l) || find(x.r)));
+      })(root);
+      if (last.labels[v] !== heightOf(n))
+        fails.push(name + "/height: node " + v + " badge " + last.labels[v] + ", expected " + heightOf(n));
+    });
+
+    // the destructor must free every node exactly once, in post-order, and
+    // never a parent before one of its children
+    var df = buildDestroy(root);
+    runs++;
+    var freed = df[df.length - 1].freed;
+    if (freed.join() !== walk(root, "postorder", []).join())
+      fails.push(name + "/destroy: free order is not post-order");
+    if (freed.length !== seq.length)
+      fails.push(name + "/destroy: freed " + freed.length + " of " + seq.length);
+    freed.forEach(function (v, i) {
+      var n = (function find(x) { return !x ? null : (x.v === v ? x : (find(x.l) || find(x.r))); })(root);
+      ["l", "r"].forEach(function (side) {
+        if (n[side] && freed.indexOf(n[side].v) > i)
+          fails.push(name + "/destroy: freed " + v + " before its child " + n[side].v);
+      });
+    });
+
+    // every functor must see every value in in-order, and end on the right answer
+    Object.keys(FUNCTORS).forEach(function (k) {
+      var af = buildApply(root, k);
+      runs++;
+      var end = af[af.length - 1];
+      if (end.done.join() !== sorted.join())
+        fails.push(name + "/apply " + k + ": values not handed over in order");
+      var want = { print: sorted.join(" "),
+                   sum: String(sorted.reduce(function (a, b) { return a + b; }, 0)),
+                   count: String(sorted.length) }[k];
+      if (end.functor.value !== want)
+        fails.push(name + "/apply " + k + ": ended on " + end.functor.value + ", expected " + want);
+    });
+
+    // every frame must map to a How-it-works step that exists, or the panel
+    // opens the wrong one -- or nothing
+    var GUIDE_OF = { inorder: "traverse", preorder: "traverse", postorder: "traverse" };
+    [["insert", ins], ["height", hf], ["destroy", df], ["search", buildSearch(root, 99)],
+     ["apply", buildApply(root, "sum")]]
+      .concat(["inorder", "preorder", "postorder"].map(function (o) {
+        return [o, buildTraversal(root, o)];
+      })).forEach(function (pair) {
+        var key = pair[0];
+        var g = GUIDE[GUIDE_OF[key] || key];
+        runs++;
+        pair[1].forEach(function (f) {
+          var ph = phaseOf(key, f.line);
+          if (!g || ph < 0 || ph >= g.steps.length)
+            fails.push(name + "/" + key + ": line " + f.line + " maps to step " + ph);
+        });
+      });
+
+    // every frame must point at a real line of code
+    [["insert", ins], ["height", hf], ["destroy", df],
+     ["apply", buildApply(root, "sum")]].concat(["inorder", "preorder", "postorder"].map(function (o) {
+      return [o, buildTraversal(root, o)];
+    })).forEach(function (pair) {
+      pair[1].forEach(function (f) {
+        if (CODE[pair[0]][f.line] === undefined)
+          fails.push(name + "/" + pair[0] + ": frame points at line " + f.line);
+      });
+    });
+  });
+
+  document.getElementById("selftest").innerHTML = fails.length === 0
+    ? '<span class="ok">&#x2714; Self-check passed</span> &mdash; ' + runs +
+      " runs across " + Object.keys(PRESETS).length +
+      " trees: in-order comes out sorted on every one, all three traversals emit every node " +
+      "exactly once and agree with a plain recursive walk, insert ends on the right tree, " +
+      "search finds every value present and misses one that is not, every height badge matches " +
+      "a plain recursive height, the destructor frees every node exactly once and never before " +
+      "its children, all three functors see every value in order and end on the right answer, " +
+      "every step highlights a real line of code, and every step maps to a " +
+      "How-it-works phase that exists."
+    : '<span class="fail">&#x2716; Self-check FAILED (' + fails.length + ")</span>: " +
+      fails.slice(0, 6).join("; ");
+})();
+
+// Deep links: stepper.html#height opens that tab directly, so a Canvas page or
+// a lecture slide can point at one topic instead of "then click tab 5".
+var MODES = ["insert", "search", "traverse", "compare", "height", "destroy", "apply"];
+
+function modeFromHash() {
+  var h = (location.hash || "").replace("#", "");
+  if (MODES.indexOf(h) !== -1) return h;
+  return null;
+}
+
+function applyHash() {
+  var m = modeFromHash();
+  if (m && m !== state.mode) {
+    stopPlay();
+    state.mode = m;
+    state.step = 0;
+    state.pinned = null;
+    compute();
+    render();
+  }
+}
+
+window.addEventListener("hashchange", applyHash);
+
+var initial = modeFromHash();
+if (initial) state.mode = initial;
+
+compute();
+render();
+</script>
+</body>
+</html>
