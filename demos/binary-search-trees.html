@@ -368,6 +368,19 @@ function layout(root) {
 function treeSvg(root, mark) {
   mark = mark || {};
   if (!root) {
+    // When the next step puts a value here, draw the slot. Saying "50 goes
+    // here" over a picture that reads "the tree is empty" leaves "here"
+    // pointing at nothing.
+    if (mark.rootSlot !== undefined) {
+      return '<svg class="tree" viewBox="0 0 400 110" role="img" aria-label="an empty tree, ' +
+        'with a dashed outline marking where ' + mark.rootSlot + ' is about to become the root">' +
+        '<circle cx="200" cy="46" r="20" fill="#fff" stroke="#6e6e6e" stroke-width="2" ' +
+        'stroke-dasharray="4 3"/>' +
+        '<text x="200" y="52" text-anchor="middle" fill="#6e6e6e" font-weight="700">' +
+        mark.rootSlot + '</text>' +
+        '<text x="200" y="92" text-anchor="middle" fill="#6e6e6e" font-weight="400">' +
+        'the tree is empty &#x2014; this becomes the root</text></svg>';
+    }
     return '<svg class="tree" viewBox="0 0 400 60" role="img" aria-label="an empty tree">' +
       '<text x="200" y="34" text-anchor="middle" fill="#6e6e6e" font-weight="400">' +
       'the tree is empty &#x2014; root is nullptr</text></svg>';
@@ -910,9 +923,31 @@ function buildInsert(seq) {
     var path = [], depth = 0;
 
     (function descend(node, parent, side) {
+      // Entering the function. Without this the walk jumps from the
+      // signature to the placement with nothing saying a call was made.
+      var callText = parent
+        ? "node->" + (side === "l" ? "left" : "right")
+        : "root";
+      frames.push(F({ tree: clone(root), line: 0, stack: vals(path), path: vals(path),
+        hit: node ? node.v : undefined,
+        calc: "insert_(" + callText + ", " + value + ")\n" +
+              "node = " + (node ? node.v : "nullptr") + ",  value = " + value,
+        head: parent
+          ? "Called from the line above with <code>" + callText + "</code> &mdash; " +
+            (node ? "that child is <strong>" + node.v + "</strong>"
+                  : "that child is <code>nullptr</code>")
+          : "<strong>insert(" + value + ")</strong> calls <code>insert_(root, " + value +
+            ")</code>" + (node ? "" : " &mdash; the tree is still empty"),
+        why: parent
+          ? ["the parameter <code>node</code> is now that child, and the same function runs again",
+             "each call only ever looks at one node"]
+          : ["the public <code>insert</code> does nothing but start this off at the root",
+             "<code>node</code> is a parameter, so each call has its own"],
+        insertingValue: value, depth: depth }));
       if (!node) {
         frames.push(F({ tree: clone(root), line: 1, stack: path.map(function (n) { return n.v; }),
-          slot: parent ? { parent: parent.v, side: side } : null, path: vals(path),
+          slot: parent ? { parent: parent.v, side: side } : null,
+          rootSlot: parent ? undefined : value, path: vals(path),
           calc: "!node   \u2192   new Node(" + value + ")" +
               (parent ? "\n" + (side === "l" ? "left" : "right") + " child of " + parent.v
                       : "\nthe tree was empty, so this becomes the root"),
