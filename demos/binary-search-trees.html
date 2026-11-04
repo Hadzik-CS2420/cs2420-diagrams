@@ -17,54 +17,15 @@
   body { margin:0; padding:1.5rem 1.25rem 3rem;
          font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
          color:var(--ink); background:#fff; line-height:1.5; }
-  .wrap { max-width:1280px; margin:0 auto; }
+  /* 1280 was already clipping the right-hand comments in the code block.
+     The rail is paid for by the extra 200, not taken out of the code. */
+  .wrap { max-width:1480px; margin:0 auto; }
   h1 { font-size:1.35rem; margin:0 0 .2rem; }
   .sub { color:var(--muted); font-size:.9rem; margin:0 0 1.1rem; }
 
   /* ---- How it works, variables, callouts ----------------------------
      Same components as ct15-non-comparison-sorts' stepper, so the two read
      the same way. Copied rather than retyped, for the same reason. */
-  .howto .lead { margin:0 0 .7rem; font-size:.9rem; }
-  .howto-steps { display:grid; gap:.7rem; margin:0 0 .7rem;
-                 grid-template-columns:repeat(auto-fit,minmax(16rem,1fr)); }
-  .hstep { background:#f7f9fb; border:1px solid var(--rule); border-radius:8px;
-           padding:.55rem .7rem .6rem; }
-  .hstep > h4 { margin:0 0 .4rem; font-size:.84rem; display:flex; gap:.45rem;
-                align-items:center; color:var(--ink); }
-  .hnum { flex:0 0 auto; width:1.3rem; height:1.3rem; border-radius:50%;
-          background:var(--deep); color:#fff; font-size:.7rem; font-weight:700;
-          display:flex; align-items:center; justify-content:center; }
-  .hstep ul { margin:0; padding:0; list-style:none; }
-  .hstep li { position:relative; padding-left:.85rem; margin-bottom:.22rem;
-              font-size:.8rem; line-height:1.45; }
-  .hstep li::before { content:""; position:absolute; left:.2rem; top:.52em;
-                      width:.3rem; height:.3rem; border-radius:50%;
-                      background:var(--muted); }
-  .hstep li:last-child { margin-bottom:0; }
-  /* Collapsed steps keep the arc visible without the bulk: you can see how
-     many there are and what is coming, but only the one being executed is
-     open. state.peek lets you look ahead at one of the others. */
-  .hstep.off { background:#fbfcfd; opacity:.72; cursor:pointer; }
-  .hstep.off:hover { opacity:1; border-color:var(--blue); }
-  .hstep.off > h4 { margin:0; font-weight:600; }
-  .hstep.off .hnum { background:var(--rule); }
-  .hstep .peek { margin-left:auto; font-size:.66rem; font-weight:600; color:var(--muted);
-                 text-transform:uppercase; letter-spacing:.05em; }
-  .hstep.on { border-color:var(--blue); box-shadow:0 0 0 2px rgba(37,115,167,.12); }
-  .pseudo { margin:.5rem 0 0; padding:.45rem .6rem; background:#f2f5f8;
-            border-left:3px solid var(--blue); border-radius:0 5px 5px 0;
-            font-family:Consolas,"Courier New",monospace; font-size:.76rem;
-            line-height:1.6; white-space:pre; overflow-x:auto; color:#2c3e50; }
-  .pseudo .pl { display:block; font-family:system-ui,sans-serif; font-size:.6rem;
-                font-weight:800; letter-spacing:.06em; text-transform:uppercase;
-                color:var(--muted); margin-bottom:.15rem; }
-  .callout { font-size:.82rem; padding:.6rem .8rem; border-radius:6px; margin-top:.7rem;
-             background:var(--tint-purple); border:1px solid #d1c4e9; color:var(--deep); }
-  .callout.warn { background:var(--tint-red); border-color:#f5c6cb; color:var(--red); }
-  /* The algorithm-level warning belongs with the conclusions at the bottom,
-     not above the controls where it would be the densest thing on screen. */
-  #watch { margin-top:1.1rem; }
-  #howto { margin-bottom:1.1rem; }
   .locals { display:grid; grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));
             gap:.5rem 1.1rem; margin:.6rem 0 0; padding:.55rem .7rem;
             border:1px solid var(--rule); border-radius:8px; background:#fbfcfd; }
@@ -119,8 +80,38 @@
   .count { font-variant-numeric:tabular-nums; font-size:.84rem; color:var(--muted); margin-left:auto; }
 
   /* ---- layout ---- */
-  .solo { display:grid; grid-template-columns:1.05fr .95fr; gap:1.1rem; align-items:start; }
-  @media (max-width:1040px) { .solo { grid-template-columns:1fr; } }
+  .solo { display:grid; grid-template-columns:1fr 1fr 210px; gap:1.1rem; align-items:start; }
+  /* Below 1380 the rail cannot hold its own column, so it spans underneath
+     instead -- still small, and still never above the tree. */
+  @media (max-width:1380px) { .solo { grid-template-columns:1.05fr .95fr; }
+                              .solo > .railcol { grid-column:1 / -1; } }
+  @media (max-width:1040px) { .solo { grid-template-columns:1fr; }
+                              .solo > .railcol { grid-column:auto; } }
+
+  /* ---- the rail: what is being worked on, and nothing else ---- */
+  .rail { font-size:.78rem; }
+  .rail .rlab { font-size:.62rem; letter-spacing:.07em; text-transform:uppercase;
+                color:var(--muted); font-weight:700; margin:0 0 .25rem; }
+  .rail .rnow { font-size:.92rem; font-weight:700; color:#c64500;
+                background:#fff3e0; border:1px solid #a95c19; border-radius:7px;
+                padding:.3rem .5rem; margin:0 0 .9rem; line-height:1.3; }
+  .rail ol { list-style:none; margin:0; padding:0; display:grid; gap:.3rem; }
+  .rail li { border:1px solid var(--rule); border-radius:7px; background:#f7f9fb;
+             padding:.33rem .45rem; cursor:pointer; }
+  .rail li:hover { border-color:var(--deep); }
+  .rail li.on { background:#ede7f6; border-color:var(--deep); }
+  .rail .rt { display:flex; gap:.4rem; align-items:baseline; line-height:1.35; }
+  .rail .rn { flex:0 0 auto; width:1.05rem; height:1.05rem; border-radius:50%;
+              background:var(--muted); color:#fff; font-size:.6rem; font-weight:700;
+              display:flex; align-items:center; justify-content:center;
+              position:relative; top:.15rem; }
+  .rail li.on .rn { background:var(--deep); }
+  .rail ul { margin:.35rem 0 0; padding:0; list-style:none; }
+  .rail ul li { border:0; background:none; padding:0 0 0 .7rem; margin:0 0 .2rem;
+                position:relative; font-size:.74rem; line-height:1.4; cursor:default; }
+  .rail ul li::before { content:""; position:absolute; left:0; top:.5em;
+                        width:.25rem; height:.25rem; border-radius:50%;
+                        background:var(--muted); }
   .card { border:1px solid var(--rule); border-radius:10px; overflow:hidden; margin-bottom:1.1rem; }
   .card > h2 { font-size:.92rem; margin:0; padding:.5rem .85rem;
                border-bottom:1px solid var(--rule); background:#f7f9fb; }
@@ -128,6 +119,8 @@
 
   /* ---- the tree ---- */
   svg.tree { width:100%; height:auto; display:block; }
+  /* chips and the test line come and go per frame; the strip does not */
+  .treefoot { min-height:3.6rem; }
   svg.tree text { font-family:"Segoe UI",system-ui,sans-serif; font-size:15px; font-weight:600; }
   svg.tree text.sub { font-size:10px; font-weight:400; fill:#6e6e6e; }
 
@@ -264,8 +257,6 @@
     <span class="step-hint">&larr; &rarr; arrow keys step &middot; space plays</span>
   </div>
 
-  <div id="howto"></div>
-
   <div class="panel">
     <div class="row">
       <span class="lbl">Insert order</span>
@@ -368,21 +359,26 @@ function layout(root) {
 function treeSvg(root, mark) {
   mark = mark || {};
   if (!root) {
+    // Without this the frames before the first value lands draw their own
+    // small box and the panel is a third the height of every other frame.
+    var eb = mark.box ? mark.box : { x: 0, w: 400, h: 60 };
+    var ew = 'viewBox="' + eb.x + " 0 " + eb.w + " " + eb.h + '"';
+    var ecx = eb.x + eb.w / 2;
     // When the next step puts a value here, draw the slot. Saying "50 goes
     // here" over a picture that reads "the tree is empty" leaves "here"
     // pointing at nothing.
     if (mark.rootSlot !== undefined) {
-      return '<svg class="tree" viewBox="0 0 400 110" role="img" aria-label="an empty tree, ' +
+      return '<svg class="tree" ' + ew + ' role="img" aria-label="an empty tree, ' +
         'with a dashed outline marking where ' + mark.rootSlot + ' is about to become the root">' +
-        '<circle cx="200" cy="46" r="20" fill="#fff" stroke="#6e6e6e" stroke-width="2" ' +
+        '<circle cx="' + ecx + '" cy="46" r="20" fill="#fff" stroke="#6e6e6e" stroke-width="2" ' +
         'stroke-dasharray="4 3"/>' +
-        '<text x="200" y="52" text-anchor="middle" fill="#6e6e6e" font-weight="700">' +
+        '<text x="' + ecx + '" y="52" text-anchor="middle" fill="#6e6e6e" font-weight="700">' +
         mark.rootSlot + '</text>' +
-        '<text x="200" y="92" text-anchor="middle" fill="#6e6e6e" font-weight="400">' +
+        '<text x="' + ecx + '" y="92" text-anchor="middle" fill="#6e6e6e" font-weight="400">' +
         'the tree is empty &#x2014; this becomes the root</text></svg>';
     }
-    return '<svg class="tree" viewBox="0 0 400 60" role="img" aria-label="an empty tree">' +
-      '<text x="200" y="34" text-anchor="middle" fill="#6e6e6e" font-weight="400">' +
+    return '<svg class="tree" ' + ew + ' role="img" aria-label="an empty tree">' +
+      '<text x="' + ecx + '" y="34" text-anchor="middle" fill="#6e6e6e" font-weight="400">' +
       'the tree is empty &#x2014; root is nullptr</text></svg>';
   }
   var L = layout(root);
@@ -487,12 +483,25 @@ function treeSvg(root, mark) {
             'font-size="12.5" font-weight="700">' + esc(ct) + "</text>";
   }
 
-  return '<svg class="tree" viewBox="' + MINX + " 0 " + (W - MINX) + " " + H +
+  // Every frame of a run shares one box, so the panel never resizes and the
+  // nodes never change scale. The box is at least this frame's own extent.
+  var bx = MINX, bw = W - MINX, bh = H, shift = 0;
+  if (mark.box) {
+    bx = Math.min(MINX, mark.box.x);
+    bw = Math.max(W - MINX, mark.box.w);
+    bh = Math.max(H, mark.box.h);
+    shift = bx + (bw - (W - MINX)) / 2 - MINX;   // centred, not pinned left
+  }
+  var body = shift ? '<g transform="translate(' + shift + ',0)">' +
+                     edges + nodes + carry + "</g>"
+                   : edges + nodes + carry;
+
+  return '<svg class="tree" viewBox="' + bx + " 0 " + bw + " " + bh +
     '" role="img" aria-label="the binary search tree, ' + countOf(root) +
     ' nodes, height ' + heightOf(root) +
     (carryXY && mark.carry
        ? ", with " + mark.carry.v + " shown beside the node it is being compared with"
-       : "") + '">' + edges + nodes + carry + "</svg>";
+       : "") + '">' + body + "</svg>";
 }
 
 // ---------------------------------------------------------------------------
@@ -928,6 +937,29 @@ function F(o) { return o; }
 // every mark travels as a value. See the comment in treeSvg.
 function vals(nodes) { return nodes.map(function (n) { return n.v; }); }
 
+// A short name for each line of each listing, for the rail's "this step".
+// A frame may override it with its own `tag` where the line alone cannot say:
+// lines 4 and 6 of insert run twice, once making the call and once taking the
+// result back, and the line text is identical both times.
+var STEP_TAG = {
+  insert:    { 0: "entering the call", 1: "the empty slot", 3: "comparing",
+               4: "the left call", 5: "comparing", 6: "the right call",
+               8: "a duplicate", 10: "handing it back" },
+  search:    { 1: "fell off the tree", 2: "found it", 4: "comparing" },
+  inorder:   { 0: "entering the call", 1: "the bottom", 2: "down the left",
+               3: "visiting this node", 4: "down the right" },
+  preorder:  { 0: "entering the call", 1: "the bottom", 2: "visiting this node",
+               3: "down the left", 4: "down the right" },
+  postorder: { 0: "entering the call", 1: "the bottom", 2: "down the left",
+               3: "down the right", 4: "visiting this node" },
+  height:    { 1: "empty subtree", 2: "asking the left", 3: "asking the right",
+               4: "taller side, plus one" },
+  destroy:   { 1: "nothing to free", 2: "freeing the left", 3: "freeing the right",
+               4: "deleting this node" },
+  apply:     { 2: "the bottom", 3: "down the left", 4: "calling the functor",
+               5: "down the right" }
+};
+
 // Which How-it-works step each line of each listing belongs to. Derived from
 // the code rather than stored on the frame, so a frame can never claim a phase
 // its highlighted line does not belong to.
@@ -941,6 +973,13 @@ var PHASE_OF = {
   destroy:   { 1: 0, 2: 1, 3: 1, 4: 2, 5: 2 },
   apply:     { 2: 0, 3: 1, 4: 2, 5: 1, 6: 2 }
 };
+
+// The phase a FRAME is in. Lines 4 and 6 of insert run in both directions and
+// belong to a different phase each way, so a frame may override the line's
+// default. Everything that cares about phase goes through here.
+function phaseAt(f, key) {
+  return f && f.phase !== undefined ? f.phase : phaseOf(key, f ? f.line : -1);
+}
 
 function phaseOf(key, line) {
   var m = PHASE_OF[key];
@@ -1052,6 +1091,9 @@ function buildInsert(seq) {
               "   \u2192   the same function runs again with node = " +
               (kid ? kid.v : "nullptr"),
         carry: { v: value, tag: goLeft ? "\u2199" : "\u2198" },
+        // the line defaults to the reattach phase, which is where it lands on
+        // the way back up -- going down it is still picking a side
+        tag: "making the call", phase: 0,
         head: "<code>insert_</code> is called again on the " + cs + " child of " +
               node.v + " &mdash; the assignment on this line waits for it to come back.",
         why: ["the <code>=</code> does not run yet &mdash; the right-hand side has to finish first",
@@ -1069,6 +1111,7 @@ function buildInsert(seq) {
       var changed = got && got.v === value;
       frames.push(F({ tree: clone(after), line: goLeft ? 4 : 6,
         stack: vals(path), hit: node.v, path: vals(path), placed: value,
+        tag: "taking the result back",
         calc: "the call returned " + (got ? got.v : "nullptr") + "\n" +
               node.v + "->" + cs + " = " + (got ? got.v : "nullptr") + "   \u2192   " +
               (changed ? "this pointer changed — it is the only one that does"
@@ -1110,6 +1153,7 @@ function buildInsert(seq) {
     })(root);
 
     frames.push(F({ tree: clone(root), line: 10, stack: [], placed: placed ? placed.v : null,
+      tag: "back at the top",
       calc: "root = insert_(root, " + value + ")\n" +
             "the outermost call returns the root, and insert() assigns it back",
       head: "<strong>" + value + "</strong> is in. Height is now " + heightOf(root) +
@@ -1431,10 +1475,27 @@ function compute() {
     destroy: buildDestroy(root),
     apply: buildApply(root, state.functor)
   };
+  // Size each run's tree panel to its largest frame. The extent is read back
+  // out of the rendered viewBox rather than recomputed, so it cannot drift
+  // from what treeSvg actually draws.
+  Object.keys(state.runs).forEach(function (k) {
+    var box = null;
+    state.runs[k].forEach(function (f) {
+      var vb = /viewBox="([-\d.]+) ([-\d.]+) ([\d.]+) ([\d.]+)"/.exec(treeSvg(f.tree, f));
+      if (!vb) return;
+      if (f.tree === null) return;           // the placeholder, not a real tree
+      var x = +vb[1], w = +vb[3], h = +vb[4];
+      box = box ? { x: Math.min(box.x, x), w: Math.max(box.w, w), h: Math.max(box.h, h) }
+                : { x: x, w: w, h: h };
+    });
+    if (box) state.runs[k].forEach(function (f) { f.box = box; });
+  });
+
   state.maxFrames = state.mode === "compare"
     ? Math.max(state.runs.inorder.length, state.runs.preorder.length, state.runs.postorder.length)
     : state.runs[state.mode].length;
   if (state.step >= state.maxFrames) state.step = state.maxFrames - 1;
+  state.mh = null;        // the reservation belongs to the run that was just built
 }
 
 function frameAt(key, step) {
@@ -1559,49 +1620,49 @@ function localsHtml(f) {
 }
 
 // How it works: the phase being executed is open, the rest collapse to titles.
-function howtoHtml() {
+// The rail. Two facts: the line being executed, and which of the three
+// phases it belongs to. The bullets stay collapsed until clicked, and open
+// into the rail rather than above the page.
+function railHtml(f) {
   var g = GUIDE[state.mode];
   if (!g) return "";
-  var f = frameAt(state.mode, state.step);
-  var at = state.mode === "compare" ? null : phaseOf(codeKey(), f.line);
-  return '<div class="card"><h2>How it works</h2><div class="card-body howto">' +
-    '<p class="lead">' + g.idea + "</p>" +
-    '<div class="howto-steps">' + g.steps.map(function (st, i) {
-      var open = (i === at) || (state.peek === i);
-      if (!open) {
-        return '<div class="hstep off" data-step="' + i + '" role="button" tabindex="0">' +
-               '<h4><span class="hnum">' + (i + 1) + "</span>" + st.t +
-               '<span class="peek">show</span></h4></div>';
-      }
-      return '<div class="hstep' + (i === at ? " on" : "") + '" data-step="' + i + '" ' +
-             'role="button" tabindex="0"><h4><span class="hnum">' + (i + 1) + "</span>" +
-             st.t + (i === at ? '<span class="peek">you are here</span>' : "") + "</h4><ul>" +
-             st.b.map(function (b) { return "<li>" + b + "</li>"; }).join("") + "</ul>" +
-             (st.p ? '<div class="pseudo"><span class="pl">in pseudocode</span>' +
-                     st.p.map(esc).join("\n") + "</div>" : "") +
-             "</div>";
-    }).join("") + "</div></div></div>";
+  var key = codeKey();
+  var at = phaseAt(f, key);
+  var tag = f.tag || (STEP_TAG[key] && STEP_TAG[key][f.line]);
+  var mode = { insert: "in insert", search: "in search", height: "in height",
+               destroy: "in the destructor", apply: "in inorder_apply",
+               traverse: "in the traversal" }[state.mode] || "";
+  return '<div class="card rail"><h2>Where we are</h2><div class="card-body">' +
+    (tag ? '<p class="rlab">this step</p><p class="rnow">' + esc(tag) + "</p>" : "") +
+    '<p class="rlab">' + mode + "</p><ol>" +
+    g.steps.map(function (st, i) {
+      var open = state.peek === i;
+      return '<li class="' + (i === at ? "on" : "") + '" data-step="' + i + '" ' +
+             'role="button" tabindex="0"><span class="rt">' +
+             '<span class="rn">' + (i + 1) + "</span><span>" + st.t + "</span></span>" +
+             (open ? "<ul>" + st.b.map(function (b) { return "<li>" + b + "</li>"; }).join("") +
+                     "</ul>" : "") + "</li>";
+    }).join("") + "</ol></div></div>";
 }
 
-function wireHowto() {
-  var root = document.getElementById("howto");
-  Array.prototype.forEach.call(root.querySelectorAll("[data-step]"), function (d) {
-    var i = parseInt(d.getAttribute("data-step"), 10);
-    function toggle() { state.peek = (state.peek === i) ? null : i; render(); }
-    d.addEventListener("click", toggle);
-    d.addEventListener("keydown", function (ev) {
-      if (ev.key === "Enter") { ev.preventDefault(); toggle(); }
+function wireRail() {
+  var root = document.getElementById("stage");
+  Array.prototype.forEach.call(root.querySelectorAll(".rail [data-step]"), function (d) {
+    var n = +d.getAttribute("data-step");
+    var hit = function () { state.peek = state.peek === n ? null : n; render(); };
+    d.addEventListener("click", hit);
+    d.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); hit(); }
     });
   });
 }
 
-// Jump to the first frame belonging to a later How-it-works step.
 function nextPhase() {
   if (state.mode === "compare") { go(state.maxFrames - 1); return; }
   var key = codeKey();
-  var here = phaseOf(key, frameAt(state.mode, state.step).line);
+  var here = phaseAt(frameAt(state.mode, state.step), key);
   for (var i = state.step + 1; i < state.maxFrames; i++) {
-    if (phaseOf(key, frameAt(state.mode, i).line) !== here) { go(i); return; }
+    if (phaseAt(frameAt(state.mode, i), key) !== here) { go(i); return; }
   }
   go(state.maxFrames - 1);
 }
@@ -1615,31 +1676,74 @@ function factsHtml(key) {
   }).join("") + "</dl>";
 }
 
-function renderSolo() {
-  var key = state.mode === "traverse" ? state.order : state.mode;
-  var f = frameAt(state.mode, state.step);
-  var title = { insert: "Insert", search: "Search for " + state.target,
-                traverse: state.order.replace("order", "-order"),
-                height: "Height", destroy: "Destructor",
-                apply: "inorder_apply with " + FUNCTORS[state.functor].label }[state.mode];
-
-  document.getElementById("stage").innerHTML =
-    '<div class="solo"><div class="col">' +
+// The markup, so the hidden measuring pass and the visible render cannot
+// drift apart -- a reservation measured against different markup is worthless.
+function soloHtml(f, key, title) {
+  var mh = state.mh || {};
+  var fix = function (n) { return mh[n] ? ' style="min-height:' + mh[n] + 'px"' : ""; };
+  return '<div class="solo"><div class="col">' +
       '<div class="card"><h2>' + title + " &mdash; " + PRESETS[state.preset].label + " tree</h2>" +
-        '<div class="card-body">' + treeSvg(f.tree, f) + chipsHtml(f) + testHtml(f) + "</div></div>" +
-      '<div class="card"><h2>What the machine is holding</h2><div class="card-body">' +
+        '<div class="card-body"' + fix("tree") + ">" + treeSvg(f.tree, f) +
+        '<div class="treefoot">' + chipsHtml(f) + testHtml(f) + "</div></div></div>" +
+      '<div class="card"><h2>What the machine is holding</h2><div class="card-body"' + fix("locals") + ">" +
         localsHtml(f) + "</div></div>" +
-      '<div class="card"><h2>What just happened</h2><div class="card-body">' +
+      '<div class="card"><h2>What just happened</h2><div class="card-body"' + fix("says") + ">" +
         nowBox(f) +
         (f.why && f.why.length ? '<ul class="why">' + f.why.map(function (w) {
           return "<li>" + w + "</li>"; }).join("") + "</ul>" : "") +
       "</div></div>" +
     "</div><div class=\"col\">" +
-      '<div class="card"><h2>The code</h2><div class="card-body">' + codeHtml(key, f.line, f) + "</div></div>" +
+      '<div class="card"><h2>The code</h2><div class="card-body"' + fix("code") + ">" +
+        codeHtml(key, f.line, f) + "</div></div>" +
       '<div class="card"><h2>What it costs</h2><div class="card-body">' + factsHtml(key) + "</div></div>" +
-    "</div></div>";
+    '</div><div class="col railcol">' + railHtml(f) + "</div></div>";
+}
 
+// Render every frame of the run offscreen at the real width and keep the
+// tallest each panel reaches. Cheap enough to redo whenever the answer can
+// change -- mode, preset or window width -- and nowhere near a per-step cost.
+function measureRun() {
+  if (state.mode === "compare") { state.mh = null; return; }
+  var stage = document.getElementById("stage");
+  var run = state.runs[state.mode], key = codeKey();
+  if (!run || !stage.offsetWidth) return;
+
+  var title = soloTitle();
+  state.mh = null;                       // measure the natural height, not a reserved one
+  var ghost = document.createElement("div");
+  ghost.style.cssText = "position:absolute;left:-99999px;top:0;visibility:hidden;width:" +
+                        stage.offsetWidth + "px";
+  document.body.appendChild(ghost);
+
+  var max = { tree: 0, locals: 0, says: 0, code: 0 };
+  run.forEach(function (f) {
+    ghost.innerHTML = soloHtml(f, key, title);
+    var cols = ghost.querySelectorAll(".col");
+    var left = cols[0].children, right = cols[1].children;
+    var h = function (card) { return card ? card.querySelector(".card-body").offsetHeight : 0; };
+    max.tree   = Math.max(max.tree,   h(left[0]));
+    max.locals = Math.max(max.locals, h(left[1]));
+    max.says   = Math.max(max.says,   h(left[2]));
+    max.code   = Math.max(max.code,   h(right[0]));
+  });
+
+  document.body.removeChild(ghost);
+  state.mh = max;
+}
+
+function soloTitle() {
+  return { insert: "Insert", search: "Search for " + state.target,
+           traverse: state.order.replace("order", "-order"),
+           height: "Height", destroy: "Destructor",
+           apply: "inorder_apply with " + FUNCTORS[state.functor].label }[state.mode];
+}
+
+function renderSolo() {
+  var key = state.mode === "traverse" ? state.order : state.mode;
+  var f = frameAt(state.mode, state.step);
+  document.getElementById("stage").innerHTML = soloHtml(f, key, soloTitle());
   wireCode(key);
+  wireRail();
 }
 
 function renderCompare() {
@@ -1749,10 +1853,9 @@ function extraControls() {
 
 function render() {
   extraControls();
+  if (!state.mh && state.mode !== "compare") { renderSolo(); measureRun(); }
   if (state.mode === "compare") renderCompare(); else renderSolo();
 
-  document.getElementById("howto").innerHTML = howtoHtml();
-  wireHowto();
   var g = GUIDE[state.mode];
   document.getElementById("watch").innerHTML = g
     ? '<div class="card"><div class="card-body"><div class="callout warn" style="margin:0">' +
@@ -1931,7 +2034,7 @@ document.addEventListener("keydown", function (e) {
         var g = GUIDE[GUIDE_OF[key] || key];
         runs++;
         pair[1].forEach(function (f) {
-          var ph = phaseOf(key, f.line);
+          var ph = phaseAt(f, key);
           if (!g || ph < 0 || ph >= g.steps.length)
             fails.push(name + "/" + key + ": line " + f.line + " maps to step " + ph);
         });
@@ -1985,6 +2088,12 @@ function applyHash() {
   }
 }
 
+// A narrower window makes taller panels, so the reservation has to be redone
+var rt = null;
+window.addEventListener("resize", function () {
+  clearTimeout(rt);
+  rt = setTimeout(function () { state.mh = null; render(); }, 150);
+});
 window.addEventListener("hashchange", applyHash);
 
 var initial = modeFromHash();
