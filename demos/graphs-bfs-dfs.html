@@ -1,0 +1,1619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CT 18 Stepper — Adjacency Lists, BFS and DFS</title>
+<style>
+  :root {
+    --ink:#2c3e50; --muted:#6e6e6e; --rule:#d8dee6;
+    --green:#1c7e45; --blue:#2573a7; --orange:#a95c19;
+    --red:#c0392b; --purple:#8e44ad; --deep:#4527a0; --teal:#00695c;
+    --tint-green:#f2fbf4; --tint-blue:#eaf2f8; --tint-orange:#fff3e0;
+    --tint-red:#fce4ec; --tint-purple:#ede7f6; --tint-teal:#e0f2f1;
+    --code-bg:#1e1e2e; --code-fg:#cdd6f4; --code-dim:#9399b2; --code-hit:#45475a;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:1.5rem 1.25rem 3rem;
+         font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+         color:var(--ink); background:#fff; line-height:1.5; }
+  /* 1280 was already clipping the right-hand comments in the code block.
+     The rail is paid for by the extra 200, not taken out of the code. */
+  .wrap { max-width:1480px; margin:0 auto; }
+  h1 { font-size:1.35rem; margin:0 0 .2rem; }
+  .sub { color:var(--muted); font-size:.9rem; margin:0 0 1.1rem; }
+
+  /* ---- How it works, variables, callouts ----------------------------
+     Same components as ct15-non-comparison-sorts' stepper, so the two read
+     the same way. Copied rather than retyped, for the same reason. */
+  .locals { display:grid; grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));
+            gap:.5rem 1.1rem; margin:.6rem 0 0; padding:.55rem .7rem;
+            border:1px solid var(--rule); border-radius:8px; background:#fbfcfd; }
+  .locals h5 { margin:0 0 .3rem; font-size:.68rem; font-weight:700; color:var(--muted);
+               text-transform:uppercase; letter-spacing:.06em; }
+  .locals .lv { display:flex; align-items:baseline; gap:.45rem; font-size:.79rem;
+                line-height:1.5; }
+  .locals .ln { font-family:Consolas,monospace; font-weight:650; color:var(--ink);
+                min-width:4.6rem; }
+  .locals .lval { font-family:Consolas,monospace; font-weight:700;
+                  color:var(--blue); background:var(--tint-blue);
+                  border:1px solid rgba(37,115,167,.3); border-radius:999px;
+                  padding:.02rem .45rem; min-width:1.6rem; text-align:center; }
+  .locals .lval.pend { color:var(--muted); background:#f0f2f5;
+                       border-color:var(--rule); font-weight:600; }
+  .locals .lat { color:var(--muted); font-size:.75rem; }
+  .locals .stackline .ln { font-weight:600; color:var(--teal); min-width:0; }
+  .locals .stackline.here .lat { color:var(--ink); font-weight:600; }
+
+  /* ---- tabs ---- */
+  .tabs { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:1rem;
+          border-bottom:2px solid var(--rule); padding-bottom:.6rem; }
+  .tabs button { font:inherit; font-size:.9rem; font-weight:600; padding:.45rem 1rem;
+                 border:1px solid var(--rule); border-radius:7px 7px 0 0;
+                 background:#f7f9fb; color:var(--muted); cursor:pointer; }
+  .tabs button:hover { color:var(--ink); }
+  .tabs button.on { background:#fff; color:var(--ink); border-bottom-color:#fff; }
+  .tabs button[data-mode="insert"].on    { border-top:3px solid var(--blue);   color:var(--blue); }
+  .tabs button[data-mode="search"].on    { border-top:3px solid var(--green);  color:var(--green); }
+  .tabs button[data-mode="traverse"].on  { border-top:3px solid var(--orange); color:var(--orange); }
+  .tabs button[data-mode="compare"].on   { border-top:3px solid var(--deep);   color:var(--deep); }
+  .tabs button[data-mode="height"].on    { border-top:3px solid var(--deep);   color:var(--deep); }
+  .tabs button[data-mode="destroy"].on   { border-top:3px solid var(--red);    color:var(--red); }
+  .tabs button[data-mode="apply"].on     { border-top:3px solid var(--purple); color:var(--purple); }
+  .tabs .spacer { flex:1; }
+  .tabs .step-hint { align-self:center; font-size:.76rem; color:var(--muted); }
+
+  /* ---- controls ---- */
+  .panel { border:1px solid var(--rule); border-radius:10px;
+           padding:.85rem 1rem; margin-bottom:1.1rem; background:#fcfdfe; }
+  .row { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+  .row + .row { margin-top:.6rem; }
+  .lbl { font-size:.73rem; text-transform:uppercase; letter-spacing:.05em;
+         color:var(--muted); min-width:7.5rem; }
+  button.ctl { font:inherit; font-size:.86rem; padding:.38rem .8rem;
+               border:1px solid var(--rule); border-radius:6px;
+               background:#fff; color:var(--ink); cursor:pointer; }
+  button.ctl:hover:not(:disabled) { border-color:var(--blue); color:var(--blue); }
+  button.ctl:disabled { opacity:.4; cursor:default; }
+  button.ctl.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+  button.ctl.primary { background:var(--deep); border-color:var(--deep); color:#fff; }
+  .count { font-variant-numeric:tabular-nums; font-size:.84rem; color:var(--muted); margin-left:auto; }
+
+  /* ---- layout ---- */
+  .solo { display:grid; grid-template-columns:1fr 1fr 210px; gap:1.1rem; align-items:start; }
+  /* Below 1380 the rail cannot hold its own column, so it spans underneath
+     instead -- still small, and still never above the tree. */
+  @media (max-width:1380px) { .solo { grid-template-columns:1.05fr .95fr; }
+                              .solo > .railcol { grid-column:1 / -1; } }
+  @media (max-width:1040px) { .solo { grid-template-columns:1fr; }
+                              .solo > .railcol { grid-column:auto; } }
+
+  /* ---- the rail: what is being worked on, and nothing else ---- */
+  .rail { font-size:.78rem; }
+  .rail .rlab { font-size:.62rem; letter-spacing:.07em; text-transform:uppercase;
+                color:var(--muted); font-weight:700; margin:0 0 .25rem; }
+  .rail .rnow { font-size:.92rem; font-weight:700; color:#c64500;
+                background:#fff3e0; border:1px solid #a95c19; border-radius:7px;
+                padding:.3rem .5rem; margin:0 0 .9rem; line-height:1.3; }
+  .rail ol { list-style:none; margin:0; padding:0; display:grid; gap:.3rem; }
+  .rail li { border:1px solid var(--rule); border-radius:7px; background:#f7f9fb;
+             padding:.33rem .45rem; cursor:pointer; }
+  .rail li:hover { border-color:var(--deep); }
+  .rail li.on { background:#ede7f6; border-color:var(--deep); }
+  .rail .rt { display:flex; gap:.4rem; align-items:baseline; line-height:1.35; }
+  .rail .rn { flex:0 0 auto; width:1.05rem; height:1.05rem; border-radius:50%;
+              background:var(--muted); color:#fff; font-size:.6rem; font-weight:700;
+              display:flex; align-items:center; justify-content:center;
+              position:relative; top:.15rem; }
+  .rail li.on .rn { background:var(--deep); }
+  .rail ul { margin:.35rem 0 0; padding:0; list-style:none; }
+  .rail ul li { border:0; background:none; padding:0 0 0 .7rem; margin:0 0 .2rem;
+                position:relative; font-size:.74rem; line-height:1.4; cursor:default; }
+  .rail ul li::before { content:""; position:absolute; left:0; top:.5em;
+                        width:.25rem; height:.25rem; border-radius:50%;
+                        background:var(--muted); }
+  .card { border:1px solid var(--rule); border-radius:10px; overflow:hidden; margin-bottom:1.1rem; }
+  .card > h2 { font-size:.92rem; margin:0; padding:.5rem .85rem;
+               border-bottom:1px solid var(--rule); background:#f7f9fb; }
+  .card-body { padding:.85rem; }
+
+  /* ---- the tree ---- */
+  svg.gr { width:100%; height:auto; display:block; }
+  /* chips and the test line come and go per frame; the strip does not */
+  .grfoot { min-height:3.6rem; }
+  svg.gr text { font-family:"Segoe UI",system-ui,sans-serif; font-size:15px; font-weight:600; }
+  svg.gr text.sub { font-size:10px; font-weight:400; fill:#6e6e6e; }
+
+  .legend { font-size:.72rem; color:var(--muted); margin:.5rem 0 0; }
+  .legend span { display:inline-block; margin-right:.9rem; }
+  .sw { display:inline-block; width:.75rem; height:.75rem; border-radius:50%;
+        border:2px solid var(--rule); vertical-align:-2px; margin-right:.25rem; }
+
+  /* ---- state ---- */
+  .chips { display:flex; flex-wrap:wrap; gap:.5rem; margin:.8rem 0 0; }
+  .chip { font-size:.8rem; padding:.3rem .65rem; border-radius:999px;
+          border:1px solid var(--rule); background:#fff; font-variant-numeric:tabular-nums; }
+  .chip.cur  { border-color:var(--orange); color:var(--orange); background:var(--tint-orange); }
+  .chip.out  { border-color:var(--teal);   color:var(--teal);   background:var(--tint-teal); }
+  .chip.ok   { border-color:var(--green);  color:var(--green);  background:var(--tint-green); }
+  .chip.no   { border-color:var(--red);    color:var(--red);    background:var(--tint-red); }
+
+  .test { margin:.75rem 0 0; font-size:.9rem; padding:.55rem .8rem; border-radius:8px;
+          border:1px solid var(--rule); background:#fbfcfd; }
+  .test .q { font-family:Consolas,monospace; font-weight:700; }
+  .test .yes { color:var(--green); font-weight:700; }
+  .test .no  { color:var(--muted); font-weight:700; }
+
+  /* ---- call stack ---- */
+  .stack { margin:.8rem 0 0; font-size:.78rem; font-family:Consolas,monospace; }
+  .stack div { padding:.16rem .5rem; border-left:3px solid var(--rule); margin-bottom:.1rem;
+               background:#fbfcfd; }
+  .stack div.top { border-left-color:var(--orange); background:var(--tint-orange);
+                   font-weight:700; }
+  .stack .none { color:var(--muted); font-style:italic; border-left-color:transparent;
+                 background:none; font-family:inherit; }
+
+  /* ---- narration ---- */
+  .head { font-size:.98rem; font-weight:600; margin:0 0 .4rem; }
+  .why { margin:0; padding-left:1.1rem; font-size:.86rem; }
+  .why li { margin-bottom:.22rem; }
+
+  /* ---- code ---- */
+  .code { background:var(--code-bg); color:var(--code-fg); border-radius:8px;
+          padding:.6rem 0; font-family:Consolas,"Courier New",monospace;
+          font-size:.82rem; line-height:1.55; overflow-x:auto; }
+  .code div { padding:.02rem .9rem; white-space:pre; cursor:pointer; }
+  .code div:hover { background:#313244; }
+  .code div.hit { background:var(--code-hit); border-left:3px solid #f9e2af;
+                  padding-left:calc(.9rem - 3px); }
+  .code div.pin { outline:1px dashed #f9e2af; outline-offset:-2px; }
+  .code .cm { color:var(--code-dim); }
+
+  .lineinfo { border:1px solid var(--rule); border-left:4px solid var(--deep);
+              border-radius:0 8px 8px 0; padding:.6rem .85rem; margin:.7rem 0 0;
+              background:#fcfcfd; font-size:.83rem; }
+  .lineinfo h4 { margin:0 0 .35rem; font-size:.84rem; font-family:Consolas,monospace;
+                 color:var(--deep); }
+  .li-items { margin:.3rem 0 0; padding-left:1.05rem; }
+  .li-items li { margin-bottom:.22rem; }
+  .li-kind { display:inline-block; font-size:.66rem; text-transform:uppercase;
+             letter-spacing:.04em; padding:.03rem .32rem; border-radius:3px;
+             margin-right:.3rem; vertical-align:1px; }
+  .k-why    { background:var(--tint-blue);   color:var(--blue); }
+  .k-trap   { background:var(--tint-red);    color:var(--red); }
+  .k-note   { background:var(--tint-green);  color:var(--green); }
+  .k-syntax { background:var(--tint-purple); color:var(--deep); }
+
+  .facts { font-size:.8rem; margin:0; }
+  .facts dt { font-weight:600; float:left; width:8rem; clear:left; color:var(--muted); }
+  .facts dd { margin:0 0 .3rem 8rem; }
+
+  /* ---- compare lanes ---- */
+  .lanes { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; }
+  @media (max-width:1040px) { .lanes { grid-template-columns:1fr; } }
+  .lane { border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
+  .lane h2 { font-size:.9rem; margin:0; padding:.5rem .85rem; border-bottom:1px solid var(--rule); }
+  .lane.inorder h2   { background:var(--tint-green);  color:var(--green); }
+  .lane.preorder h2  { background:var(--tint-blue);   color:var(--blue); }
+  .lane.postorder h2 { background:var(--tint-orange); color:var(--orange); }
+  .lane .card-body { padding:.7rem; }
+  .lane .mini { font-size:.78rem; color:var(--muted); margin:.5rem 0 0; min-height:2.6rem; }
+
+  .verdict { border-left:5px solid var(--deep); background:var(--tint-purple);
+             border-radius:0 8px 8px 0; padding:.9rem 1.1rem; font-size:.88rem; }
+  .verdict p { margin:0 0 .55rem; }
+  .verdict p:last-child { margin:0; }
+  table.v { width:100%; border-collapse:collapse; font-size:.83rem; margin:.3rem 0 .8rem; }
+  table.v th, table.v td { border:1px solid var(--rule); padding:.35rem .55rem; text-align:left; }
+  table.v th { background:#f5f7f9; }
+  .mono { font-family:Consolas,monospace; }
+
+  .selftest { margin-top:1.2rem; font-size:.78rem; color:var(--muted);
+              border-top:1px solid var(--rule); padding-top:.6rem; }
+  .selftest .ok   { color:var(--green); font-weight:600; }
+  .selftest .fail { color:var(--red);   font-weight:700; }
+  code.inl { background:#eef2f6; padding:.08em .32em; border-radius:4px;
+             font-family:Consolas,monospace; font-size:.92em; }
+
+  /* ---- ported verbatim from the CT 15 stepper ---------------------
+     The THIS STEP band, the yellow note box, the phase rail and the
+     two independent column flows. Copied rather than retyped so the
+     steppers cannot drift apart on spacing. */  .nowbox { background:#f9e2af; color:#1e1e2e; border-left:4px solid #b8860b;
+            border-radius:0 8px 8px 0; padding:.6rem .8rem; margin:.7rem 0 0; }  .nowbox .nownote { margin:0; font-size:.93rem; line-height:1.55; }  .nowbox .nownote code { font-family:Consolas,monospace; font-size:.93em;
+                          background:rgba(0,0,0,.09); border-radius:3px; padding:.03em .3em; }  .nowbox .nownums { margin-top:.5rem; padding-top:.5rem; border-top:1px solid rgba(0,0,0,.18);
+                     font-family:Consolas,"Courier New",monospace; font-size:.84rem;
+                     font-weight:600; line-height:1.65; overflow-x:auto; }  .nowbox .nownums b { font-weight:800; }  .nowbox .nownums em { font-style:normal; background:rgba(0,0,0,.09);
+                        border-radius:3px; padding:.02em .3em; }  .nowbox .lt { display:block; font-family:system-ui,sans-serif; font-weight:800;
+                font-size:.62rem; letter-spacing:.06em; text-transform:uppercase;
+                color:#6b4f04; margin-bottom:.2rem; }  .solo > .col { display:flex; flex-direction:column; gap:1.1rem; min-width:0; }  .code div.calc { background:#f9e2af; color:#1e1e2e; font-size:.88rem;
+                   font-weight:600; white-space:pre; cursor:default;
+                   display:flex; align-items:flex-start; gap:.55rem;
+                   padding:.22rem .8rem; margin:.12rem 0;
+                   border-left:4px solid #b8860b; }  .code div.calc > .cv { min-width:0; white-space:pre-wrap;
+                         text-indent:-1.1rem; padding-left:1.1rem; }  .code div.calc.art > .cv { white-space:pre; text-indent:0; padding-left:0; }  .code div.calc::before { content:"THIS STEP"; font-size:.62rem; font-weight:800;
+                           letter-spacing:.06em; color:#6b4f04;
+                           background:rgba(0,0,0,.09); border-radius:3px;
+                           padding:.08em .32em; flex:0 0 auto;
+                           margin-top:.28em; }  .code div.calc:hover { background:#f9e2af; }
+
+  /* ---- the adjacency list, drawn as the map the code actually indexes ---- */
+  .adj { display:grid; gap:.25rem; margin:.5rem 0 0; font-family:Consolas,monospace;
+         font-size:.84rem; }
+  .arow { display:flex; align-items:center; gap:.4rem; padding:.2rem .4rem;
+          border:1px solid transparent; border-radius:6px; }
+  .arow.hot  { background:var(--tint-orange); border-color:var(--orange); }
+  .arow.look { background:#f3e8ff; border-color:var(--purple); }
+  .akey { font-weight:800; min-width:1.5rem; }
+  .aarrow { color:var(--muted); }
+  .avals { display:flex; gap:.25rem; flex-wrap:wrap; }
+  .av { border:1px solid var(--rule); border-radius:5px; padding:0 .32rem; background:#fff; }
+  .av.on { background:var(--tint-orange); border-color:var(--orange); color:#c64500;
+           font-weight:800; }
+  .av.empty { border:0; color:var(--muted); font-style:italic; }
+
+  /* ---- the queue and the stack, which are the whole difference ---- */
+  .cont { display:grid; gap:.4rem; margin:.5rem 0 0; }
+  .crow { display:flex; align-items:center; gap:.45rem; }
+  .clab { font-size:.68rem; letter-spacing:.05em; text-transform:uppercase;
+          color:var(--muted); font-weight:700; min-width:4.6rem; }
+  .cbox { display:flex; gap:.25rem; flex-wrap:wrap; min-height:1.5rem; }
+  .ci { font-family:Consolas,monospace; font-size:.82rem; font-weight:700;
+        border:1px solid var(--blue); background:var(--tint-blue); color:#1b4f72;
+        border-radius:5px; padding:.05rem .4rem; }
+  .ci.next { border-color:var(--orange); background:var(--tint-orange); color:#c64500; }
+  .ci.vis  { border-color:var(--green); background:var(--tint-green); color:#14532d; }
+  .ci.none { border:0; background:none; color:var(--muted); font-style:italic;
+             font-weight:400; }
+</style>
+<body>
+<div class="wrap">
+  <h1>Graphs &mdash; adjacency lists, BFS and DFS</h1>
+  <p class="sub">CT 18. Build the adjacency list, then walk it two ways. Every step shows the
+     line that is running, what the containers hold, and which vertex is being looked at.</p>
+
+  <div class="tabs" id="tabs">
+    <button data-mode="build">1 &middot; Build the list</button>
+    <button data-mode="bfs">2 &middot; BFS</button>
+    <button data-mode="dfs">3 &middot; DFS</button>
+    <button data-mode="compare">4 &middot; BFS vs DFS</button>
+    <span class="spacer"></span>
+    <span class="step-hint">&larr; &rarr; arrow keys step &middot; space plays</span>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <span class="lbl">Graph</span>
+      <button class="ctl" data-preset="tested">the test fixture</button>
+      <button class="ctl" data-preset="social">social</button>
+      <button class="ctl" data-preset="line">path</button>
+      <button class="ctl" data-preset="star">star</button>
+      <span class="count" id="treeNote"></span>
+    </div>
+    <div class="row" id="extraRow"></div>
+    <div class="row">
+      <span class="lbl">Step</span>
+      <button class="ctl" id="first">&laquo; First</button>
+      <button class="ctl" id="prev">&lsaquo; Prev</button>
+      <button class="ctl primary" id="play">&#9654; Play</button>
+      <button class="ctl" id="next">Next &rsaquo;</button>
+      <button class="ctl" id="last">Last &raquo;</button>
+      <button class="ctl" id="nextPhase">Next phase &raquo;&raquo;</button>
+      <span class="count" id="frameCount"></span>
+    </div>
+  </div>
+
+  <div id="stage"></div>
+
+  <p class="legend">
+    <span><i class="sw" style="border-color:#a95c19;background:#fff3e0"></i>the vertex being handled</span>
+    <span><i class="sw" style="border-color:#8e44ad;background:#f3e8ff"></i>the neighbour being looked at</span>
+    <span><i class="sw" style="border-color:#2573a7;background:#eaf2f8"></i>discovered, waiting in the queue or stack</span>
+    <span><i class="sw" style="border-color:#1c7e45;background:#f2fbf4"></i>visited, and in the result</span>
+  </p>
+
+  <div id="watch"></div>
+
+  <div class="selftest" id="selftest"></div>
+</div>
+
+<script>
+
+// ---------------------------------------------------------------------------
+// Graphs. Fixed, so the same preset always produces the same walk -- a stepper
+// that shuffles is useless for "look at step 7" in a room full of people.
+//
+// Adjacency lists are stored in insertion order, because that is what the
+// students' std::vector<std::string> does and it is what decides the order
+// neighbours come out. Sorting them here would hide the fact that BFS and DFS
+// order depends on the order edges were added.
+// ---------------------------------------------------------------------------
+var PRESETS = {
+  // The graph tests/graph_fixtures.h builds. BFS from A is pinned to
+  // A, B, C, D, E, so this is the one to step through before submitting.
+  tested: { label: "the test fixture",
+            vs: ["A", "B", "C", "D", "E"],
+            es: [["A","B"], ["A","C"], ["B","D"], ["B","E"], ["C","E"]],
+            pos: { A:[1,0], B:[0,1], C:[2,1], D:[0,2], E:[2,2] } },
+  social: { label: "social",
+            vs: ["A", "B", "C", "D", "E", "F"],
+            es: [["A","B"], ["A","C"], ["B","D"], ["B","E"], ["C","F"], ["E","F"]],
+            pos: { A:[1,0], B:[0,1], C:[2,1], D:[0,2], E:[1,2], F:[2,2] } },
+  line:   { label: "path",
+            vs: ["A", "B", "C", "D", "E"],
+            es: [["A","B"], ["B","C"], ["C","D"], ["D","E"]],
+            pos: { A:[0,0], B:[1,0], C:[2,0], D:[3,0], E:[4,0] } },
+  star:   { label: "star",
+            vs: ["A", "B", "C", "D", "E"],
+            es: [["A","B"], ["A","C"], ["A","D"], ["A","E"]],
+            pos: { A:[1.5,1], B:[0,0], C:[3,0], D:[0,2], E:[3,2] } }
+};
+
+// An adjacency list is a plain object of arrays, which is what
+// unordered_map<string, vector<string>> is. Copied per frame for the same
+// reason the tree was cloned: a frame must hold a value, not a live reference.
+function emptyGraph() { return { order: [], adj: {} }; }
+
+function addVertex(g, v) {
+  if (g.adj[v] === undefined) { g.adj[v] = []; g.order.push(v); }
+  return g;
+}
+
+function addEdge(g, a, b) {
+  addVertex(g, a); addVertex(g, b);
+  if (g.adj[a].indexOf(b) === -1) g.adj[a].push(b);
+  if (g.adj[b].indexOf(a) === -1) g.adj[b].push(a);
+  return g;
+}
+
+function cloneGraph(g) {
+  var out = { order: g.order.slice(), adj: {} };
+  g.order.forEach(function (v) { out.adj[v] = g.adj[v].slice(); });
+  return out;
+}
+
+function buildGraph(p) {
+  var g = emptyGraph();
+  p.vs.forEach(function (v) { addVertex(g, v); });
+  p.es.forEach(function (e) { addEdge(g, e[0], e[1]); });
+  return g;
+}
+
+function edgeCount(g) {
+  var n = 0;
+  g.order.forEach(function (v) { n += g.adj[v].length; });
+  return n / 2;        // every edge is stored on both endpoints
+}
+
+// ---------------------------------------------------------------------------
+// Drawing. Positions come from the preset rather than a layout algorithm: a
+// graph has no canonical shape, and a hand-placed one stays recognisable from
+// step to step, which is the whole point of drawing it at all.
+// ---------------------------------------------------------------------------
+function graphSvg(g, mark) {
+  mark = mark || {};
+  var P = PRESETS[state.preset].pos, CW = 104, RH = 86, PAD = 34, R = 19;
+  var xs = [], ys = [];
+  Object.keys(P).forEach(function (v) { xs.push(P[v][0]); ys.push(P[v][1]); });
+  var W = (Math.max.apply(null, xs) + 1) * CW + PAD;
+  var H = (Math.max.apply(null, ys) + 1) * RH + PAD;
+  var X = function (v) { return PAD + P[v][0] * CW + CW / 2 - PAD / 2; };
+  var Y = function (v) { return PAD + P[v][1] * RH; };
+
+  var seen = {}, edges = "", nodes = "";
+  g.order.forEach(function (a) {
+    g.adj[a].forEach(function (b) {
+      var key = a < b ? a + "|" + b : b + "|" + a;
+      if (seen[key]) return;
+      seen[key] = 1;
+      var on = mark.edge && (mark.edge === key);
+      var tree = mark.treeEdges && mark.treeEdges.indexOf(key) !== -1;
+      edges += '<line x1="' + X(a) + '" y1="' + Y(a) + '" x2="' + X(b) + '" y2="' + Y(b) +
+               '" stroke="' + (on ? "#a95c19" : tree ? "#1c7e45" : "#c7cdd1") +
+               '" stroke-width="' + (on ? 4 : tree ? 3.5 : 2) + '"/>';
+    });
+  });
+
+  var carryAt = null;
+  g.order.forEach(function (v) {
+    var fill = "#fff", stroke = "#c7cdd1", tcol = "#2c3e50", sw = 2;
+    if (mark.queued && mark.queued.indexOf(v) !== -1)   { fill = "#eaf2f8"; stroke = "#2573a7"; }
+    if (mark.visited && mark.visited.indexOf(v) !== -1) { fill = "#f2fbf4"; stroke = "#1c7e45"; }
+    if (mark.out && mark.out.indexOf(v) !== -1)         { fill = "#f2fbf4"; stroke = "#1c7e45"; sw = 3; }
+    if (mark.look === v)                                { fill = "#f3e8ff"; stroke = "#8e44ad"; sw = 3; }
+    if (mark.hit === v)                                 { fill = "#fff3e0"; stroke = "#a95c19"; sw = 3; }
+    if (mark.carry && mark.hit === v) carryAt = v;
+    nodes += '<circle cx="' + X(v) + '" cy="' + Y(v) + '" r="' + R + '" fill="' + fill +
+             '" stroke="' + stroke + '" stroke-width="' + sw + '"/>' +
+             '<text x="' + X(v) + '" y="' + (Y(v) + 5) + '" text-anchor="middle" fill="' +
+             tcol + '">' + v + "</text>";
+    // the order a vertex came out in, which is the answer BFS and DFS produce
+    if (mark.out && mark.out.indexOf(v) !== -1) {
+      var k = mark.out.indexOf(v) + 1;
+      nodes += '<circle cx="' + (X(v) + 15) + '" cy="' + (Y(v) - 15) + '" r="9" fill="#1c7e45"/>' +
+               '<text x="' + (X(v) + 15) + '" y="' + (Y(v) - 11) + '" text-anchor="middle" ' +
+               'fill="#fff" font-size="10.5" font-weight="700">' + k + "</text>";
+    }
+  });
+
+  // The vertex being handled, named beside itself. Same device as the BST
+  // stepper's carry pill: the panels say which vertex it is, the picture says
+  // where it is, and only together do they answer "where are we".
+  var carry = "";
+  if (carryAt && mark.carry) {
+    var ct = mark.carry.tag ? mark.carry.v + "  " + mark.carry.tag : String(mark.carry.v);
+    var cw = 16 + ct.length * 7.5, ch = 21;
+    var cx = X(carryAt), cy = Y(carryAt) + R + 9;
+    if (cx - cw / 2 < 2) cx = cw / 2 + 2;
+    if (cx + cw / 2 > W - 2) cx = W - cw / 2 - 2;
+    if (cy + ch + 4 > H) H = cy + ch + 4;
+    carry = '<rect class="carry" x="' + (cx - cw / 2) + '" y="' + cy + '" width="' + cw +
+            '" height="' + ch + '" rx="10" fill="#fff3e0" stroke="#a95c19" stroke-width="2"/>' +
+            '<text x="' + cx + '" y="' + (cy + 15) + '" text-anchor="middle" fill="#c64500" ' +
+            'font-size="12.5" font-weight="700">' + esc(ct) + "</text>";
+  }
+
+  var box = mark.box || { w: W, h: H };
+  var bw = Math.max(W, box.w), bh = Math.max(H, box.h);
+  var shift = (bw - W) / 2;
+  var body = shift ? '<g transform="translate(' + shift + ',0)">' + edges + nodes + carry + "</g>"
+                   : edges + nodes + carry;
+
+  return '<svg class="gr" viewBox="0 0 ' + bw + " " + bh +
+    '" role="img" aria-label="the graph, ' + g.order.length + ' vertices and ' +
+    edgeCount(g) + ' edges' +
+    (mark.out && mark.out.length ? ", visited so far: " + mark.out.join(", ") : "") +
+    (carryAt ? ", currently at " + carryAt : "") + '">' + body + "</svg>";
+}
+
+// The adjacency list itself, drawn as the map it is. Students picture a graph
+// as the circles-and-lines diagram; the thing their code indexes is this.
+function adjHtml(g, mark) {
+  mark = mark || {};
+  if (!g.order.length) return '<p class="legend" style="margin:.4rem 0 0">adj_list_ is empty</p>';
+  return '<div class="adj">' + g.order.map(function (v) {
+    var hot = mark.hit === v, look = mark.look === v;
+    return '<div class="arow' + (hot ? " hot" : look ? " look" : "") + '">' +
+      '<span class="akey">' + v + '</span><span class="aarrow">&rarr;</span>' +
+      '<span class="avals">' +
+      (g.adj[v].length
+        ? g.adj[v].map(function (n) {
+            var cls = mark.nb === n && hot ? "av on" : "av";
+            return '<span class="' + cls + '">' + n + "</span>";
+          }).join("")
+        : '<span class="av empty">(none)</span>') +
+      "</span></div>";
+  }).join("") + "</div>";
+}
+
+// ---------------------------------------------------------------------------
+// Code panes. These are the solutions to CT 18's TODOs, written out: the
+// stepper and the file the student is editing have to be the same code, or the
+// highlight is pointing at something they cannot find.
+// ---------------------------------------------------------------------------
+var CODE = {
+  build: [
+    "void Graph::add_vertex(const std::string& vertex) {",
+    "    if (adj_list_.find(vertex) == adj_list_.end()) {",
+    "        adj_list_[vertex] = {};        // a new key, with no neighbours yet",
+    "    }",
+    "}",
+    "",
+    "void Graph::add_edge(const std::string& from, const std::string& to) {",
+    "    add_vertex(from);                  // both ends must exist first",
+    "    add_vertex(to);",
+    "",
+    "    adj_list_[from].push_back(to);     // undirected, so the edge is stored",
+    "    adj_list_[to].push_back(from);     // on BOTH vertices",
+    "}"
+  ],
+  bfs: [
+    "std::vector<std::string> Graph::bfs(const std::string& start) const {",
+    "    std::vector<std::string> result;",
+    "    if (!has_vertex(start)) return result;",
+    "",
+    "    std::unordered_set<std::string> visited;",
+    "    std::queue<std::string> q;         // FIFO -- nearest first",
+    "",
+    "    q.push(start);",
+    "    visited.insert(start);             // marked when ENQUEUED",
+    "",
+    "    while (!q.empty()) {",
+    "        std::string current = q.front();",
+    "        q.pop();",
+    "        result.push_back(current);",
+    "",
+    "        for (const std::string& nb : neighbors(current)) {",
+    "            if (visited.count(nb) == 0) {",
+    "                visited.insert(nb);    // mark on the way IN",
+    "                q.push(nb);",
+    "            }",
+    "        }",
+    "    }",
+    "    return result;",
+    "}"
+  ],
+  dfs: [
+    "std::vector<std::string> Graph::dfs(const std::string& start) const {",
+    "    std::vector<std::string> result;",
+    "    if (!has_vertex(start)) return result;",
+    "",
+    "    std::unordered_set<std::string> visited;",
+    "    std::stack<std::string> s;         // LIFO -- deepest first",
+    "",
+    "    s.push(start);                     // NOT marked yet",
+    "",
+    "    while (!s.empty()) {",
+    "        std::string current = s.top();",
+    "        s.pop();",
+    "        if (visited.count(current)) continue;   // it got pushed twice",
+    "        visited.insert(current);       // marked when POPPED",
+    "        result.push_back(current);",
+    "",
+    "        std::vector<std::string> nbs = neighbors(current);",
+    "        for (auto it = nbs.rbegin(); it != nbs.rend(); ++it) {",
+    "            if (!visited.count(*it)) s.push(*it);",
+    "        }",
+    "    }",
+    "    return result;",
+    "}"
+  ]
+};
+
+var LINE_INFO = {
+  build: {
+    1: { src: "if (adj_list_.find(vertex) == adj_list_.end())",
+      what: "Only create the key if it is not already there.",
+      items: [
+        ["trap", "Writing <code class='inl'>adj_list_[vertex] = {}</code> unconditionally wipes the neighbours of a vertex that already exists. <code class='inl'>add_edge</code> calls <code class='inl'>add_vertex</code> on both ends every time, so without this guard the second edge erases the first."],
+        ["syntax", "<code class='inl'>operator[]</code> on a map default-constructs a missing key, so <code class='inl'>adj_list_[v]</code> would create an empty entry just by looking. <code class='inl'>find</code> does not."]
+      ] },
+    10: { src: "adj_list_[from].push_back(to);",
+      what: "Store the edge on the from-vertex.",
+      items: [
+        ["why", "An adjacency list holds, for each vertex, the vertices it is joined to. This is that, one direction of it."]
+      ] },
+    11: { src: "adj_list_[to].push_back(from);",
+      what: "And again the other way, because the graph is undirected.",
+      items: [
+        ["why", "Undirected means A-B and B-A are the same edge, and both vertices have to be able to find the other. Store it once and <code class='inl'>neighbors(\"B\")</code> will not list A, so BFS from B never reaches A."],
+        ["note", "This is why <code class='inl'>edge_count()</code> divides by two: every edge appears in the structure twice."]
+      ] }
+  },
+  bfs: {
+    2: { src: "if (!has_vertex(start)) return result;",
+      what: "A start vertex that is not in the graph gives an empty answer, not a crash.",
+      items: [
+        ["trap", "Without it, <code class='inl'>neighbors(start)</code> on a missing key default-constructs an entry, and the walk silently returns just that phantom vertex."]
+      ] },
+    8: { src: "visited.insert(start);",
+      what: "The start vertex is marked as it goes in, not when it comes out.",
+      items: [
+        ["why", "This is the rule that makes BFS need no guard later: a vertex is marked at the moment it is queued, so it can never be queued a second time."],
+        ["note", "DFS marks on the way OUT instead, which is exactly why DFS needs the <code class='inl'>continue</code> that BFS does not. Step the two side by side."]
+      ] },
+    13: { src: "result.push_back(current);",
+      what: "The vertex is emitted when it leaves the queue.",
+      items: [
+        ["why", "Because the queue is FIFO, everything one edge from the start comes out before anything two edges away. That is the whole reason BFS answers shortest-path questions on an unweighted graph."]
+      ] },
+    16: { src: "if (visited.count(nb) == 0)",
+      what: "Skip neighbours that are already spoken for.",
+      items: [
+        ["trap", "Drop this and a cycle makes the queue grow forever &mdash; A queues B, B queues A, and the loop never ends. The visited set, not the queue, is what makes the walk terminate."]
+      ] },
+    17: { src: "visited.insert(nb);",
+      what: "Mark it now, while it is being queued.",
+      items: [
+        ["trap", "Move this to the pop, as DFS does, and a vertex with two neighbours already in the queue gets queued twice and emitted twice. BFS has no <code class='inl'>continue</code> guard to catch that."]
+      ] }
+  },
+  dfs: {
+    5: { src: "std::stack<std::string> s;",
+      what: "A stack instead of a queue. That is the entire difference in the data.",
+      items: [
+        ["why", "LIFO means the most recently discovered vertex is explored next, so the walk runs as deep as it can before coming back. Swap this for a queue and the same code is BFS."]
+      ] },
+    12: { src: "if (visited.count(current)) continue;",
+      what: "A vertex can be on the stack more than once. This drops the repeats.",
+      items: [
+        ["why", "DFS marks on POP, so between a vertex being pushed and being popped, another vertex can push it again. Both copies come off; only the first does any work."],
+        ["trap", "Leave this out and vertices appear twice in the result. The walk still terminates, which is what makes it hard to spot &mdash; the only symptom is a wrong answer."]
+      ] },
+    13: { src: "visited.insert(current);",
+      what: "Marked when it comes OFF the stack, not when it goes on.",
+      items: [
+        ["note", "BFS marks at push, DFS at pop. Everything else about the two functions is the same shape, and this one difference is why one needs a guard and the other does not."]
+      ] },
+    17: { src: "for (auto it = nbs.rbegin(); it != nbs.rend(); ++it)",
+      what: "Push the neighbours in reverse, so the first one comes off first.",
+      items: [
+        ["why", "A stack reverses whatever you put in it. Pushing A's neighbours in order B, C means C is explored first. Pushing them backwards puts B on top, and the walk reads left to right like the diagram does."],
+        ["note", "Forward order is just as correct. The DFS tests do not pin a sequence &mdash; <code class='inl'>is_depth_first()</code> checks the <strong>rule</strong>: the next vertex visited is always a neighbour of the deepest vertex on the path that still has an unvisited one. Pushing forwards, backwards, or writing it recursively all pass. BFS order fails it."],
+        ["note", "<code class='inl'>bfs</code> is different &mdash; that one IS pinned, to <code class='inl'>A, B, C, D, E</code> on the fixture graph, because BFS has only one correct answer once the adjacency order is fixed."]
+      ] }
+  }
+};
+
+var STEP_TAG = {
+  build: { 0: "add_vertex", 1: "is it already there?", 2: "making the key",
+           6: "add_edge", 7: "making sure from exists", 8: "making sure to exists",
+           10: "storing it on from", 11: "storing it on to" },
+  bfs:   { 0: "entering bfs", 2: "guarding the start", 7: "queueing the start",
+           8: "marking the start", 10: "is the queue empty?", 11: "taking the front",
+           12: "popping it", 13: "emitting it", 15: "each neighbour",
+           16: "seen this one?", 17: "marking it", 18: "queueing it", 22: "done" },
+  dfs:   { 0: "entering dfs", 2: "guarding the start", 7: "pushing the start",
+           9: "is the stack empty?", 10: "taking the top", 11: "popping it",
+           12: "already done?", 13: "marking it", 14: "emitting it",
+           16: "its neighbours", 17: "in reverse", 18: "pushing it", 21: "done" }
+};
+
+var PHASE_OF = {
+  build: { 0: 0, 1: 0, 2: 0, 6: 1, 7: 1, 8: 1, 10: 2, 11: 2 },
+  bfs:   { 0: 0, 2: 0, 7: 0, 8: 0, 10: 1, 11: 1, 12: 1, 13: 1,
+           15: 2, 16: 2, 17: 2, 18: 2, 22: 1 },
+  dfs:   { 0: 0, 2: 0, 7: 0, 9: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1,
+           16: 2, 17: 2, 18: 2, 21: 1 }
+};
+
+var GUIDE = {
+  build: {
+    idea: "A graph is stored as a map from each vertex to the list of vertices it touches. Building it is nothing but filling that map in.",
+    steps: [
+      { t: "Make the key, once",
+        b: ["<code>add_vertex</code> only creates an entry if there is not one already",
+            "an existing vertex must keep its neighbours &mdash; overwriting is the classic bug",
+            "a vertex with no edges is a real vertex: a key with an empty list"] },
+      { t: "An edge needs both ends",
+        b: ["<code>add_edge</code> calls <code>add_vertex</code> on both before touching either list",
+            "so you can add an edge between vertices you never declared",
+            "this is why the guard in <code>add_vertex</code> matters: it runs constantly"] },
+      { t: "Store it twice",
+        b: ["undirected means both vertices have to know about the edge",
+            "store it once and the walk works in one direction only",
+            "<code>edge_count()</code> divides by two for exactly this reason"] }
+    ],
+    watch: "<strong>The guard in <code>add_vertex</code> is load-bearing.</strong> Write <code>adj_list_[vertex] = {};</code> without checking and every <code>add_edge</code> wipes the neighbours of both endpoints, because <code>add_edge</code> calls <code>add_vertex</code> on both every single time. The graph ends up with one edge &mdash; the last one you added."
+  },
+  bfs: {
+    idea: "Use a queue, and mark a vertex the moment it is queued. Everything one edge away comes out before anything two edges away.",
+    steps: [
+      { t: "Seed the queue",
+        b: ["push the start, and mark it visited immediately",
+            "marking at push is what stops a vertex ever being queued twice",
+            "a start vertex that is not in the graph returns an empty result"] },
+      { t: "Take from the front",
+        b: ["<code>q.front()</code> reads it, <code>q.pop()</code> removes it &mdash; two calls, because pop returns nothing",
+            "the vertex is emitted when it comes OUT, not when it goes in",
+            "FIFO is what makes the output come out in distance order"] },
+      { t: "Queue the unvisited neighbours",
+        b: ["every neighbour that is not already marked gets marked and queued",
+            "marked here, not at the pop &mdash; this is the difference from DFS",
+            "the visited set is what makes a cycle terminate"] }
+    ],
+    watch: "<strong>Mark at push, not at pop.</strong> BFS has no <code>continue</code> guard in the loop, so if you move the <code>visited.insert</code> down to where DFS has it, a vertex reachable from two others is queued twice and appears twice in the result. On the social preset that is F, reached from both C and E."
+  },
+  dfs: {
+    idea: "The same walk with a stack instead of a queue, and the vertex marked when it is popped rather than when it is pushed.",
+    steps: [
+      { t: "Seed the stack",
+        b: ["push the start &mdash; and do NOT mark it yet",
+            "a stack is LIFO, so the most recent discovery is explored next",
+            "swap the stack for a queue and this function is BFS"] },
+      { t: "Pop, guard, mark, emit",
+        b: ["<code>s.top()</code> then <code>s.pop()</code>, the same two-call shape as the queue",
+            "<code>if (visited.count(current)) continue;</code> &mdash; the copy that got pushed twice",
+            "only now is it marked and emitted"] },
+      { t: "Push the neighbours backwards",
+        b: ["a stack reverses what you put in, so pushing in reverse reads forwards",
+            "already-visited neighbours are skipped, but the guard above is still needed",
+            "a vertex can sit on the stack twice before either copy is popped"] }
+    ],
+    watch: "<strong>The <code>continue</code> is not optional.</strong> DFS marks on pop, so a vertex can be pushed by two different neighbours before it is ever popped. Without the guard both copies are emitted and the result has a duplicate. It does not crash and it does not hang &mdash; it just quietly returns the wrong vector."
+  },
+  compare: {
+    idea: "Same graph, same adjacency list, same loop shape. One uses a queue and marks at push; the other uses a stack and marks at pop.",
+    steps: [
+      { t: "BFS &mdash; nearest first", b: ["queue, FIFO", "marked when queued", "output is in distance order"] },
+      { t: "DFS &mdash; deepest first", b: ["stack, LIFO", "marked when popped", "needs the duplicate guard"] },
+      { t: "Both are O(V + E)", b: ["every vertex comes out once", "every edge is looked at twice, once from each end", "the choice is about the ORDER you need, never about speed"] }
+    ],
+    watch: "<strong>Both visit every reachable vertex exactly once, and neither is faster.</strong> Choose BFS when you need distance or a shortest hop count; choose DFS when you need to go deep &mdash; cycle detection, path existence, topological order."
+  }
+};
+
+var FACTS = {
+  build: [
+    ["add_vertex", "O(1) average &mdash; one hash lookup, one insert"],
+    ["add_edge", "O(1) average, two push_backs"],
+    ["Stored twice", "an undirected edge lives on both vertices"],
+    ["Space", "O(V + E), against O(V&#178;) for a matrix"],
+    ["Scored by", "<code class=\"inl\">GraphAddVertex</code>, <code class=\"inl\">GraphAddEdge</code>"]
+  ],
+  bfs: [
+    ["Cost", "O(V + E) &mdash; every vertex once, every edge from both ends"],
+    ["Container", "<code class=\"inl\">std::queue</code>, FIFO"],
+    ["Marks visited", "when a vertex is <strong>queued</strong>"],
+    ["Gives you", "distance order &mdash; shortest hops on an unweighted graph"],
+    ["Scored by", "<code class=\"inl\">GraphBFS</code>"]
+  ],
+  dfs: [
+    ["Cost", "O(V + E), the same as BFS"],
+    ["Container", "<code class=\"inl\">std::stack</code>, LIFO"],
+    ["Marks visited", "when a vertex is <strong>popped</strong>"],
+    ["Needs", "the duplicate guard, because of the above"],
+    ["Scored by", "<code class=\"inl\">GraphDFS</code>"]
+  ],
+  compare: [
+    ["Cost", "both O(V + E)"],
+    ["Difference", "one container, and when you mark visited"],
+    ["BFS for", "shortest hop count, level order"],
+    ["DFS for", "cycles, path existence, going deep"]
+  ]
+};
+
+// ---------------------------------------------------------------------------
+// Frame builders. One frame per line that runs, in the order it runs -- a
+// pop that is really front() then pop() is two frames, and the moment a
+// vertex is marked visited is always its own, because that moment is the
+// difference between the two walks.
+// ---------------------------------------------------------------------------
+function F(o) { return o; }
+
+function snapshot(g) { return cloneGraph(g); }
+
+function buildBuild(p) {
+  var frames = [], g = emptyGraph();
+
+  p.vs.forEach(function (v) {
+    frames.push(F({ g: snapshot(g), line: 0, tag: "add_vertex", phase: 0,
+      calc: 'add_vertex("' + v + '")',
+      head: "Adding the vertex <strong>" + v + "</strong>.",
+      why: ["a vertex is a key in the map, and its value is the list of what it touches",
+            "nothing is joined to anything yet"] }));
+    var there = g.adj[v] !== undefined;
+    frames.push(F({ g: snapshot(g), line: 1, look: there ? v : undefined,
+      calc: 'adj_list_.find("' + v + '") == adj_list_.end()   →   ' +
+            (there ? "false, it is already a key" : "true, there is no key yet"),
+      head: there
+        ? "<strong>" + v + "</strong> is already in the map, so nothing happens."
+        : "<strong>" + v + "</strong> is not in the map yet.",
+      why: there
+        ? ["the guard is what protects the neighbours it already has",
+           "<code>add_edge</code> calls this on both ends every time, so it runs constantly"]
+        : ["<code>find</code> is used rather than <code>[]</code> because <code>[]</code> would create the key just by looking"] }));
+    if (!there) {
+      addVertex(g, v);
+      frames.push(F({ g: snapshot(g), line: 2, hit: v,
+        calc: 'adj_list_["' + v + '"] = {}',
+        head: "<strong>" + v + "</strong> is now a key, with an empty neighbour list.",
+        why: ["a vertex with no edges is still a vertex &mdash; a key with an empty vector",
+              "the map now holds " + g.order.length + " vertices"] }));
+    }
+  });
+
+  p.es.forEach(function (e) {
+    var a = e[0], b = e[1];
+    frames.push(F({ g: snapshot(g), line: 6, tag: "add_edge", phase: 1,
+      calc: 'add_edge("' + a + '", "' + b + '")',
+      head: "Joining <strong>" + a + "</strong> and <strong>" + b + "</strong>.",
+      why: ["an undirected edge has to be stored on both vertices",
+            "both ends are made to exist first, whether they already did or not"] }));
+    [[7, a], [8, b]].forEach(function (pair) {
+      frames.push(F({ g: snapshot(g), line: pair[0], look: pair[1],
+        calc: 'add_vertex("' + pair[1] + '")   →   already a key, nothing changes',
+        head: "<code>add_vertex(\"" + pair[1] + "\")</code> &mdash; already there.",
+        why: ["this is the call the guard inside <code>add_vertex</code> exists for",
+              "without that guard this line would empty " + pair[1] + "'s neighbour list"] }));
+    });
+    g.adj[a].push(b);
+    frames.push(F({ g: snapshot(g), line: 10, hit: a, nb: b, edge: (a < b ? a + "|" + b : b + "|" + a),
+      calc: 'adj_list_["' + a + '"].push_back("' + b + '")\n' +
+            a + " now lists " + g.adj[a].join(", "),
+      head: "<strong>" + b + "</strong> is added to <strong>" + a + "</strong>'s list.",
+      why: ["half the edge is stored &mdash; " + a + " can reach " + b + " but not yet the other way"] }));
+    g.adj[b].push(a);
+    frames.push(F({ g: snapshot(g), line: 11, hit: b, nb: a, edge: (a < b ? a + "|" + b : b + "|" + a),
+      calc: 'adj_list_["' + b + '"].push_back("' + a + '")\n' +
+            b + " now lists " + g.adj[b].join(", "),
+      head: "And <strong>" + a + "</strong> is added to <strong>" + b + "</strong>'s list.",
+      why: ["now the edge exists in both directions, which is what undirected means",
+            "the structure holds " + (edgeCount(g) * 2) + " entries for " + edgeCount(g) + " edges"] }));
+  });
+
+  return frames;
+}
+
+function buildBFS(g, start) {
+  var frames = [], result = [], visited = [], q = [];
+  var snap = function (o) {
+    o.g = g; o.out = result.slice(); o.visited = visited.slice(); o.queue = q.slice();
+    frames.push(F(o)); return o;
+  };
+
+  snap({ line: 0, tag: "entering bfs",
+         calc: 'bfs("' + start + '")',
+         head: "Breadth-first from <strong>" + start + "</strong>.",
+         why: ["a queue, and a visited set; nothing else",
+               "the answer comes out in distance order"] });
+  snap({ line: 2, look: start,
+         calc: '!has_vertex("' + start + '")   →   false, it is in the graph',
+         head: "<strong>" + start + "</strong> is a real vertex, so the walk can start.",
+         why: ["a missing start would return an empty vector rather than crash"] });
+
+  q.push(start);
+  snap({ line: 7, hit: start, carry: { v: start, tag: "queued" },
+         calc: 'q.push("' + start + '")\nqueue: ' + q.join(", "),
+         head: "<strong>" + start + "</strong> goes into the queue.",
+         why: ["nothing has been emitted yet &mdash; being queued is not being visited"] });
+  visited.push(start);
+  snap({ line: 8, hit: start, carry: { v: start, tag: "marked" },
+         calc: 'visited.insert("' + start + '")\nvisited: ' + visited.join(", "),
+         head: "<strong>" + start + "</strong> is marked, at the moment it was queued.",
+         why: ["marking at push is what stops anything being queued twice",
+               "DFS marks at pop instead, and needs a guard because of it"] });
+
+  while (true) {
+    var more = q.length > 0;
+    snap({ line: 10,
+           calc: "!q.empty()   →   " + (more ? "true, " + q.length + " waiting" : "false, the queue is empty"),
+           head: more ? "The queue still holds " + q.join(", ") + "."
+                      : "The queue is empty &mdash; everything reachable has been visited.",
+           why: more ? ["the loop runs once per vertex, not once per edge"]
+                     : ["there is nothing left that has been discovered but not handled"] });
+    if (!more) break;
+
+    var cur = q[0];
+    snap({ line: 11, hit: cur, carry: { v: cur, tag: "front" },
+           calc: 'current = q.front()   →   "' + cur + '"',
+           head: "<strong>" + cur + "</strong> is at the front of the queue.",
+           why: ["<code>front()</code> reads it; it is still in the queue at this point",
+                 "<code>pop()</code> returns nothing, which is why this takes two calls"] });
+    q.shift();
+    snap({ line: 12, hit: cur, carry: { v: cur, tag: "popped" },
+           calc: "q.pop()\nqueue: " + (q.length ? q.join(", ") : "(empty)"),
+           head: "<strong>" + cur + "</strong> is removed from the queue.",
+           why: ["FIFO: the oldest discovery is handled first, which is what orders the output"] });
+    result.push(cur);
+    snap({ line: 13, hit: cur, carry: { v: cur, tag: "#" + result.length },
+           calc: 'result.push_back("' + cur + '")\nresult: ' + result.join(", "),
+           head: "<strong>" + cur + "</strong> is the next vertex in the answer.",
+           why: ["a vertex is emitted when it comes OUT of the queue, not when it goes in",
+                 "position " + result.length + " of " + g.order.length] });
+
+    var nbs = g.adj[cur];
+    for (var i = 0; i < nbs.length; i++) {
+      var nb = nbs[i];
+      var key = cur < nb ? cur + "|" + nb : nb + "|" + cur;
+      snap({ line: 15, hit: cur, nb: nb, look: nb, edge: key,
+             calc: "nb = \"" + nb + "\"   (" + (i + 1) + " of " + nbs.length +
+                   " neighbours of " + cur + ")",
+             head: "Looking at <strong>" + cur + "</strong>'s neighbour <strong>" + nb + "</strong>.",
+             why: ["the neighbours come out in the order the edges were added"] });
+      var seen = visited.indexOf(nb) !== -1;
+      snap({ line: 16, hit: cur, nb: nb, look: nb, edge: key,
+             calc: 'visited.count("' + nb + '") == 0   →   ' +
+                   (seen ? "false, already marked" : "true, not seen yet"),
+             head: seen ? "<strong>" + nb + "</strong> is already marked &mdash; skip it."
+                        : "<strong>" + nb + "</strong> has not been seen.",
+             why: seen ? ["this test is what makes a cycle terminate",
+                          "without it " + nb + " would be queued again and the loop would never end"]
+                       : ["so it gets marked and queued, in that order"] });
+      if (seen) continue;
+      visited.push(nb);
+      snap({ line: 17, hit: nb, carry: { v: nb, tag: "marked" }, edge: key,
+             calc: 'visited.insert("' + nb + '")\nvisited: ' + visited.join(", "),
+             head: "<strong>" + nb + "</strong> is marked now, on the way in.",
+             why: ["this is the line that differs from DFS",
+                   "marked here, it can never be queued by anyone else"] });
+      q.push(nb);
+      snap({ line: 18, hit: nb, carry: { v: nb, tag: "queued" }, edge: key,
+             calc: 'q.push("' + nb + '")\nqueue: ' + q.join(", "),
+             head: "<strong>" + nb + "</strong> joins the back of the queue.",
+             why: ["it waits behind everything discovered before it, which is what keeps the order by distance"] });
+    }
+  }
+
+  snap({ line: 22, done: "done",
+         calc: "return result\n" + result.join(", "),
+         head: "Done. <strong>" + result.length + "</strong> vertices, in distance order from " + start + ".",
+         why: ["every reachable vertex came out exactly once",
+               "O(V + E): each vertex popped once, each edge looked at from both ends"] });
+  return frames;
+}
+
+function buildDFS(g, start) {
+  var frames = [], result = [], visited = [], st = [];
+  var snap = function (o) {
+    o.g = g; o.out = result.slice(); o.visited = visited.slice(); o.stack2 = st.slice();
+    frames.push(F(o)); return o;
+  };
+
+  snap({ line: 0, tag: "entering dfs",
+         calc: 'dfs("' + start + '")',
+         head: "Depth-first from <strong>" + start + "</strong>.",
+         why: ["a stack instead of a queue, and the marking moved to the pop",
+               "everything else is the same shape as BFS"] });
+  snap({ line: 2, look: start,
+         calc: '!has_vertex("' + start + '")   →   false, it is in the graph',
+         head: "<strong>" + start + "</strong> is a real vertex, so the walk can start.",
+         why: ["same guard as BFS, for the same reason"] });
+
+  st.push(start);
+  snap({ line: 7, hit: start, carry: { v: start, tag: "pushed" },
+         calc: 's.push("' + start + '")\nstack: ' + st.join(", ") + "   (top is on the right)",
+         head: "<strong>" + start + "</strong> goes on the stack &mdash; and is <em>not</em> marked.",
+         why: ["BFS would mark it here; DFS waits until it comes off",
+               "that one difference is why the loop below needs a guard"] });
+
+  while (true) {
+    var more = st.length > 0;
+    snap({ line: 9,
+           calc: "!s.empty()   →   " + (more ? "true, " + st.length + " on the stack" : "false, the stack is empty"),
+           head: more ? "The stack holds " + st.join(", ") + " (top on the right)."
+                      : "The stack is empty &mdash; the walk is finished.",
+           why: more ? ["the top is whatever was discovered most recently"]
+                     : ["every reachable vertex has been popped"] });
+    if (!more) break;
+
+    var cur = st[st.length - 1];
+    snap({ line: 10, hit: cur, carry: { v: cur, tag: "top" },
+           calc: 'current = s.top()   →   "' + cur + '"',
+           head: "<strong>" + cur + "</strong> is on top of the stack.",
+           why: ["LIFO: the most recent discovery is explored first",
+                 "<code>top()</code> then <code>pop()</code>, the same two calls a queue needs"] });
+    st.pop();
+    snap({ line: 11, hit: cur, carry: { v: cur, tag: "popped" },
+           calc: "s.pop()\nstack: " + (st.length ? st.join(", ") : "(empty)"),
+           head: "<strong>" + cur + "</strong> comes off the stack.",
+           why: ["only now can it be marked, which is the whole difference from BFS"] });
+
+    var dup = visited.indexOf(cur) !== -1;
+    snap({ line: 12, hit: cur, carry: { v: cur, tag: dup ? "already done" : "new" },
+           calc: 'visited.count("' + cur + '")   →   ' +
+                 (dup ? "true, this is a second copy — continue"
+                      : "false, this is the first time"),
+           head: dup
+             ? "<strong>" + cur + "</strong> was already visited &mdash; this copy is dropped."
+             : "<strong>" + cur + "</strong> has not been visited yet.",
+           why: dup
+             ? ["it was pushed twice, by two different neighbours, before either copy was popped",
+                "without this guard it would be emitted twice &mdash; no crash, just a wrong answer"]
+             : ["so it gets marked and emitted"] });
+    if (dup) continue;
+
+    visited.push(cur);
+    snap({ line: 13, hit: cur, carry: { v: cur, tag: "marked" },
+           calc: 'visited.insert("' + cur + '")\nvisited: ' + visited.join(", "),
+           head: "<strong>" + cur + "</strong> is marked, at the moment it was popped.",
+           why: ["BFS marks at push, DFS at pop",
+                 "that is why DFS needs the guard above and BFS does not"] });
+    result.push(cur);
+    snap({ line: 14, hit: cur, carry: { v: cur, tag: "#" + result.length },
+           calc: 'result.push_back("' + cur + '")\nresult: ' + result.join(", "),
+           head: "<strong>" + cur + "</strong> is the next vertex in the answer.",
+           why: ["position " + result.length + " of " + g.order.length] });
+
+    var nbs = g.adj[cur];
+    snap({ line: 16, hit: cur,
+           calc: "nbs = neighbors(\"" + cur + "\")   →   " + (nbs.join(", ") || "(none)"),
+           head: "<strong>" + cur + "</strong> touches " + (nbs.join(", ") || "nothing") + ".",
+           why: ["taken as a vector so it can be walked backwards"] });
+    for (var i = nbs.length - 1; i >= 0; i--) {
+      var nb = nbs[i];
+      var key = cur < nb ? cur + "|" + nb : nb + "|" + cur;
+      var seen = visited.indexOf(nb) !== -1;
+      snap({ line: 17, hit: cur, nb: nb, look: nb, edge: key,
+             calc: "*it = \"" + nb + "\"   (neighbour " + (i + 1) + " of " + nbs.length +
+                   ", walking backwards)",
+             head: "Reverse order: looking at <strong>" + nb + "</strong>.",
+             why: ["a stack reverses whatever goes in, so pushing backwards makes it come out forwards",
+                   "forward order is still depth-first, just a different branch first"] });
+      snap({ line: 18, hit: seen ? cur : nb, nb: nb, look: nb, edge: key,
+             carry: seen ? undefined : { v: nb, tag: "pushed" },
+             calc: seen
+               ? '!visited.count("' + nb + '")   →   false, already visited — not pushed'
+               : 's.push("' + nb + '")\nstack: ' + st.concat([nb]).join(", "),
+             head: seen
+               ? "<strong>" + nb + "</strong> is already visited, so it is not pushed."
+               : "<strong>" + nb + "</strong> goes on the stack, still unmarked.",
+             why: seen
+               ? ["this check saves work but it is not the guard &mdash; the one after the pop is"]
+               : ["unmarked, so another vertex can push it again before it is popped",
+                  "that is exactly the case the guard after the pop handles"] });
+      if (!seen) st.push(nb);
+    }
+  }
+
+  snap({ line: 21, done: "done",
+         calc: "return result\n" + result.join(", "),
+         head: "Done. <strong>" + result.length + "</strong> vertices, deepest branch first.",
+         why: ["same vertices as BFS, different order",
+               "O(V + E), exactly as BFS &mdash; the choice is about order, never speed"] });
+  return frames;
+}
+
+// The phase a FRAME is in. A line can belong to more than one phase -- the
+// lesson from CT 16, where insert's recursive-call line runs on the way down
+// and on the way back up -- so a frame may override the line's default.
+function phaseAt(f, key) {
+  return f && f.phase !== undefined ? f.phase : phaseOf(key, f ? f.line : -1);
+}
+
+function phaseOf(key, line) {
+  var m = PHASE_OF[key];
+  if (!m) return 0;
+  return m[line] === undefined ? 0 : m[line];
+}
+
+// Which listing a mode reads from. Here it is one to one; the BST stepper
+// needed a map because its three traversals shared a mode.
+function codeKey() { return state.mode === "compare" ? "bfs" : state.mode; }
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+var state = { mode: "build", preset: "tested", step: 0, start: "A",
+              pinned: null, peek: null,
+              runs: {}, maxFrames: 1, timer: null };
+
+function compute() {
+  var p = PRESETS[state.preset];
+  var g = buildGraph(p);
+  if (p.vs.indexOf(state.start) === -1) state.start = p.vs[0];
+  state.graph = g;
+  state.runs = {
+    build: buildBuild(p),
+    bfs: buildBFS(g, state.start),
+    dfs: buildDFS(g, state.start)
+  };
+
+  // Size each run's graph panel to its largest frame, read back out of the
+  // rendered viewBox rather than recomputed -- a second copy of the geometry
+  // would drift from what graphSvg actually draws, and silently.
+  Object.keys(state.runs).forEach(function (k) {
+    var box = null;
+    state.runs[k].forEach(function (f) {
+      var vb = /viewBox="([-\d.]+) ([-\d.]+) ([\d.]+) ([\d.]+)"/.exec(graphSvg(f.g, f));
+      if (!vb) return;
+      var w = +vb[3], h = +vb[4];
+      box = box ? { w: Math.max(box.w, w), h: Math.max(box.h, h) } : { w: w, h: h };
+    });
+    if (box) state.runs[k].forEach(function (f) { f.box = box; });
+  });
+
+  state.maxFrames = state.mode === "compare"
+    ? Math.max(state.runs.bfs.length, state.runs.dfs.length)
+    : state.runs[state.mode].length;
+  if (state.step >= state.maxFrames) state.step = state.maxFrames - 1;
+  state.mh = null;        // the reservation belongs to the run just built
+}
+
+function frameAt(key, step) {
+  var r = state.runs[key];
+  return r[Math.min(step, r.length - 1)];
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Index-math art keeps its columns and must not wrap; prose in the band
+// should wrap like prose. These are the characters the art is drawn with.
+function isArt(t) { return /[\u2191\u2502\u2514\u2500]/.test(String(t)); }
+
+// The sentence and, where the frame has them, the worked numbers behind it --
+// one block in the band's colour, because they are the same idea at two
+// lengths. The band in the code panel is anchored to the executing line; this
+// is its prose half.
+function nowBox(f) {
+  var nums = f.live
+    ? '<div class="nownums"><span class="lt">with this run\'s numbers</span>' + f.live + "</div>"
+    : "";
+  return '<div class="nowbox"><p class="nownote">' + f.head + "</p>" + nums + "</div>";
+}
+
+function codeHtml(key, hit, frame) {
+  var calc = frame && frame.calc;
+  return '<div class="code" id="code">' + CODE[key].map(function (ln, i) {
+    var cls = [];
+    if (i === hit) cls.push("hit");
+    if (state.pinned === i) cls.push("pin");
+    var t = esc(ln);
+    var at = t.indexOf("//");
+    if (at !== -1) t = t.slice(0, at) + '<span class="cm">' + t.slice(at) + "</span>";
+    return '<div data-line="' + i + '"' + (cls.length ? ' class="' + cls.join(" ") + '"' : "") +
+           ' tabindex="0">' + (t === "" ? "&nbsp;" : t) + "</div>" +
+           // The live values go under the line that is executing. esc() is
+           // deliberate: this band is text, not markup, so a calc string must
+           // carry real characters rather than HTML entities.
+           (i === hit && calc
+              ? '<div class="calc' + (isArt(calc) ? " art" : "") + '">' +
+                '<span class="cv">' + esc(calc) + "</span></div>"
+              : "");
+  }).join("") + "</div>" + lineInfoHtml(key);
+}
+
+function lineInfoHtml(key) {
+  var n = state.pinned;
+  var info = LINE_INFO[key] && LINE_INFO[key][n];
+  if (!info) {
+    return '<p class="legend" style="margin-top:.5rem">Click a line of code for a breakdown of it.</p>';
+  }
+  return '<div class="lineinfo"><h4>' + esc(info.src) + "</h4><p style='margin:0'>" + info.what +
+    "</p><ul class='li-items'>" + info.items.map(function (it) {
+      return '<li><span class="li-kind k-' + it[0] + '">' + it[0] + "</span>" + it[1] + "</li>";
+    }).join("") + "</ul></div>";
+}
+
+function chipsHtml(f) {
+  var out = [];
+  if (f.out) out.push('<span class="chip out">result: <b>' +
+                      (f.out.length ? f.out.join(", ") : "&mdash;") + "</b></span>");
+  if (f.visited) out.push('<span class="chip">visited <b>' + f.visited.length + " of " +
+                          state.graph.order.length + "</b></span>");
+  if (f.queue) out.push('<span class="chip cur">queue: <b>' +
+                        (f.queue.length ? f.queue.join(", ") : "empty") + "</b></span>");
+  if (f.stack2) out.push('<span class="chip cur">stack: <b>' +
+                         (f.stack2.length ? f.stack2.join(", ") : "empty") + "</b></span>");
+  if (f.done) out.push('<span class="chip ok">finished</span>');
+  return out.length ? '<div class="chips">' + out.join("") + "</div>" : "";
+}
+
+function testHtml(f) {
+  if (!f.test) return "";
+  return '<div class="test"><span class="q">' + f.test.q + "</span> &rarr; " + f.test.res + "</div>";
+}
+
+// Variables in scope beside the call stack. Every value here is read off the
+// frame, so it is what the code would actually be holding at this line.
+function localsHtml(f) {
+  // The container IS the algorithm here. A queue and a stack hold the same
+  // vertices in the same loop; which end you take from is the whole lesson,
+  // so both are drawn as an ordered row with the next-out end marked.
+  function row(label, items, note, nextAt) {
+    var cells = items.length
+      ? items.map(function (v, i) {
+          return '<span class="ci' + (i === nextAt ? " next" : "") + '">' + v + "</span>";
+        }).join("")
+      : '<span class="ci none">empty</span>';
+    return '<div class="crow"><span class="clab">' + label + '</span>' +
+           '<span class="cbox">' + cells + "</span>" +
+           (note ? '<span class="lat">' + note + "</span>" : "") + "</div>";
+  }
+
+  var out = "";
+  if (f.queue) out += row("queue", f.queue, f.queue.length ? "front is marked &mdash; FIFO" : "", 0);
+  if (f.stack2) out += row("stack", f.stack2,
+                           f.stack2.length ? "top is marked &mdash; LIFO" : "",
+                           f.stack2.length - 1);
+  if (f.visited) out += '<div class="crow"><span class="clab">visited</span><span class="cbox">' +
+      (f.visited.length ? f.visited.map(function (v) { return '<span class="ci vis">' + v + "</span>"; }).join("")
+                        : '<span class="ci none">empty</span>') + "</span></div>";
+  if (f.out) out += '<div class="crow"><span class="clab">result</span><span class="cbox">' +
+      (f.out.length ? f.out.map(function (v) { return '<span class="ci vis">' + v + "</span>"; }).join("")
+                    : '<span class="ci none">empty</span>') + "</span></div>";
+
+  var adj = adjHtml(f.g || state.graph, f);
+  return '<div class="cont">' + out + "</div>" +
+         '<h5 style="margin:.8rem 0 0">adj_list_</h5>' + adj;
+}
+
+// How it works: the phase being executed is open, the rest collapse to titles.
+// The rail. Two facts: the line being executed, and which of the three
+// phases it belongs to. The bullets stay collapsed until clicked, and open
+// into the rail rather than above the page.
+function railHtml(f) {
+  var g = GUIDE[state.mode];
+  if (!g) return "";
+  var key = codeKey();
+  var at = phaseAt(f, key);
+  var tag = f.tag || (STEP_TAG[key] && STEP_TAG[key][f.line]);
+  var mode = { insert: "in insert", search: "in search", height: "in height",
+               destroy: "in the destructor", apply: "in inorder_apply",
+               traverse: "in the traversal" }[state.mode] || "";
+  return '<div class="card rail"><h2>Where we are</h2><div class="card-body">' +
+    (tag ? '<p class="rlab">this step</p><p class="rnow">' + esc(tag) + "</p>" : "") +
+    '<p class="rlab">' + mode + "</p><ol>" +
+    g.steps.map(function (st, i) {
+      var open = state.peek === i;
+      return '<li class="' + (i === at ? "on" : "") + '" data-step="' + i + '" ' +
+             'role="button" tabindex="0"><span class="rt">' +
+             '<span class="rn">' + (i + 1) + "</span><span>" + st.t + "</span></span>" +
+             (open ? "<ul>" + st.b.map(function (b) { return "<li>" + b + "</li>"; }).join("") +
+                     "</ul>" : "") + "</li>";
+    }).join("") + "</ol></div></div>";
+}
+
+function wireRail() {
+  var root = document.getElementById("stage");
+  Array.prototype.forEach.call(root.querySelectorAll(".rail [data-step]"), function (d) {
+    var n = +d.getAttribute("data-step");
+    var hit = function () { state.peek = state.peek === n ? null : n; render(); };
+    d.addEventListener("click", hit);
+    d.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); hit(); }
+    });
+  });
+}
+
+function nextPhase() {
+  if (state.mode === "compare") { go(state.maxFrames - 1); return; }
+  var key = codeKey();
+  var here = phaseAt(frameAt(state.mode, state.step), key);
+  for (var i = state.step + 1; i < state.maxFrames; i++) {
+    if (phaseAt(frameAt(state.mode, i), key) !== here) { go(i); return; }
+  }
+  go(state.maxFrames - 1);
+}
+
+function factsHtml(key) {
+  var k = key === "inorder" || key === "preorder" || key === "postorder" ? "traverse" : key;
+  if (state.mode === "height" || state.mode === "destroy" || state.mode === "apply") k = state.mode;
+  if (!FACTS[k]) return "";
+  return '<dl class="facts">' + FACTS[k].map(function (p) {
+    return "<dt>" + p[0] + "</dt><dd>" + p[1] + "</dd>";
+  }).join("") + "</dl>";
+}
+
+// The markup, so the hidden measuring pass and the visible render cannot
+// drift apart -- a reservation measured against different markup is worthless.
+function soloHtml(f, key, title) {
+  var mh = state.mh || {};
+  var fix = function (n) { return mh[n] ? ' style="min-height:' + mh[n] + 'px"' : ""; };
+  return '<div class="solo"><div class="col">' +
+      '<div class="card"><h2>' + title + " &mdash; " + PRESETS[state.preset].label + " graph</h2>" +
+        '<div class="card-body"' + fix("tree") + ">" + graphSvg(f.g || state.graph, f) +
+        '<div class="grfoot">' + chipsHtml(f) + testHtml(f) + "</div></div></div>" +
+      '<div class="card"><h2>What the machine is holding</h2><div class="card-body"' + fix("locals") + ">" +
+        localsHtml(f) + "</div></div>" +
+      '<div class="card"><h2>What just happened</h2><div class="card-body"' + fix("says") + ">" +
+        nowBox(f) +
+        (f.why && f.why.length ? '<ul class="why">' + f.why.map(function (w) {
+          return "<li>" + w + "</li>"; }).join("") + "</ul>" : "") +
+      "</div></div>" +
+    "</div><div class=\"col\">" +
+      '<div class="card"><h2>The code</h2><div class="card-body"' + fix("code") + ">" +
+        codeHtml(key, f.line, f) + "</div></div>" +
+      '<div class="card"><h2>What it costs</h2><div class="card-body">' + factsHtml(key) + "</div></div>" +
+    '</div><div class="col railcol">' + railHtml(f) + "</div></div>";
+}
+
+// Render every frame of the run offscreen at the real width and keep the
+// tallest each panel reaches. Cheap enough to redo whenever the answer can
+// change -- mode, preset or window width -- and nowhere near a per-step cost.
+function measureRun() {
+  if (state.mode === "compare") { state.mh = null; return; }
+  var stage = document.getElementById("stage");
+  var run = state.runs[state.mode], key = codeKey();
+  if (!run || !stage.offsetWidth) return;
+
+  var title = soloTitle();
+  state.mh = null;                       // measure the natural height, not a reserved one
+  var ghost = document.createElement("div");
+  ghost.style.cssText = "position:absolute;left:-99999px;top:0;visibility:hidden;width:" +
+                        stage.offsetWidth + "px";
+  document.body.appendChild(ghost);
+
+  var max = { tree: 0, locals: 0, says: 0, code: 0 };
+  run.forEach(function (f) {
+    ghost.innerHTML = soloHtml(f, key, title);
+    var cols = ghost.querySelectorAll(".col");
+    var left = cols[0].children, right = cols[1].children;
+    var h = function (card) { return card ? card.querySelector(".card-body").offsetHeight : 0; };
+    max.tree   = Math.max(max.tree,   h(left[0]));
+    max.locals = Math.max(max.locals, h(left[1]));
+    max.says   = Math.max(max.says,   h(left[2]));
+    max.code   = Math.max(max.code,   h(right[0]));
+  });
+
+  document.body.removeChild(ghost);
+  state.mh = max;
+}
+
+function soloTitle() {
+  return { build: "Building the adjacency list",
+           bfs: "BFS from " + state.start,
+           dfs: "DFS from " + state.start }[state.mode];
+}
+
+function renderSolo() {
+  var key = codeKey();
+  var f = frameAt(state.mode, state.step);
+  document.getElementById("stage").innerHTML = soloHtml(f, key, soloTitle());
+  wireCode(key);
+  wireRail();
+}
+
+function renderCompare() {
+  // Same graph, same step number, both walks. The point is watching the two
+  // result rows diverge while the code shape stays identical.
+  var lanes = [["bfs", "BFS &mdash; queue, marked at push"],
+               ["dfs", "DFS &mdash; stack, marked at pop"]];
+  document.getElementById("stage").innerHTML =
+    '<div class="lanes">' + lanes.map(function (pair) {
+      var run = state.runs[pair[0]];
+      var f = run[Math.min(state.step, run.length - 1)];
+      return '<div class="card"><h2>' + pair[1] + "</h2>" +
+        '<div class="card-body">' + graphSvg(f.g || state.graph, f) +
+        '<div class="grfoot">' + chipsHtml(f) + "</div>" +
+        '<p class="nownote" style="margin:.5rem 0 0">' + f.head + "</p></div></div>";
+    }).join("") + "</div>";
+}
+
+function wireCode(key) {
+  var code = document.getElementById("code");
+  if (!code) return;
+  Array.prototype.forEach.call(code.children, function (d) {
+    d.addEventListener("click", function () {
+      var n = parseInt(d.getAttribute("data-line"), 10);
+      state.pinned = (state.pinned === n) ? null : n;
+      render();
+    });
+  });
+}
+
+function extraControls() {
+  var row = document.getElementById("extraRow");
+  if (state.mode === "build") { row.innerHTML = ""; return; }
+  var vs = PRESETS[state.preset].vs;
+  row.innerHTML = '<span class="lbl">Start at</span>' + vs.map(function (v) {
+    return '<button class="ctl' + (state.start === v ? " on" : "") + '" data-start="' + v +
+      '">' + v + "</button>";
+  }).join("") + '<span class="count">the order depends on where you start</span>';
+  Array.prototype.forEach.call(row.querySelectorAll("[data-start]"), function (b) {
+    b.addEventListener("click", function () {
+      stopPlay(); state.start = b.getAttribute("data-start");
+      state.step = 0; state.pinned = null; compute(); render();
+    });
+  });
+}
+
+function render() {
+  extraControls();
+  if (!state.mh && state.mode !== "compare") { renderSolo(); measureRun(); }
+  if (state.mode === "compare") renderCompare(); else renderSolo();
+
+  var g = GUIDE[state.mode];
+  document.getElementById("watch").innerHTML = g
+    ? '<div class="card"><div class="card-body"><div class="callout warn" style="margin:0">' +
+      g.watch + "</div></div></div>"
+    : "";
+
+  var t = state.tree;
+  document.getElementById("treeNote").textContent =
+    state.graph.order.length + " vertices, " + edgeCount(state.graph) + " edges";
+  document.getElementById("frameCount").textContent =
+    "step " + (state.step + 1) + " of " + state.maxFrames;
+  document.getElementById("first").disabled = state.step === 0;
+  document.getElementById("prev").disabled = state.step === 0;
+  document.getElementById("next").disabled = state.step >= state.maxFrames - 1;
+  document.getElementById("last").disabled = state.step >= state.maxFrames - 1;
+  document.getElementById("nextPhase").disabled = state.step >= state.maxFrames - 1;
+
+  Array.prototype.forEach.call(document.querySelectorAll("#tabs [data-mode]"), function (b) {
+    b.classList.toggle("on", b.getAttribute("data-mode") === state.mode);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function (b) {
+    b.classList.toggle("on", b.getAttribute("data-preset") === state.preset);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Controls
+// ---------------------------------------------------------------------------
+function go(n) { state.step = Math.max(0, Math.min(n, state.maxFrames - 1)); render(); }
+function stopPlay() {
+  if (state.timer) { clearInterval(state.timer); state.timer = null; }
+  document.getElementById("play").innerHTML = "&#9654; Play";
+}
+function togglePlay() {
+  if (state.timer) { stopPlay(); return; }
+  document.getElementById("play").innerHTML = "&#10073;&#10073; Pause";
+  state.timer = setInterval(function () {
+    if (state.step >= state.maxFrames - 1) { stopPlay(); return; }
+    go(state.step + 1);
+  }, 850);
+}
+
+document.getElementById("first").addEventListener("click", function () { stopPlay(); go(0); });
+document.getElementById("prev").addEventListener("click", function () { stopPlay(); go(state.step - 1); });
+document.getElementById("next").addEventListener("click", function () { stopPlay(); go(state.step + 1); });
+document.getElementById("last").addEventListener("click", function () { stopPlay(); go(state.maxFrames - 1); });
+document.getElementById("play").addEventListener("click", togglePlay);
+document.getElementById("nextPhase").addEventListener("click", function () {
+  stopPlay(); nextPhase();
+});
+
+Array.prototype.forEach.call(document.querySelectorAll("#tabs [data-mode]"), function (b) {
+  b.addEventListener("click", function () {
+    stopPlay(); state.mode = b.getAttribute("data-mode"); state.peek = null;
+    if (history.replaceState) history.replaceState(null, "", "#" + state.mode);
+    else location.hash = state.mode;
+    state.step = 0; state.pinned = null; compute(); render();
+  });
+});
+Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function (b) {
+  b.addEventListener("click", function () {
+    stopPlay(); state.preset = b.getAttribute("data-preset");
+    state.step = 0; state.pinned = null; compute(); render();
+  });
+});
+document.addEventListener("keydown", function (e) {
+  // A focused code line handles its own Enter; everything else is navigation.
+  var onCodeLine = e.target && e.target.parentNode && e.target.parentNode.classList &&
+                   e.target.parentNode.classList.contains("code");
+  if (e.key === "ArrowRight") { stopPlay(); go(state.step + 1); }
+  else if (e.key === "ArrowLeft") { stopPlay(); go(state.step - 1); }
+  else if (e.key === " " && !onCodeLine) { e.preventDefault(); togglePlay(); }
+});
+
+// ---------------------------------------------------------------------------
+// Self-check. Runs every preset from every start vertex and compares the
+// stepper's walks against plain implementations written independently below,
+// so a green bar means the demonstration is a correct one and not merely a
+// tidy one. The two properties that matter most are the ones students get
+// wrong: no vertex may appear twice, and BFS must come out in distance order.
+// ---------------------------------------------------------------------------
+(function selftest() {
+  var fails = [], runs = 0;
+
+  function plainBFS(g, s0) {
+    var seen = {}, q = [s0], out = [];
+    seen[s0] = 1;
+    while (q.length) {
+      var c = q.shift(); out.push(c);
+      g.adj[c].forEach(function (n) { if (!seen[n]) { seen[n] = 1; q.push(n); } });
+    }
+    return out;
+  }
+
+  function plainDFS(g, s0) {
+    var seen = {}, st = [s0], out = [];
+    while (st.length) {
+      var c = st.pop();
+      if (seen[c]) continue;
+      seen[c] = 1; out.push(c);
+      for (var i = g.adj[c].length - 1; i >= 0; i--) if (!seen[g.adj[c][i]]) st.push(g.adj[c][i]);
+    }
+    return out;
+  }
+
+  function depths(g, s0) {
+    var d = {}, q = [s0];
+    d[s0] = 0;
+    while (q.length) {
+      var c = q.shift();
+      g.adj[c].forEach(function (n) { if (d[n] === undefined) { d[n] = d[c] + 1; q.push(n); } });
+    }
+    return d;
+  }
+
+  Object.keys(PRESETS).forEach(function (name) {
+    var p = PRESETS[name], g = buildGraph(p);
+
+    // the built list must match what the preset describes, in both directions
+    p.es.forEach(function (e) {
+      if (g.adj[e[0]].indexOf(e[1]) === -1 || g.adj[e[1]].indexOf(e[0]) === -1)
+        fails.push(name + ": edge " + e[0] + "-" + e[1] + " is not stored on both ends");
+    });
+    if (edgeCount(g) !== p.es.length)
+      fails.push(name + ": " + edgeCount(g) + " edges counted, " + p.es.length + " defined");
+
+    // and the build walk must end on exactly that list
+    var bf = buildBuild(p), last = bf[bf.length - 1].g;
+    if (last.order.join() !== g.order.join())
+      fails.push(name + ": the build walk ends on different vertices");
+    last.order.forEach(function (v) {
+      if (last.adj[v].join() !== g.adj[v].join())
+        fails.push(name + ": the build walk ends with " + v + " = " + last.adj[v].join(","));
+    });
+
+    p.vs.forEach(function (s0) {
+      runs++;
+      var bfs = buildBFS(g, s0), dfs = buildDFS(g, s0);
+      var bOut = bfs[bfs.length - 1].out, dOut = dfs[dfs.length - 1].out;
+
+      if (bOut.join() !== plainBFS(g, s0).join())
+        fails.push(name + "/" + s0 + ": BFS disagrees with a plain BFS");
+      if (dOut.join() !== plainDFS(g, s0).join())
+        fails.push(name + "/" + s0 + ": DFS disagrees with a plain DFS");
+
+      // no repeats, and everything reachable
+      [["BFS", bOut], ["DFS", dOut]].forEach(function (pair) {
+        var u = {};
+        pair[1].forEach(function (v) { u[v] = (u[v] || 0) + 1; });
+        Object.keys(u).forEach(function (v) {
+          if (u[v] > 1) fails.push(name + "/" + s0 + ": " + pair[0] + " emits " + v + " twice");
+        });
+        if (pair[1].length !== Object.keys(depths(g, s0)).length)
+          fails.push(name + "/" + s0 + ": " + pair[0] + " missed a reachable vertex");
+      });
+      if (bOut.slice().sort().join() !== dOut.slice().sort().join())
+        fails.push(name + "/" + s0 + ": the two walks visit different vertices");
+
+      // BFS, and only BFS, must come out in non-decreasing distance
+      var d = depths(g, s0);
+      for (var i = 1; i < bOut.length; i++)
+        if (d[bOut[i]] < d[bOut[i - 1]])
+          fails.push(name + "/" + s0 + ": BFS is not in distance order");
+
+      // every frame must point at a line that exists
+      [["bfs", bfs], ["dfs", dfs]].forEach(function (pair) {
+        pair[1].forEach(function (f, i) {
+          if (CODE[pair[0]][f.line] === undefined)
+            fails.push(name + "/" + s0 + ": " + pair[0] + " frame " + i +
+                       " points at line " + f.line + ", which does not exist");
+          var ph = phaseAt(f, pair[0]);
+          if (ph < 0 || ph >= GUIDE[pair[0]].steps.length)
+            fails.push(name + "/" + s0 + ": " + pair[0] + " line " + f.line +
+                       " maps to phase " + ph);
+        });
+      });
+    });
+  });
+
+  // The order tests/test_graph_bfs.cpp pins, copied in literally:
+  //     EXPECT_THAT(graph_.bfs("A"), ElementsAre("A", "B", "C", "D", "E"));
+  // Agreeing with my own plain BFS is not the same as agreeing with the
+  // grader. If the fixture is ever edited, this is what notices.
+  var fixture = buildGraph(PRESETS.tested);
+  var pinned = buildBFS(fixture, "A");
+  var got = pinned[pinned.length - 1].out.join(", ");
+  if (got !== "A, B, C, D, E")
+    fails.push("the fixture BFS from A gives " + got +
+               ", but test_graph_bfs.cpp pins A, B, C, D, E");
+  runs++;
+
+  var el = document.getElementById("selftest");
+  el.innerHTML = fails.length
+    ? '<span style="color:#c0392b;font-weight:700">&#x2716; Self-check failed</span> &mdash; ' +
+      fails.slice(0, 6).join("; ")
+    : '<span style="color:#1c7e45;font-weight:700">&#x2714; Self-check passed</span> &mdash; ' +
+      runs + " walks across " + Object.keys(PRESETS).length + " graphs: BFS and DFS both agree " +
+      "with a plain implementation, neither repeats a vertex, both reach everything reachable, " +
+      "BFS comes out in distance order every time, and the fixture graph gives exactly the order test_graph_bfs.cpp pins";
+})();
+
+
+// Deep links: stepper.html#dfs opens that tab directly, so a Canvas page or a
+// lecture slide can point at one walk instead of "then click tab 3".
+var MODES = ["build", "bfs", "dfs", "compare"];
+
+function modeFromHash() {
+  var h = (location.hash || "").replace("#", "");
+  if (MODES.indexOf(h) !== -1) return h;
+  return null;
+}
+
+function applyHash() {
+  var m = modeFromHash();
+  if (m && m !== state.mode) {
+    stopPlay();
+    state.mode = m;
+    state.step = 0;
+    state.pinned = null;
+    compute();
+    render();
+  }
+}
+
+// A narrower window makes taller panels, so the reservation has to be redone
+var rt = null;
+window.addEventListener("resize", function () {
+  clearTimeout(rt);
+  rt = setTimeout(function () { state.mh = null; render(); }, 150);
+});
+window.addEventListener("hashchange", applyHash);
+
+var initial = modeFromHash();
+if (initial) state.mode = initial;
+
+compute();
+render();
+</script>
+</body>
+</html>
