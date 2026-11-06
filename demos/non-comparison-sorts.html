@@ -17,7 +17,10 @@
   body { margin:0; padding:1.5rem 1.25rem 3rem;
          font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
          color:var(--ink); background:#fff; line-height:1.5; }
-  .wrap { max-width:1280px; margin:0 auto; }
+  /* No max-width: these are shown on a projector, and a centred column
+     throws away a third of the screen. Matches the CS 1400 steppers,
+     which have no width container at all. body padding is the margin. */
+  .wrap { margin:0 auto; }
   h1 { font-size:1.35rem; margin:0 0 .2rem; }
   .sub { color:var(--muted); font-size:.9rem; margin:0 0 1.1rem; }
 
@@ -113,6 +116,11 @@
   .code div.active::before { content:"\25B8 "; color:#f9e2af; }
   .code div:not(.active)::before { content:"  "; }
   .code div.cont::before { content:"  " !important; }
+  /* Radix shows the source verbatim, so long lines wrap instead of clipping. */
+  .code.verbatim div:not(.calc) { white-space:pre-wrap; padding-left:calc(.8rem + 6ch);
+                                  text-indent:-6ch; }
+  /* A highlighted comment has to stay readable against the highlight. */
+  .code div.active .cm { color:#e6e9f5; }
   .code div.pinned { box-shadow:inset 3px 0 0 #f9e2af; }
   .code div:focus-visible { outline:2px solid #89dceb; outline-offset:-2px; }
 
@@ -364,7 +372,7 @@
 
   /* the phase rail, also from ct14 */
   .phrail { display:flex; align-items:stretch; gap:.4rem; margin:0 0 .6rem; }
-  .phrail .ph { flex:1 1 0; min-width:0; border:1px solid var(--rule); border-radius:8px;
+  .phrail .ph { flex:1 1 0; min-width:0; min-height:3.2rem; border:1px solid var(--rule); border-radius:8px;
                 padding:.35rem .6rem; font-size:.78rem; background:#f7f9fb;
                 color:var(--muted); display:flex; align-items:center; gap:.4rem; }
   .phrail .ph b { font-size:.74rem; width:1.15rem; height:1.15rem; flex:0 0 auto;
@@ -510,22 +518,33 @@ var CODE = {
     {k:'end',    t:'}'}
   ],
   radix: [
-    {k:'dsig',   t:K+'static void'+E+' '+F+'counting_sort_by_digit'+E+'(v&amp; data, '+K+'int'+E+' exp) {'},
-    {k:'dout',   t:'  vector&lt;'+K+'int'+E+'&gt; output(n);  '+K+'int'+E+' count['+N+'10'+E+'] = {'+N+'0'+E+'};'},
-    {k:'t1',     t:'  '+C+'// 1. tally this digit'+E},
-    {k:'t2',     t:'  '+K+'for'+E+' ('+K+'int'+E+' i = '+N+'0'+E+'; i &lt; n; ++i) count[(data[i]/exp) % '+N+'10'+E+']++;'},
-    {k:'c1',     t:'  '+C+'// 2. make the counts CUMULATIVE'+E},
-    {k:'c2',     t:'  '+K+'for'+E+' ('+K+'int'+E+' i = '+N+'1'+E+'; i &lt; '+N+'10'+E+'; ++i) count[i] += count[i-'+N+'1'+E+'];'},
-    {k:'p1',     t:'  '+C+'// 3. place, walking the input BACKWARDS'+E},
-    {k:'p2',     t:'  '+K+'for'+E+' ('+K+'int'+E+' i = n-'+N+'1'+E+'; i &gt;= '+N+'0'+E+'; --i) {'},
-    {k:'p3',     t:'    '+K+'int'+E+' digit = (data[i] / exp) % '+N+'10'+E+';'},
-    {k:'p4',     t:'    output[count[digit] - '+N+'1'+E+'] = data[i];  count[digit]--; }'},
-    {k:'assign', t:'  data = output;'},
+    {k:'dsig',   t:K+'static void'+E+' '+F+'counting_sort_by_digit'+E+'('+K+'std'+E+'::vector&lt;'+K+'int'+E+'&gt;&amp; data, '+K+'int'+E+' exp) {'},
+    {k:'dn',     t:'    '+K+'int'+E+' n = '+K+'static_cast'+E+'&lt;'+K+'int'+E+'&gt;(data.'+F+'size'+E+'());'},
+    {k:'dout',   t:'    '+K+'std'+E+'::vector&lt;'+K+'int'+E+'&gt; output(n);'},
+    {k:'dcnt',   t:'    '+K+'int'+E+' count['+N+'10'+E+'] = {'+N+'0'+E+'};  '+C+'// k = 10 (base 10, digits 0-9)'+E},
+    {k:'t1',     t:'    '+C+'// Count occurrences of each digit at position exp'+E},
+    {k:'t2',     t:'    '+K+'for'+E+' ('+K+'int'+E+' i = '+N+'0'+E+'; i &lt; n; ++i) {'},
+    {k:'t3',     t:'        '+K+'int'+E+' digit = (data[i] / exp) % '+N+'10'+E+';'},
+    {k:'t4',     t:'        count[digit]++;'},
+    {k:'t5',     t:'    }'},
+    {k:'c1',     t:'    '+C+'// Convert counts to cumulative positions (for stability)'+E},
+    {k:'c2',     t:'    '+K+'for'+E+' ('+K+'int'+E+' i = '+N+'1'+E+'; i &lt; '+N+'10'+E+'; ++i) {'},
+    {k:'c3',     t:'        count[i] += count[i - '+N+'1'+E+'];'},
+    {k:'c4',     t:'    }'},
+    {k:'p1',     t:'    '+C+'// Build output array (iterate backwards for stability)'+E},
+    {k:'p2',     t:'    '+K+'for'+E+' ('+K+'int'+E+' i = n - '+N+'1'+E+'; i &gt;= '+N+'0'+E+'; --i) {'},
+    {k:'p3',     t:'        '+K+'int'+E+' digit = (data[i] / exp) % '+N+'10'+E+';'},
+    {k:'p4',     t:'        output[count[digit] - '+N+'1'+E+'] = data[i];'},
+    {k:'p5',     t:'        count[digit]--;'},
+    {k:'p6',     t:'    }'},
+    {k:'assign', t:'    data = '+K+'std'+E+'::'+F+'move'+E+'(output);'},
     {k:'dend',   t:'}'},
-    {k:'rsig',   t:K+'void'+E+' '+F+'radix_sort'+E+'(vector&lt;'+K+'int'+E+'&gt;&amp; data) {'},
-    {k:'rmax',   t:'  '+K+'int'+E+' max_val = *'+F+'max_element'+E+'(..);'},
-    {k:'rloop',  t:'  '+K+'for'+E+' ('+K+'int'+E+' exp = '+N+'1'+E+'; max_val / exp &gt; '+N+'0'+E+'; exp *= '+N+'10'+E+')'},
-    {k:'rcall',  t:'    '+F+'counting_sort_by_digit'+E+'(data, exp);'},
+    {k:'rsig',   t:K+'void'+E+' '+F+'radix_sort'+E+'('+K+'std'+E+'::vector&lt;'+K+'int'+E+'&gt;&amp; data) {'},
+    {k:'rguard', t:'    '+K+'if'+E+' (data.'+F+'size'+E+'() &lt;= '+N+'1'+E+') '+K+'return'+E+';'},
+    {k:'rmax',   t:'    '+K+'int'+E+' max_val = *'+K+'std'+E+'::'+F+'max_element'+E+'(data.'+F+'begin'+E+'(), data.'+F+'end'+E+'());'},
+    {k:'rloop',  t:'    '+K+'for'+E+' ('+K+'int'+E+' exp = '+N+'1'+E+'; max_val / exp &gt; '+N+'0'+E+'; exp *= '+N+'10'+E+') {'},
+    {k:'rcall',  t:'        '+F+'counting_sort_by_digit'+E+'(data, exp);'},
+    {k:'rlend',  t:'    }'},
     {k:'rend',   t:'}'}
   ]
 };
@@ -1041,21 +1060,31 @@ var LINE_INFO = {
       ] }
   },
   radix: {
-    dsig: { src: "static void counting_sort_by_digit(v&amp; data, int exp)",
+    dsig: { src: "static void counting_sort_by_digit(std::vector&lt;int&gt;&amp; data, int exp)",
       what: "One stable counting sort on a single digit position. <code>exp</code> selects which: 1 for ones, 10 for tens, 100 for hundreds.",
       items: [
         ["note", "<code>static</code> at file scope means <em>internal to this translation unit</em> &mdash; nothing to do with the class-member meaning of the keyword. It is why only <code>radix_sort</code> appears in the header."],
         ["why", "Passing <code>exp</code> rather than a digit number keeps the extraction a single division. It also means this helper has no idea how many digits exist, which is the caller's problem."],
         ["why", "This function must be <strong>stable</strong>. Not as a nice property &mdash; as a requirement. Radix sort works only because each pass preserves the order the previous pass established."]
       ] },
-    dout: { src: "vector&lt;int&gt; output(n);  int count[10] = {0};",
-      what: "Scratch space for this pass: somewhere to build the result, and exactly ten digit counters.",
+    dn: { src: "int n = static_cast&lt;int&gt;(data.size());",
+      what: "A signed copy of the element count, because a loop below has to count down past zero.",
       items: [
-        ["why", "<strong>Ten.</strong> Not <code>k</code>, not <code>max</code>, nothing that depends on the data &mdash; a decimal digit has ten possible values and that is the end of it. This is radix sort's answer to counting sort collapsing on a wide range."],
-        ["syntax", "<code>int count[10] = {0};</code> zero-initialises <em>all ten</em>, not just the first. A bare <code>int count[10];</code> leaves them holding garbage, and tallying into garbage produces plausible-looking nonsense."],
+        ["why", "<code>data.size()</code> returns an <em>unsigned</em> <code>size_t</code>. The placement loop tests <code>i &gt;= 0</code>, which is only meaningful on a signed type, so the count is converted once here rather than at every use."],
+        ["syntax", "<code>static_cast&lt;int&gt;(..)</code> is the explicit, searchable form of the conversion. It tells the compiler and the reader that the change of type is deliberate."]
+      ] },
+    dout: { src: "std::vector&lt;int&gt; output(n);",
+      what: "Somewhere to build this pass's result, one slot per element.",
+      items: [
         ["trap", "<code>output</code> must be constructed with <code>(n)</code> rather than left empty and <code>push_back</code>-ed, because the placement loop writes to computed positions and fills <em>backwards</em>. There is no order to append in."]
       ] },
-    t1: { src: "// 1. tally this digit",
+    dcnt: { src: "int count[10] = {0};  // k = 10 (base 10, digits 0-9)",
+      what: "Exactly ten digit counters, all starting at zero.",
+      items: [
+        ["why", "<strong>Ten.</strong> Not <code>k</code>, not <code>max</code>, nothing that depends on the data &mdash; a decimal digit has ten possible values and that is the end of it. This is radix sort's answer to counting sort collapsing on a wide range."],
+        ["syntax", "<code>int count[10] = {0};</code> zero-initialises <em>all ten</em>, not just the first. A bare <code>int count[10];</code> leaves them holding garbage, and tallying into garbage produces plausible-looking nonsense."]
+      ] },
+    t1: { src: "// Count occurrences of each digit at position exp",
       live: function (m, a) {
         var vals = a.map(function (e) { return e.v; });
         var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
@@ -1066,39 +1095,63 @@ var LINE_INFO = {
                "widen the values and k grows; <b>10</b> does not<br>" +
                "that is the trade: more passes, each with a fixed-size counter array";
       },
-      what: "Three numbered phases follow. They are worth keeping as comments in your own code.",
+      what: "The first of three commented phases. They are worth keeping as comments in your own code.",
       items: [
         ["note", "Tally, accumulate, place. Nearly every bug in radix sort is one of these three phases being merged into another or run in the wrong order."]
       ] },
-    t2: { src: "for (int i = 0; i &lt; n; ++i) count[(data[i]/exp) % 10]++;",
-      what: "One statement that walks the array, works out a digit, and bumps the matching counter.",
+    t2: { src: "for (int i = 0; i &lt; n; ++i) {",
+      what: "Visits every element once, forwards.",
       live: function (m) {
-        // Only on the loop header. The per-element frames already show their
-        // own arithmetic, and repeating this under each would be noise.
-        if (m.locals.i !== null && m.locals.i !== undefined) return "";
-        var e = m.exp, n = m.locals.n;
-        return "n = <b>" + n + "</b>, so this line runs " + n + " times, i = 0 &hellip; " +
+        var n = m.locals.n;
+        return "n = <b>" + n + "</b>, so the body runs " + n + " times, i = 0 &hellip; " +
                (n - 1) + "<br>" +
-               "count[&hellip;] is an <em>expression</em> &mdash; a different counter each pass<br>" +
-               "/ " + e + " shifts the digit you want down, % 10 keeps only it<br>" +
-               "the <b>++</b> bumps a counter; nothing in data is moved or compared<br>" +
+               "each time round: work out one digit, bump one counter<br>" +
+               "nothing in data is moved or compared<br>" +
                "forward is fine here &mdash; the <em>placement</em> loop is where direction matters";
+      },
+      items: [
+        ["why", "A tally does not care about order: adding the same digits up in any sequence gives the same ten totals. That is why this loop can run forwards when the placement loop cannot."]
+      ] },
+    t3: { src: "int digit = (data[i] / exp) % 10;",
+      what: "Works out which of the ten counters this element belongs to.",
+      live: function (m) {
+        var e = m.exp, d = m.locals.digit;
+        if (d === undefined) return "";
+        return "/ " + e + " shifts the digit you want down to the ones place<br>" +
+               "% 10 keeps only that digit, which here is <b>" + d + "</b><br>" +
+               "the same statement appears again in the placement loop";
       },
       items: [
         ["syntax", "<code>(data[i] / exp) % 10</code> is the whole digit-extraction trick. Dividing by <code>exp</code> shifts the digit you want into the ones place; <code>% 10</code> keeps only that digit. For 170 with <code>exp</code> 10: <code>170 / 10</code> is 17, and <code>17 % 10</code> is <strong>7</strong>."],
         ["why", "Integer division is what makes this work. <code>170 / 100</code> being 1 rather than 1.7 is the feature, not a rounding problem to correct."],
         ["trap", "Numbers shorter than the current digit position give 0, which is correct and important: <code>45 / 100</code> is 0, so 45 sorts as though it had a leading zero. That is why a pass over a position most numbers do not have still does the right thing."]
       ] },
-    c1: { src: "// 2. make the counts CUMULATIVE",
+    t4: { src: "count[digit]++;",
+      what: "Adds one to the counter for this digit.",
+      items: [
+        ["note", "The digit is being used as an <em>array index</em>. That is why nothing is compared: the value of the digit says directly which counter to touch."]
+      ] },
+    t5: { src: "}",
+      what: "End of the tally loop. Every element has now been counted exactly once.",
+      items: [
+        ["note", "The counters must now add up to <code>n</code>, because every element has some digit in this position, even if that digit is a 0 it does not visibly have."]
+      ] },
+    c1: { src: "// Convert counts to cumulative positions (for stability)",
       what: "The step that changes what the counters <em>mean</em>.",
       items: [
         ["why", "Before this line, <code>count[d]</code> answers &ldquo;how many elements have digit d&rdquo;. After it, the same array answers &ldquo;where does digit d's group <em>end</em>&rdquo;. Nothing moved; the interpretation changed. Watch the counters turn teal in the panel above when this runs."]
       ] },
-    c2: { src: "for (int i = 1; i &lt; 10; ++i) count[i] += count[i-1];",
+    c2: { src: "for (int i = 1; i &lt; 10; ++i) {",
+      what: "Walks the counters left to right, starting at the second one.",
+      items: [
+        ["syntax", "Starts at <code>i = 1</code>, not 0. <code>count[0]</code> has nothing before it to add, and <code>count[0] += count[-1]</code> would read outside the array."],
+        ["note", "The bound is 10, not <code>n</code>. This loop walks the counters rather than the data, so it costs the same however many elements there are."]
+      ] },
+    c3: { src: "count[i] += count[i - 1];",
       live: function (m) {
         var i = m.locals.i, c = m.count;
         if (!c || i === undefined) return "";
-        return "count[" + i + "] += count[" + (i - 1) + "]  \u2192  <b>" + c[i] + "</b><br>" +
+        return "count[" + i + "] += count[" + (i - 1) + "]  →  <b>" + c[i] + "</b><br>" +
                "before the sweep count[" + i + "] meant &ldquo;how many have digit " + i +
                "&rdquo;<br>" +
                "after it, it means &ldquo;how many have a digit of " + i +
@@ -1107,11 +1160,15 @@ var LINE_INFO = {
       },
       what: "A running total across the ten counters, turning tallies into end positions.",
       items: [
-        ["syntax", "Starts at <code>i = 1</code>, not 0. <code>count[0]</code> has nothing before it to add, and <code>count[0] += count[-1]</code> would read outside the array."],
         ["why", "This is what lets the placement loop put each element <em>directly</em> at its final index for this pass, instead of walking the counters and emitting in order the way plain counting sort does. It is the one structural difference between the two."],
         ["trap", "The accumulation must run forwards. Going backwards adds in the wrong direction and produces totals that are meaningless rather than merely offset."]
       ] },
-    p1: { src: "// 3. place, walking the input BACKWARDS",
+    c4: { src: "}",
+      what: "End of the sweep. The ten numbers are now positions, and no element has moved.",
+      items: [
+        ["note", "<code>count[9]</code> now equals <code>n</code>: every element has a digit of 9 or less."]
+      ] },
+    p1: { src: "// Build output array (iterate backwards for stability)",
       live: function (m) {
         var c = m.count, n = m.locals.n;
         if (!c) return "";
@@ -1122,9 +1179,9 @@ var LINE_INFO = {
       },
       what: "The hardest idea in this activity, flagged in the code so it does not get skimmed.",
       items: [
-        ["why", "If you take one thing from this stepper, take the next three lines. Everything else in radix sort is bookkeeping; the direction of this loop is the algorithm's correctness."]
+        ["why", "If you take one thing from this stepper, take the next four lines. Everything else in radix sort is bookkeeping; the direction of this loop is the algorithm's correctness."]
       ] },
-    p2: { src: "for (int i = n-1; i &gt;= 0; --i) {",
+    p2: { src: "for (int i = n - 1; i &gt;= 0; --i) {",
       what: "Walks the input from the <strong>last</strong> element to the first.",
       items: [
         ["why", "Backwards is what preserves stability, and stability is what makes radix sort work at all. The cumulative counts give the <em>end</em> of each digit's group, so taking elements from the back and filling from the back keeps equal-digit elements in the order they already had. Go forwards and every group of equal digits comes out reversed, which undoes the previous pass and makes the final answer wrong."],
@@ -1134,39 +1191,56 @@ var LINE_INFO = {
     p3: { src: "int digit = (data[i] / exp) % 10;",
       what: "Extracts the same digit the tally used, for the element now being placed.",
       items: [
-        ["note", "An identical expression to the tally loop. Change one and not the other and the counts describe a different digit than the placement uses &mdash; which is why it is worth factoring into a small helper, or at least writing it the same way both times."],
-        ["why", "Pulled into a named variable because the next line uses it twice. Recomputing it would work; naming it makes that line readable."]
+        ["note", "An identical statement to the one in the tally loop. Change one and not the other and the counts describe a different digit than the placement uses &mdash; which is why it is worth factoring into a small helper, or at least writing it the same way both times."],
+        ["why", "Pulled into a named variable because the next two lines both use it. Recomputing it would work; naming it makes that line readable."]
       ] },
-    p4: { src: "output[count[digit] - 1] = data[i];  count[digit]--;",
+    p4: { src: "output[count[digit] - 1] = data[i];",
       live: function (m) {
-        var d = m.locals.digit, pos = m.locals.pos, c = m.count;
-        if (d === undefined || !c) return "";
-        return "digit " + d + "'s group ended at " + (pos + 1) +
+        var d = m.locals.digit, pos = m.locals.pos;
+        if (d === undefined) return "";
+        return "digit " + d + "'s group currently ends at " + (pos + 1) +
                ", so this one takes output[<b>" + pos + "</b>]<br>" +
-               "count[" + d + "] is now " + c[d] + ", so the NEXT element with digit " + d +
-               " goes to " + (c[d] - 1) + "<br>" +
-               "each one lands just to the <em>left</em> of the last<br>" +
-               "reading the input backwards therefore writes them left-to-right in their " +
-               "original order";
+               "this is a lookup: the counter says exactly where it goes";
       },
-      what: "Puts the element at the end of its digit's group, then shrinks the group so the next element with that digit lands just before it.",
+      what: "Puts the element in the last unclaimed slot of its digit's group.",
       items: [
-        ["syntax", "The <code>- 1</code> converts a count into an index. If three elements have digit 7 and <code>count[7]</code> is 9, they occupy indices 6, 7 and 8 &mdash; the last of them goes at 8."],
+        ["syntax", "The <code>- 1</code> converts a count into an index. If three elements have digit 7 and <code>count[7]</code> is 9, they occupy indices 6, 7 and 8 &mdash; the last of them goes at 8."]
+      ] },
+    p5: { src: "count[digit]--;",
+      live: function (m, a) {
+        var d = m.locals.digit, i = m.locals.i, c = m.count, left = 0, j;
+        if (d === undefined || !c) return "";
+        for (j = 0; j < i; j++) if (Math.floor(a[j].v / m.exp) % 10 === d) left++;
+        return "count[" + d + "] is now <b>" + c[d] + "</b><br>" +
+               (left ? "so the NEXT element with digit " + d + " goes to output[" + (c[d] - 1) + "]<br>" +
+                       "each one lands just to the <em>left</em> of the last<br>" +
+                       "reading the input backwards therefore keeps them in their original order"
+                     : "and no elements with digit " + d + " are left to place in this pass");
+      },
+      what: "Shrinks the group, so the next element with this digit lands just before this one.",
+      items: [
         ["why", "Decrementing after each placement turns one cumulative count into a cursor that fills its group from right to left. Combined with the backwards outer loop, that is precisely a stable sort."],
         ["trap", "Forget the decrement and every element with the same digit is written to the <em>same</em> index, each overwriting the last. The rest of <code>output</code> keeps its zeros, so the result is a vector mostly full of 0s with a few real values in it."]
       ] },
-    assign: { src: "data = output;",
-      what: "Copies this pass's result back over the input, ready for the next digit.",
+    p6: { src: "}",
+      what: "End of the placement loop. Every slot in <code>output</code> has been filled.",
       items: [
-        ["syntax", "Vector assignment copies every element &mdash; a real O(n) copy, not a pointer swap. <code>data = std::move(output);</code> would hand the buffer over instead, which is safe here because <code>output</code> is about to be destroyed anyway."],
+        ["note", "The loop stops because <code>i</code> reached -1. That only works because <code>i</code> is a signed <code>int</code>, which is what the <code>static_cast</code> at the top of this function was for."]
+      ] },
+    assign: { src: "data = std::move(output);",
+      what: "Hands this pass's finished result over to <code>data</code> without copying a single element.",
+      items: [
+        ["syntax", "<code>std::move</code> moves nothing by itself. It marks <code>output</code> as safe to take from, so the assignment takes over its buffer instead of copying every element."],
+        ["why", "<code>data = output;</code> would give the same answer, but it allocates and copies the whole vector once per pass. <code>output</code> is about to be destroyed anyway, so there is nothing worth preserving."],
+        ["trap", "After the move, <code>output</code> is valid but its contents are unspecified, so do not read from it. That is harmless here, since the function ends on the next line."],
         ["why", "Each pass needs the previous pass's <em>complete</em> output as its input. That dependency is what makes radix sort d sequential passes rather than one clever pass, and it is where the O(d &times; (n + 10)) comes from."]
       ] },
     dend: { src: "}",
-      what: "End of one digit pass. <code>output</code> and <code>count</code> are released here.",
+      what: "End of one digit pass. <code>count</code> and the now-empty <code>output</code> are released here.",
       items: [
         ["why", "The O(n + 10) extra space is per pass, not cumulative &mdash; pass 3 does not still hold pass 1's scratch. Peak memory is what the comparison tab reports, which is why a four-digit sort costs the same space as a one-digit sort."]
       ] },
-    rsig: { src: "void radix_sort(vector&lt;int&gt;&amp; data)",
+    rsig: { src: "void radix_sort(std::vector&lt;int&gt;&amp; data)",
       live: function (m, a) {
         var d = a.map(function (e) { return e.v; }); var n = d.length;
         return "data = [" + d.join(", ") + "]   <b>" + n + "</b> elements<br>" +
@@ -1180,7 +1254,20 @@ var LINE_INFO = {
         ["why", "Almost nothing happens here, and that is the design: the interesting work is one stable digit sort, and radix sort is that helper called repeatedly. Getting the helper right is the whole task."],
         ["trap", "This version handles non-negative integers only. Negatives break the digit extraction &mdash; <code>-45 % 10</code> is <code>-5</code> in C++, which indexes before the array. Supporting them means splitting the negatives off, sorting them separately, and reversing that part."]
       ] },
-    rmax: { src: "int max_val = *max_element(..);",
+    rguard: { src: "if (data.size() &lt;= 1) return;",
+      what: "Asks one question: <strong>is there 0 or 1 element?</strong> If so there is nothing to sort, and the next line would not be safe to run.",
+      live: function (m) {
+        var n = m.locals["data.size()"];
+        return "is there <b>0 or 1</b> element?<br>" +
+               "data.size() = <b>" + n + "</b>  →  " +
+               (n <= 1 ? "yes" : "no, there are " + n) + "<br>" +
+               "0 or 1 element <em>cannot</em> be out of order, so there is nothing to do<br>" +
+               "and on an empty vector the next line would dereference end()";
+      },
+      items: [
+        ["trap", "<code>*std::max_element(..)</code> on an empty vector dereferences <code>end()</code>, which is undefined behaviour. This guard is what keeps that from happening."]
+      ] },
+    rmax: { src: "int max_val = *std::max_element(data.begin(), data.end());",
       what: "The largest value, which determines how many digit positions there are.",
       live: function (m) {
         var mx = m.locals.max_val, dg = String(mx).length;
@@ -1194,7 +1281,7 @@ var LINE_INFO = {
         ["why", "Only the maximum matters. Shorter numbers are handled by the fact that their missing digits extract as 0, so there is no need to count digits per element."],
         ["note", "No <code>min_element</code> here, unlike the other two sorts. Radix sort never allocates anything proportional to the value range &mdash; that is the entire point of it."]
       ] },
-    rloop: { src: "for (int exp = 1; max_val / exp &gt; 0; exp *= 10)",
+    rloop: { src: "for (int exp = 1; max_val / exp &gt; 0; exp *= 10) {",
       what: "One iteration per digit position, from least significant upwards: 1, 10, 100, and so on.",
       items: [
         ["note", "A neat way to say &ldquo;while there are digits left&rdquo; without computing a digit count. For <code>max_val</code> 802: <code>802/1</code>, <code>802/10</code> and <code>802/100</code> are all positive, <code>802/1000</code> is 0, so it runs exactly three times."],
@@ -1206,6 +1293,11 @@ var LINE_INFO = {
       items: [
         ["why", "Step the three-digit preset and watch what this call does on pass 2: it sorts by the tens digit and <em>leaves pass 1's ones-digit order intact</em> within each group. That is the stability guarantee being spent, and it is why the array is fully sorted once the last pass finishes."],
         ["trap", "Pass <code>exp</code>, not the digit index. Passing 0, 1, 2 instead of 1, 10, 100 makes the first call divide by zero, which is a crash rather than a wrong answer &mdash; the merciful version of this bug."]
+      ] },
+    rlend: { src: "}",
+      what: "End of the pass loop. <code>max_val / exp</code> reached 0, so no digits are left.",
+      items: [
+        ["why", "The array is sorted only now. Each earlier pass left it sorted by the digits seen so far, and only the last pass brings in the most significant digit."]
       ] },
     rend: { src: "}",
       what: "Sorted, with no two elements ever having been compared.",
@@ -1544,6 +1636,13 @@ function radixSort(items) {
          "being stable.",
          { phase: 0, banner: B1, locals: { "data.size()": n }, stack: [],
            calc: "radix_sort(data)   \u2190  " + n + " elements" });
+  r.snap('rguard', "<strong>The size guard.</strong> 0 or 1 element is already sorted. It also protects " +
+         "the next line: with no elements there is no maximum to dereference.",
+         { phase: 0, banner: B1, locals: { "data.size()": n }, stack: [],
+           calc: "data.size() <= 1 ?   is there 0 or 1 element?\n" +
+                 n + " <= 1  is " + (n <= 1 ? "true" : "false") + "  \u2192  " +
+                 (n <= 1 ? "already sorted by definition, return"
+                         : "2 or more, so there IS something to sort") });
   if (n <= 1) { return r; }
   var mx = Math.max.apply(null, a.map(function (e) { return e.v; }));
   var digits = String(mx).length;
@@ -1553,7 +1652,7 @@ function radixSort(items) {
          "shorter and its missing digits read as 0.",
          { readAll: true, phase: 0, banner: B1,
            locals: { "data.size()": n, max_val: mx }, stack: [],
-           calc: "max_val = *max_element(..) = " + mx + "   \u2192  " + digits + " digit position" +
+           calc: "max_val = *std::max_element(..) = " + mx + "   \u2192  " + digits + " digit position" +
                  (digits === 1 ? "" : "s") });
   var passNo = 0;
   var B2 = { tone: "extract", text: "Phase 2 \u00b7 One pass per digit",
@@ -1586,13 +1685,24 @@ function radixSort(items) {
              calc: "counting_sort_by_digit(data, exp = " + exp + ")" });
     var count = new Array(10).fill(0);
     var output = new Array(n).fill(null);
+    r.snap('dn', "<strong>The element count, as a signed int.</strong> <code>size()</code> returns an " +
+           "unsigned value, and the placement loop further down has to be able to test " +
+           "<code>i &gt;= 0</code>.",
+           { exp: exp, pass: passNo, phase: 1, banner: BP,
+             locals: { exp: exp, n: n }, stack: stk.slice(),
+             calc: "int n = static_cast<int>(data.size()) = " + n });
+    r.aux = n;
+    r.snap('dout', "<strong>A fresh output array,</strong> one slot per element. Nothing is written " +
+           "to it until the counters know where everything goes.",
+           { exp: exp, pass: passNo, output: output.slice(),
+             phase: 1, banner: BP, locals: { exp: exp, n: n }, stack: stk.slice(),
+             calc: "std::vector<int> output(" + n + ")   ←  " + n + " empty slots" });
     r.aux = n + 10;
-    r.snap('dout', "<strong>A fresh output array, and exactly ten counters.</strong> Ten \u2014 " +
-           "however big the numbers get. That is the whole reason for going digit by digit instead " +
-           "of value by value.",
+    r.snap('dcnt', "<strong>Exactly ten counters.</strong> Ten — however big the numbers get. " +
+           "That is the whole reason for going digit by digit instead of value by value.",
            { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
              phase: 1, banner: BP, locals: { exp: exp, n: n }, stack: stk.slice(),
-             calc: "vector<int> output(" + n + ");  int count[10] = {0}" });
+             calc: "int count[10] = {0}   ←  ten zeros, whatever the input" });
     // 1. tally
     r.snap('t1', "<strong>Ten counters, and ten is not a coincidence.</strong> A base-10 digit has " +
            "exactly ten possible values, so this array is ten long whatever the numbers are \u2014 " +
@@ -1601,31 +1711,37 @@ function radixSort(items) {
            { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
              phase: 1, banner: BP, locals: { exp: exp, n: n }, stack: stk.slice(),
              calc: counters(count) + "\nall zero \u2014 nothing counted yet" });
-    r.snap('t2', "<strong>One statement doing three things.</strong> The loop runs " + n +
-           " times; <code>(data[i] / " + exp + ") % 10</code> works out <em>which</em> counter on " +
-           "every pass, so the subscript is a different number each time; and <code>++</code> " +
-           "bumps that counter. Nothing in <code>data</code> is read for comparison or moved.",
+    r.snap('t2', "<strong>The tally loop.</strong> It runs " + n + " times, and each time round it " +
+           "works out one digit and bumps one counter. Nothing in <code>data</code> is read for " +
+           "comparison or moved.",
            { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
-             phase: 1, banner: BP, locals: { exp: exp, n: n, i: null, digit: null },
+             phase: 1, banner: BP, locals: { exp: exp, n: n, i: 0, digit: null },
              stack: stk.slice(),
-             calc: "for (int i = 0; i < " + n + "; ++i)        " + n + " passes, i = 0 .. " +
-                   (n - 1) + "\n" +
-                   "count[(data[i] / " + exp + ") % 10]++   exp = " + exp + ", so the " +
-                   (exp === 1 ? "ones" : exp === 10 ? "tens" : exp === 100 ? "hundreds"
-                              : "exp=" + exp) + " digit" });
+             calc: "for (int i = 0; i < " + n + "; ++i)   ←  " + n + " times, i = 0 .. " + (n - 1) });
     for (i = 0; i < n; i++) {
       var d = Math.floor(a[i].v / exp) % 10;
-      count[d]++;
-      r.snap('t2', "<strong>" + lab(a[i]) + " has " + place + " digit " + d + ".</strong> Divide to " +
+      r.snap('t3', "<strong>" + lab(a[i]) + " has " + place + " digit " + d + ".</strong> Divide to " +
              "throw away the digits below this position, then take the remainder mod 10 to keep just " +
              "this one.",
              { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
                read: [i], hotCount: d, phase: 1, banner: BP,
                locals: { i: i, exp: exp, digit: d }, stack: stk.slice(),
-               calc: "(data[" + i + "] / exp) % 10\n" +
-                     "(" + a[i].v + " / " + exp + ") % 10 = " + Math.floor(a[i].v / exp) +
-                     " % 10 = " + d + "   \u2192  count[" + d + "] = " + count[d] });
+               calc: "int digit = (data[" + i + "] / exp) % 10\n" +
+                     "          = (" + a[i].v + " / " + exp + ") % 10 = " + Math.floor(a[i].v / exp) +
+                     " % 10 = " + d });
+      count[d]++;
+      r.snap('t4', "<strong>count[" + d + "] goes up by one.</strong> The digit itself is the array " +
+             "index, so no searching and no comparing is needed to find the right counter.",
+             { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
+               read: [i], hotCount: d, phase: 1, banner: BP,
+               locals: { i: i, exp: exp, digit: d }, stack: stk.slice(),
+               calc: "count[digit]++\ncount[" + d + "]: " + (count[d] - 1) + " → " + count[d] });
     }
+    r.snap('t5', "<strong>The tally loop is done.</strong> Every element has been counted once, so " +
+           "the ten counters add up to " + n + ".",
+           { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
+             phase: 1, banner: BP, locals: { i: n, n: n, exp: exp }, stack: stk.slice(),
+             calc: "i = " + n + ":  " + n + " < " + n + " is false  →  the loop ends" });
     // 2. cumulative
     r.snap('c1', "<strong>The tally is finished, and it is about to change meaning.</strong> Every " +
            "entry below currently answers &ldquo;how many have this digit&rdquo;. After the next " +
@@ -1634,10 +1750,16 @@ function radixSort(items) {
            { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
              phase: 1, banner: BP, locals: { exp: exp }, stack: stk.slice(),
              calc: counters(count) + "\nhow many elements have each digit" });
+    r.snap('c2', "<strong>The sweep across the counters.</strong> It starts at 1 because " +
+           "<code>count[0]</code> has nothing to its left to absorb, and it stops at 10 because that " +
+           "is how many counters there are, however many elements there are.",
+           { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
+             phase: 1, banner: BP, locals: { i: 1, exp: exp }, stack: stk.slice(),
+             calc: "for (int i = 1; i < 10; ++i)   \u2190  9 times, i = 1 .. 9" });
     for (i = 1; i < 10; i++) {
       var prev = count[i];
       count[i] += count[i - 1];
-      r.snap('c2', "<strong>count[" + i + "] += count[" + (i - 1) + "].</strong> Each entry absorbs " +
+      r.snap('c3', "<strong>count[" + i + "] += count[" + (i - 1) + "].</strong> Each entry absorbs " +
              "everything to its left, so it ends up holding the position just past this digit's group.",
              { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
                hotCount: i, cumulative: true, phase: 1, banner: BP,
@@ -1645,60 +1767,82 @@ function radixSort(items) {
                calc: "count[" + i + "] = " + prev + " + count[" + (i - 1) + "] (" +
                      count[i - 1] + ") = " + count[i] });
     }
+    r.snap('c4', "<strong>The sweep is done.</strong> <code>count[9]</code> has reached " + n +
+           ", the element count, and not one element has moved.",
+           { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
+             cumulative: true, phase: 1, banner: BP, locals: { i: 10, exp: exp }, stack: stk.slice(),
+             calc: "i = 10:  10 < 10 is false  \u2192  the loop ends" });
     // 3. place, backwards
     r.snap('p1', "<strong>Same ten numbers, new meaning.</strong> They are positions now, so placing " +
            "an element is a lookup rather than a search. The last entry is <code>" + n + "</code>, " +
            "the element count \u2014 it has to be, since every element fell into some digit. Now the " +
            "direction matters, and this is the line people get wrong.",
            { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
-             phase: 1, banner: BP, locals: { exp: exp, n: n }, stack: stk.slice(),
+             phase: 2, banner: BP, locals: { exp: exp, n: n }, stack: stk.slice(),
              calc: counters(count) + "\nwhere each digit's group ENDS" });
     r.snap('p2', "<strong>From the last element to the first.</strong> Going forwards would hand out " +
            "positions in the opposite order for equal digits, reversing them \u2014 and the order " +
            "they are in right now is the previous pass's result, which must survive.",
            { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
-             phase: 1, banner: BP, locals: { i: n - 1, n: n, exp: exp }, stack: stk.slice(),
-             calc: "for (int i = n\u22121; i >= 0; \u2212\u2212i)   \u2190  starts at " + (n - 1) +
+             phase: 2, banner: BP, locals: { i: n - 1, n: n, exp: exp }, stack: stk.slice(),
+             calc: "for (int i = n - 1; i >= 0; --i)   \u2190  starts at " + (n - 1) +
                    ", ends at 0" });
     for (i = n - 1; i >= 0; i--) {
       var dg = Math.floor(a[i].v / exp) % 10;
       r.snap('p3', "<strong>Pull the digit out again</strong> \u2014 the same expression the tally " +
              "loop used, because the placement has to agree with the counts it is reading.",
              { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
-               read: [i], hotCount: dg, phase: 1, banner: BP,
+               read: [i], hotCount: dg, phase: 2, banner: BP,
                locals: { i: i, exp: exp, digit: dg }, stack: stk.slice(),
                calc: "digit = (data[" + i + "] / exp) % 10\n" +
                      "      = (" + a[i].v + " / " + exp + ") % 10 = " + dg });
       var pos = count[dg] - 1;
       output[pos] = a[i];
-      count[dg]--;
       r.writes++;
       r.snap('p4', "<strong>" + lab(a[i]) + " lands at output[" + pos + "].</strong> The counter said " +
-             "where this digit's group ends; take one off it and that slot is claimed, so the next " +
+             "where this digit's group ends, and the <code>- 1</code> turns that into an index.",
+             { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
+               read: [i], hotCount: dg, moved: [pos], inOutput: true, phase: 2, banner: BP,
+               locals: { i: i, digit: dg, pos: pos }, stack: stk.slice(),
+               calc: "output[count[" + dg + "] − 1] = data[" + i + "]\n" +
+                     "output[" + (pos + 1) + " − 1] = " + a[i].v + "   →  output[" + pos +
+                     "] = " + a[i].v });
+      count[dg]--;
+      r.snap('p5', "<strong>Take one off the counter.</strong> That slot is claimed now, so the next " +
              "element with the same digit goes just to the left of this one.",
              { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
-               read: [i], hotCount: dg, moved: [pos], inOutput: true, phase: 1, banner: BP,
+               read: [i], hotCount: dg, moved: [pos], inOutput: true, phase: 2, banner: BP,
                locals: { i: i, digit: dg, pos: pos }, stack: stk.slice(),
-               calc: "output[count[" + dg + "] \u2212 1] = data[" + i + "]\n" +
-                     "output[" + pos + "] = " + a[i].v + "   \u2192  count[" + dg + "] drops to " +
-                     count[dg] });
+               calc: "count[digit]--\ncount[" + dg + "]: " + (count[dg] + 1) + " → " + count[dg] });
     }
+    r.snap('p6', "<strong>The placement loop is done.</strong> All " + n + " slots of " +
+           "<code>output</code> are full, and this array is now in " + place + "-digit order.",
+           { exp: exp, pass: passNo, count: count.slice(), output: output.slice(),
+             phase: 2, banner: BP, locals: { i: -1, n: n, exp: exp }, stack: stk.slice(),
+             calc: "i = -1:  -1 >= 0 is false  →  the loop ends" });
     for (i = 0; i < n; i++) a[i] = output[i];
-    r.snap('assign', "<strong>Copy the output back over data.</strong> The array is now sorted by every " +
-           "digit up to the " + place + " \u2014 and ties are still in the order the previous pass " +
-           "left them.",
-           { exp: exp, pass: passNo, count: count.slice(), phase: 1, banner: BP,
+    r.snap('assign', "<strong>Hand the result over to data.</strong> Nothing is copied: " +
+           "<code>std::move</code> lets <code>data</code> take over <code>output</code>'s buffer. The " +
+           "array is now sorted by every digit up to the " + place + " — and ties are still in " +
+           "the order the previous pass left them.",
+           { exp: exp, pass: passNo, count: count.slice(), phase: 2, banner: BP,
              locals: { exp: exp, passNo: passNo }, stack: stk.slice(),
-             calc: "data = output   \u2190  " + n + " elements copied back" });
+             calc: "data = std::move(output)   ←  0 elements copied, " + n +
+                   " now belong to data" });
     r.snap('dend', "<strong>counting_sort_by_digit returns.</strong> Control goes back to the pass " +
            "loop, which multiplies <code>exp</code> by 10 and " +
            (Math.floor(mx / (exp * 10)) > 0 ? "comes straight back in for the next digit."
                                             : "finds no digits left, so the loop ends."),
-           { exp: exp, pass: passNo, count: count.slice(), phase: 1, banner: BP,
+           { exp: exp, pass: passNo, count: count.slice(), phase: 2, banner: BP,
              locals: { exp: exp, passNo: passNo }, stack: stk.slice(),
              calc: "return   \u2190  sorted by the " + place + " digit" });
     stk.pop();
   }
+  r.snap('rlend', "<strong>No digits left, so the pass loop ends.</strong> " + mx + " has no digit at " +
+         "this position, which means no other value has one either.",
+         { phase: 2, banner: B2, locals: { max_val: mx, exp: exp, passNo: passNo }, stack: [],
+           calc: "max_val / exp = " + mx + " / " + exp + " = " + Math.floor(mx / exp) +
+                 "   \u2192  0 > 0 is false, the loop ends" });
   r.snap('rend', "<strong>Sorted after " + passNo + " pass" + (passNo === 1 ? "" : "es") +
          ".</strong> No two elements were ever compared with each other \u2014 every decision came " +
          "from a digit used as an index.",
@@ -1882,7 +2026,7 @@ function lineInfoHtml(key, fr) {
 }
 
 // Filled in by stage C. Returning "" keeps the stage valid in the meantime.
-function phaseRail(m) { return m && m.phase ? railHtml(m) : ""; }
+function phaseRail(m) { return m && m.phase !== undefined ? railHtml(m) : ""; }
 function bannerHtml(m) {
   if (!m || !m.banner) return "";
   return '<div class="banner ' + (m.banner.tone || "") + '"><strong>' + m.banner.text +
@@ -1952,6 +2096,48 @@ function localsHtml(f) {
          '<div><h5>Call stack</h5>' + stack + '</div></div>';
 }
 
+function howtoSteps(f, atPhase, peek) {
+  return f.steps.map(function (st, i) {
+    var open = (i === atPhase) || (peek === i);
+    if (!open) {
+      return '<div class="hstep off" data-step="' + i + '" role="button" tabindex="0">' +
+             '<h4><span class="hnum">' + (i + 1) + '</span>' + st.t +
+             '<span class="peek">show</span></h4></div>';
+    }
+    return '<div class="hstep' + (i === atPhase ? ' on' : '') + '" data-step="' + i + '" ' +
+           'role="button" tabindex="0"><h4><span class="hnum">' + (i + 1) + '</span>' +
+           st.t + (i === atPhase ? '<span class="peek">you are here</span>' : '') +
+           '</h4><ul>' +
+           st.b.map(function (b) { return '<li>' + b + '</li>'; }).join("") +
+           '</ul>' +
+           (st.p ? '<div class="pseudo"><span class="pl">in pseudocode</span>' +
+                   st.p.join("\n") + '</div>' : '') +
+           '</div>';
+  }).join("");
+}
+// Each phase opens a different card, and the cards are different heights. This
+// panel sits above the controls and the code, so every change of height moved
+// all of them. Reserve the tallest card's height, measured at the current width
+// because that is what decides the wrapping, and everything below holds still.
+var howtoHeights = {};
+function reserveHowtoHeight(f) {
+  var steps = document.querySelector("#howto .howto-steps");
+  if (!steps) return;
+  var width = steps.clientWidth, cacheKey = state.mode + "/" + width;
+  if (!howtoHeights[cacheKey]) {
+    var ghost = document.createElement("div");
+    ghost.className = "howto";
+    ghost.style.cssText = "position:absolute;left:-99999px;top:0;visibility:hidden;width:" + width + "px";
+    document.body.appendChild(ghost);
+    howtoHeights[cacheKey] = f.steps.reduce(function (tallest, st, i) {
+      ghost.innerHTML = '<div class="howto-steps">' + howtoSteps(f, i, null) + '</div>';
+      return Math.max(tallest, ghost.firstChild.offsetHeight);
+    }, 0);
+    document.body.removeChild(ghost);
+  }
+  steps.style.minHeight = howtoHeights[cacheKey] + "px";
+}
+
 function renderSolo() {
   var key = state.mode, run = state.runs[key], f = FACTS[key];
   var idx = Math.min(state.step, run.frames.length - 1);
@@ -1973,26 +2159,9 @@ function renderSolo() {
   document.getElementById("howto").innerHTML =
     '<div class="card"><h2>How it works</h2><div class="card-body howto">' +
       '<p class="lead">' + f.idea + '</p>' +
-      '<div class="howto-steps">' +
-        f.steps.map(function (st, i) {
-          var open = (i === atPhase) || (state.peek === i);
-          if (!open) {
-            return '<div class="hstep off" data-step="' + i + '" role="button" tabindex="0">' +
-                   '<h4><span class="hnum">' + (i + 1) + '</span>' + st.t +
-                   '<span class="peek">show</span></h4></div>';
-          }
-          return '<div class="hstep' + (i === atPhase ? ' on' : '') + '" data-step="' + i + '" ' +
-                 'role="button" tabindex="0"><h4><span class="hnum">' + (i + 1) + '</span>' +
-                 st.t + (i === atPhase ? '<span class="peek">you are here</span>' : '') +
-                 '</h4><ul>' +
-                 st.b.map(function (b) { return '<li>' + b + '</li>'; }).join("") +
-                 '</ul>' +
-                 (st.p ? '<div class="pseudo"><span class="pl">in pseudocode</span>' +
-                         st.p.join("\n") + '</div>' : '') +
-                 '</div>';
-        }).join("") +
-      '</div>' +
+      '<div class="howto-steps">' + howtoSteps(f, atPhase, state.peek) + '</div>' +
     '</div></div>';
+  reserveHowtoHeight(f);
   Array.prototype.forEach.call(document.getElementById("howto").querySelectorAll("[data-step]"),
     function (d) {
       var i = parseInt(d.getAttribute("data-step"), 10);
@@ -2045,6 +2214,7 @@ function renderSolo() {
     '</div>';
 
   var code = document.getElementById("code-solo");
+  code.classList.toggle("verbatim", key === "radix");
   var clickable = !!LINE_INFO[key];
   // The live values go under the LAST row of the executing statement, so a
   // statement split across two rows gets the band beneath the whole thing.

@@ -17,9 +17,10 @@
   body { margin:0; padding:1.5rem 1.25rem 3rem;
          font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
          color:var(--ink); background:#fff; line-height:1.5; }
-  /* 1280 was already clipping the right-hand comments in the code block.
-     The rail is paid for by the extra 200, not taken out of the code. */
-  .wrap { max-width:1480px; margin:0 auto; }
+  /* No max-width: these are shown on a projector, and a centred column
+     throws away a third of the screen. Matches the CS 1400 steppers,
+     which have no width container at all. body padding is the margin. */
+  .wrap { margin:0 auto; }
   h1 { font-size:1.35rem; margin:0 0 .2rem; }
   .sub { color:var(--muted); font-size:.9rem; margin:0 0 1.1rem; }
 
