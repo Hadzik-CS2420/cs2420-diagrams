@@ -33,6 +33,7 @@
   .card.c h2 { background:var(--tint-purple); }
   .card.d h2 { background:var(--tint-teal); }
     .card.e h2 { background:var(--tint-orange); }
+    .card.f h2 { background:#eaf2f8; }
   .card .body { padding:.9rem 1rem 1.1rem; flex:1; display:flex; flex-direction:column; }
   .card p { margin:0 0 .75rem; font-size:.93rem; }
   .card ul { margin:0 0 1rem; padding-left:1.15rem; font-size:.88rem; color:var(--muted); }
@@ -153,6 +154,23 @@
       <a class="open" href="binary-search-trees.html">Open the stepper</a>
     </div>
   </div>
+
+    <div class="card f">
+      <h2>Graphs &mdash; BFS and DFS</h2>
+      <div class="body">
+        <p>Build an adjacency list, then walk it two ways. The two algorithms are the same
+        loop over the same structure; the container, and the moment a vertex is marked
+        visited, are the entire difference between them.</p>
+        <ul>
+          <li>The queue and the stack drawn as rows, with the next-out end marked</li>
+          <li>The adjacency list beside the picture &mdash; the map the code actually indexes</li>
+          <li>BFS marks on <em>enqueue</em>, DFS on <em>pop</em>: why only DFS needs the guard</li>
+          <li>Both walks side by side on the same graph, step for step</li>
+        </ul>
+        <a class="open" href="graphs-bfs-dfs.html">Open the stepper</a>
+      </div>
+    </div>
+
 
 </div>
 
