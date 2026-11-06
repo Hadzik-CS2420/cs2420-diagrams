@@ -237,6 +237,17 @@
                            padding:.08em .32em; flex:0 0 auto;
                            margin-top:.28em; }  .code div.calc:hover { background:#f9e2af; }
 
+  /* The picture and the map, side by side. The SVG is width:100% over a
+     fixed viewBox, so its height is just its width times the aspect ratio --
+     give it the whole column and it renders 685px tall, nearly all of it the
+     space around the nodes. Half the width is half the height, and the
+     adjacency list fills what was empty. */
+  .gpair { display:grid; grid-template-columns:minmax(0,1fr) minmax(190px,15rem);
+           gap:1rem; align-items:start; }
+  @media (max-width:900px) { .gpair { grid-template-columns:1fr; } }
+  .gpair > .adjside h5 { margin:0 0 .3rem; font-size:.74rem; letter-spacing:.05em;
+                         text-transform:uppercase; color:var(--muted); }
+
   /* ---- the adjacency list, drawn as the map the code actually indexes ---- */
   .adj { display:grid; gap:.25rem; margin:.5rem 0 0; font-family:Consolas,monospace;
          font-size:.84rem; }
@@ -286,7 +297,7 @@
       <span class="lbl">Graph</span>
       <button class="ctl" data-preset="utah">northern Utah</button>
       <button class="ctl" data-preset="tested">the test fixture (A&ndash;E)</button>
-      <button class="ctl" data-preset="social">social</button>
+      <button class="ctl" data-preset="social">friends</button>
       <button class="ctl" data-preset="line">path</button>
       <button class="ctl" data-preset="star">star</button>
       <span class="count" id="treeNote"></span>
@@ -349,10 +360,16 @@ var PRESETS = {
             vs: ["A", "B", "C", "D", "E"],
             es: [["A","B"], ["A","C"], ["B","D"], ["B","E"], ["C","E"]],
             pos: { A:[1,0], B:[0,1], C:[2,1], D:[0,2], E:[2,2] } },
-  social: { label: "social",
-            vs: ["A", "B", "C", "D", "E", "F"],
-            es: [["A","B"], ["A","C"], ["B","D"], ["B","E"], ["C","F"], ["E","F"]],
-            pos: { A:[1,0], B:[0,1], C:[2,1], D:[0,2], E:[1,2], F:[2,2] } },
+  // The friend graph, with main.cpp's cast so the names are already familiar.
+  // Frank is missing on purpose: main.cpp uses has_vertex("Frank") to show a
+  // vertex that is NOT in the graph, so putting him in one here would
+  // contradict the program they just ran. Grace takes the sixth place.
+  social: { label: "friends",
+            vs: ["Alice", "Bob", "Carol", "Dave", "Eve", "Grace"],
+            es: [["Alice","Bob"], ["Alice","Carol"], ["Bob","Dave"],
+                 ["Bob","Eve"], ["Carol","Grace"], ["Eve","Grace"]],
+            pos: { Alice:[1,0], Bob:[0,1], Carol:[2,1],
+                   Dave:[0,2], Eve:[1,2], Grace:[2,2] } },
   line:   { label: "path",
             vs: ["A", "B", "C", "D", "E"],
             es: [["A","B"], ["B","C"], ["C","D"], ["D","E"]],
@@ -1225,9 +1242,10 @@ function localsHtml(f) {
       (f.out.length ? f.out.map(function (v) { return '<span class="ci vis">' + v + "</span>"; }).join("")
                     : '<span class="ci none">empty</span>') + "</span></div>";
 
-  var adj = adjHtml(f.g || state.graph, f);
-  return '<div class="cont">' + out + "</div>" +
-         '<h5 style="margin:.8rem 0 0">adj_list_</h5>' + adj;
+  // The adjacency list lives beside the graph now -- it is the structure
+  // being walked, not part of the walk's state. What stays here is what
+  // actually changes step to step.
+  return '<div class="cont">' + out + "</div>";
 }
 
 // How it works: the phase being executed is open, the rest collapse to titles.
@@ -1294,7 +1312,10 @@ function soloHtml(f, key, title) {
   var fix = function (n) { return mh[n] ? ' style="min-height:' + mh[n] + 'px"' : ""; };
   return '<div class="solo"><div class="col">' +
       '<div class="card"><h2>' + title + " &mdash; " + PRESETS[state.preset].label + " graph</h2>" +
-        '<div class="card-body"' + fix("tree") + ">" + graphSvg(f.g || state.graph, f) +
+        '<div class="card-body"' + fix("tree") + '><div class="gpair">' +
+          '<div>' + graphSvg(f.g || state.graph, f) + "</div>" +
+          '<div class="adjside"><h5>adj_list_</h5>' + adjHtml(f.g || state.graph, f) + "</div>" +
+        "</div>" +
         '<div class="grfoot">' + chipsHtml(f) + testHtml(f) + "</div></div></div>" +
       '<div class="card"><h2>What the machine is holding</h2><div class="card-body"' + fix("locals") + ">" +
         localsHtml(f) + "</div></div>" +
