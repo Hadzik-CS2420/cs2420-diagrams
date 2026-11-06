@@ -284,7 +284,8 @@
   <div class="panel">
     <div class="row">
       <span class="lbl">Graph</span>
-      <button class="ctl" data-preset="tested">the test fixture</button>
+      <button class="ctl" data-preset="utah">northern Utah</button>
+      <button class="ctl" data-preset="tested">the test fixture (A&ndash;E)</button>
       <button class="ctl" data-preset="social">social</button>
       <button class="ctl" data-preset="line">path</button>
       <button class="ctl" data-preset="star">star</button>
@@ -329,8 +330,21 @@
 // order depends on the order edges were added.
 // ---------------------------------------------------------------------------
 var PRESETS = {
-  // The graph tests/graph_fixtures.h builds. BFS from A is pinned to
-  // A, B, C, D, E, so this is the one to step through before submitting.
+  // The same five-vertex graph as tests/graph_fixtures.h and main.cpp, with
+  // the towns it is actually shaped like. Every pair below is genuinely
+  // adjacent on the ground -- a made-up map would teach students the diagram
+  // is arbitrary, which is the opposite of the point.
+  utah:   { label: "northern Utah",
+            vs: ["Ogden", "Layton", "Roy", "Kaysville", "Clearfield"],
+            es: [["Ogden","Layton"], ["Ogden","Roy"], ["Layton","Kaysville"],
+                 ["Layton","Clearfield"], ["Roy","Clearfield"]],
+            pos: { Ogden:[1,0], Layton:[0,1], Roy:[2,1],
+                   Kaysville:[0,2], Clearfield:[2,2] } },
+
+  // The same graph again as bare letters -- this is the labelling
+  // tests/graph_fixtures.h uses, so it is the one whose BFS order the tests
+  // pin. Switching between this and northern Utah is a decent demonstration
+  // on its own: the algorithm cannot tell the difference.
   tested: { label: "the test fixture",
             vs: ["A", "B", "C", "D", "E"],
             es: [["A","B"], ["A","C"], ["B","D"], ["B","E"], ["C","E"]],
@@ -392,7 +406,17 @@ function edgeCount(g) {
 // ---------------------------------------------------------------------------
 function graphSvg(g, mark) {
   mark = mark || {};
-  var P = PRESETS[state.preset].pos, CW = 104, RH = 86, PAD = 34, R = 19;
+  var P = PRESETS[state.preset].pos, RH = 86, PAD = 34;
+
+  // Nodes are pills sized to their text, because "Clearfield" does not fit in
+  // a circle. Column spacing follows the longest label in this preset, so the
+  // letter presets stay compact instead of being padded out for a graph they
+  // are not in.
+  var NH = 30;
+  var nodeW = function (v) { return Math.max(40, 15 + String(v).length * 8.4); };
+  var widest = 0;
+  Object.keys(P).forEach(function (v) { widest = Math.max(widest, nodeW(v)); });
+  var CW = Math.max(104, widest + 46);
   var xs = [], ys = [];
   Object.keys(P).forEach(function (v) { xs.push(P[v][0]); ys.push(P[v][1]); });
   var W = (Math.max.apply(null, xs) + 1) * CW + PAD;
@@ -423,15 +447,18 @@ function graphSvg(g, mark) {
     if (mark.look === v)                                { fill = "#f3e8ff"; stroke = "#8e44ad"; sw = 3; }
     if (mark.hit === v)                                 { fill = "#fff3e0"; stroke = "#a95c19"; sw = 3; }
     if (mark.carry && mark.hit === v) carryAt = v;
-    nodes += '<circle cx="' + X(v) + '" cy="' + Y(v) + '" r="' + R + '" fill="' + fill +
+    var nw = nodeW(v);
+    nodes += '<rect x="' + (X(v) - nw / 2) + '" y="' + (Y(v) - NH / 2) + '" width="' + nw +
+             '" height="' + NH + '" rx="' + (NH / 2) + '" fill="' + fill +
              '" stroke="' + stroke + '" stroke-width="' + sw + '"/>' +
              '<text x="' + X(v) + '" y="' + (Y(v) + 5) + '" text-anchor="middle" fill="' +
              tcol + '">' + v + "</text>";
     // the order a vertex came out in, which is the answer BFS and DFS produce
     if (mark.out && mark.out.indexOf(v) !== -1) {
       var k = mark.out.indexOf(v) + 1;
-      nodes += '<circle cx="' + (X(v) + 15) + '" cy="' + (Y(v) - 15) + '" r="9" fill="#1c7e45"/>' +
-               '<text x="' + (X(v) + 15) + '" y="' + (Y(v) - 11) + '" text-anchor="middle" ' +
+      var bx = X(v) + nodeW(v) / 2 - 4;
+      nodes += '<circle cx="' + bx + '" cy="' + (Y(v) - NH / 2) + '" r="9" fill="#1c7e45"/>' +
+               '<text x="' + bx + '" y="' + (Y(v) - NH / 2 + 4) + '" text-anchor="middle" ' +
                'fill="#fff" font-size="10.5" font-weight="700">' + k + "</text>";
     }
   });
@@ -443,7 +470,7 @@ function graphSvg(g, mark) {
   if (carryAt && mark.carry) {
     var ct = mark.carry.tag ? mark.carry.v + "  " + mark.carry.tag : String(mark.carry.v);
     var cw = 16 + ct.length * 7.5, ch = 21;
-    var cx = X(carryAt), cy = Y(carryAt) + R + 9;
+    var cx = X(carryAt), cy = Y(carryAt) + NH / 2 + 7;
     if (cx - cw / 2 < 2) cx = cw / 2 + 2;
     if (cx + cw / 2 > W - 2) cx = W - cw / 2 - 2;
     if (cy + ch + 4 > H) H = cy + ch + 4;
@@ -1054,7 +1081,7 @@ function codeKey() { return state.mode === "compare" ? "bfs" : state.mode; }
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
-var state = { mode: "build", preset: "tested", step: 0, start: "A",
+var state = { mode: "build", preset: "utah", step: 0, start: "Ogden",
               pinned: null, peek: null,
               runs: {}, maxFrames: 1, timer: null };
 
