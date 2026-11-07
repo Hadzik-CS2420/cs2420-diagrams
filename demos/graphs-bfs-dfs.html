@@ -68,6 +68,25 @@
   .panel { border:1px solid var(--rule); border-radius:10px;
            padding:.85rem 1rem; margin-bottom:1.1rem; background:#fcfdfe; }
   .row { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+
+  /* The controls keep the left; the definitions take space that was empty on
+     any screen wide enough to project, so they cost nothing vertically. */
+  .pansplit { display:grid; grid-template-columns:minmax(0,auto) minmax(300px,52rem);
+              gap:1.4rem; align-items:start; }
+  @media (max-width:1250px) { .pansplit { grid-template-columns:1fr; } }
+  .whatis { border-left:3px solid var(--rule); padding-left:1.1rem; font-size:.95rem;
+            line-height:1.45; }
+  .whatis dl { margin:0; display:grid; grid-template-columns:1fr 1fr;
+               gap:.55rem 1.1rem; }
+  @media (max-width:1250px) { .whatis dl { grid-template-columns:1fr; } }
+  .whatis .both { grid-column:1 / -1; }
+  .whatis dt { font-weight:800; font-size:1.02rem; color:var(--ink); }
+  .whatis dd { margin:.1rem 0 0; color:#444; }
+  .whatis .on dt { color:var(--blue); }
+  .whatis .on { background:var(--tint-blue); border-radius:7px;
+                padding:.35rem .55rem; margin:-.35rem -.55rem; }
+  .whatis .both { margin:.7rem 0 0; padding-top:.55rem; border-top:1px solid var(--rule);
+                  font-size:.9rem; color:#555; }
   .row + .row { margin-top:.6rem; }
   .lbl { font-size:.73rem; text-transform:uppercase; letter-spacing:.05em;
          color:var(--muted); min-width:7.5rem; }
@@ -325,6 +344,8 @@
   </div>
 
   <div class="panel">
+    <div class="pansplit">
+    <div>
     <div class="row">
       <span class="lbl">Graph</span>
       <button class="ctl" data-preset="utah">northern Utah</button>
@@ -344,6 +365,9 @@
       <button class="ctl" id="last">Last &raquo;</button>
       <button class="ctl" id="nextPhase">Next phase &raquo;&raquo;</button>
       <span class="count" id="frameCount"></span>
+    </div>
+    </div>
+    <div class="whatis" id="whatis"></div>
     </div>
   </div>
 
@@ -1157,6 +1181,28 @@ var TODO_AT = {
   dfs: function () { return { todo: "5", fn: "dfs", part: 6 }; }
 };
 
+// What the two walks ARE. The page shows both happening and never says what
+// either is for, which leaves a student inferring the idea from the mechanism.
+function whatIsHtml() {
+  var bfs = state.mode === "bfs", dfs = state.mode === "dfs";
+  return '<dl>' +
+    '<div class="' + (bfs ? "on" : "") + '">' +
+      '<dt>BFS &mdash; breadth first</dt>' +
+      '<dd>A <strong>queue</strong>. Visits everything one step from the start before ' +
+      'anything two steps away, so the result comes out in distance order &mdash; ' +
+      'this is what gives you the <em>fewest hops</em> between two places.</dd>' +
+    "</div>" +
+    '<div class="' + (dfs ? "on" : "") + '">' +
+      '<dt>DFS &mdash; depth first</dt>' +
+      '<dd>A <strong>stack</strong>. Follows one path as deep as it goes, then backs ' +
+      'up and tries the next. Good for &ldquo;is there a route at all&rdquo;, finding ' +
+      'cycles, and solving a maze.</dd>' +
+    "</div>" +
+    '<p class="both">Every vertex once, O(V + E) either way. ' +
+    '<strong>They are the same loop</strong> &mdash; the container is the whole ' +
+    'difference, and swapping it turns one into the other.</p></dl>';
+}
+
 function todoBarHtml(f) {
   if (state.mode === "compare") {
     return '<div class="todobar bg"><span class="tag">NOTHING TO WRITE HERE</span>' +
@@ -1569,6 +1615,7 @@ function render() {
     : "";
 
   var t = state.tree;
+  document.getElementById("whatis").innerHTML = whatIsHtml();
   document.getElementById("treeNote").textContent =
     state.graph.order.length + " vertices, " + edgeCount(state.graph) + " edges";
   document.getElementById("frameCount").textContent =
