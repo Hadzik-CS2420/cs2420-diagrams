@@ -81,12 +81,15 @@
   .count { font-variant-numeric:tabular-nums; font-size:.84rem; color:var(--muted); margin-left:auto; }
 
   /* ---- layout ---- */
-  .solo { display:grid; grid-template-columns:1fr 1fr 210px; gap:1.1rem; align-items:start; }
+  /* Code first and widest: it is what you follow, and the longest line
+     needs ~920px to reach a size that reads from the back of a room. */
+  .solo { display:grid; grid-template-columns:1.15fr .85fr 210px; gap:1.1rem;
+          align-items:start; }
   /* Below 1380 the rail cannot hold its own column, so it spans underneath
      instead -- still small, and still never above the tree. */
   @media (max-width:1380px) { .solo { grid-template-columns:1.05fr .95fr; }
                               .solo > .railcol { grid-column:1 / -1; } }
-  @media (max-width:1040px) { .solo { grid-template-columns:1fr; }
+  @media (max-width:1250px) { .solo { grid-template-columns:1fr; }
                               .solo > .railcol { grid-column:auto; } }
 
   /* Which TODO the current step belongs to. Sits with the controls because
@@ -171,7 +174,11 @@
   /* ---- code ---- */
   .code { background:var(--code-bg); color:var(--code-fg); border-radius:8px;
           padding:.6rem 0; font-family:Consolas,"Courier New",monospace;
-          font-size:.82rem; line-height:1.55; overflow-x:auto; }
+          /* Scales with the window so the longest line always fits: at 1920
+             this lands on ~20.8px, matching CS 1400's, and at 1366 on ~14.8px,
+             just inside the 15.0px the widest line allows there. Fixed at
+             1.3rem it would have overflowed every screen under ~1800. */
+          font-size:clamp(.85rem, 2.2cqw, 1.35rem); line-height:1.5; overflow-x:auto; }
   .code div { padding:.02rem .9rem; white-space:pre; cursor:pointer; }
   .code div:hover { background:#313244; }
   .code div.hit { background:var(--code-hit); border-left:3px solid #f9e2af;
@@ -200,7 +207,7 @@
 
   /* ---- compare lanes ---- */
   .lanes { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; }
-  @media (max-width:1040px) { .lanes { grid-template-columns:1fr; } }
+  @media (max-width:1250px) { .lanes { grid-template-columns:1fr; } }
   .lane { border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
   .lane h2 { font-size:.9rem; margin:0; padding:.5rem .85rem; border-bottom:1px solid var(--rule); }
   .lane.inorder h2   { background:var(--tint-green);  color:var(--green); }
@@ -235,7 +242,8 @@
                      font-weight:600; line-height:1.65; overflow-x:auto; }  .nowbox .nownums b { font-weight:800; }  .nowbox .nownums em { font-style:normal; background:rgba(0,0,0,.09);
                         border-radius:3px; padding:.02em .3em; }  .nowbox .lt { display:block; font-family:system-ui,sans-serif; font-weight:800;
                 font-size:.62rem; letter-spacing:.06em; text-transform:uppercase;
-                color:#6b4f04; margin-bottom:.2rem; }  .solo > .col { display:flex; flex-direction:column; gap:1.1rem; min-width:0; }  .code div.calc { background:#f9e2af; color:#1e1e2e; font-size:.88rem;
+                color:#6b4f04; margin-bottom:.2rem; }  .solo > .col { display:flex; flex-direction:column; gap:1.1rem; min-width:0;
+                 container-type:inline-size; }  .code div.calc { background:#f9e2af; color:#1e1e2e; font-size:.88rem;
                    font-weight:600; white-space:pre; cursor:default;
                    display:flex; align-items:flex-start; gap:.55rem;
                    padding:.22rem .8rem; margin:.12rem 0;
@@ -1350,6 +1358,10 @@ function soloHtml(f, key, title) {
   var mh = state.mh || {};
   var fix = function (n) { return mh[n] ? ' style="min-height:' + mh[n] + 'px"' : ""; };
   return '<div class="solo"><div class="col">' +
+      '<div class="card"><h2>The code</h2><div class="card-body"' + fix("code") + ">" +
+        codeHtml(key, f.line, f) + "</div></div>" +
+      '<div class="card"><h2>What it costs</h2><div class="card-body">' + factsHtml(key) + "</div></div>" +
+    "</div><div class=\"col\">" +
       '<div class="card"><h2>' + title + " &mdash; " + PRESETS[state.preset].label + " graph</h2>" +
         '<div class="card-body"' + fix("tree") + '><div class="gpair">' +
           '<div>' + graphSvg(f.g || state.graph, f) + "</div>" +
@@ -1363,10 +1375,6 @@ function soloHtml(f, key, title) {
         (f.why && f.why.length ? '<ul class="why">' + f.why.map(function (w) {
           return "<li>" + w + "</li>"; }).join("") + "</ul>" : "") +
       "</div></div>" +
-    "</div><div class=\"col\">" +
-      '<div class="card"><h2>The code</h2><div class="card-body"' + fix("code") + ">" +
-        codeHtml(key, f.line, f) + "</div></div>" +
-      '<div class="card"><h2>What it costs</h2><div class="card-body">' + factsHtml(key) + "</div></div>" +
     '</div><div class="col railcol">' + railHtml(f) + "</div></div>";
 }
 
@@ -1389,13 +1397,16 @@ function measureRun() {
   var max = { tree: 0, locals: 0, says: 0, code: 0 };
   run.forEach(function (f) {
     ghost.innerHTML = soloHtml(f, key, title);
+    // cols[0] is the code column now, cols[1] the graph -- these indices
+    // follow the markup, and getting them the wrong way round would lock
+    // every panel to another panel's height without moving anything.
     var cols = ghost.querySelectorAll(".col");
-    var left = cols[0].children, right = cols[1].children;
+    var codeCol = cols[0].children, graphCol = cols[1].children;
     var h = function (card) { return card ? card.querySelector(".card-body").offsetHeight : 0; };
-    max.tree   = Math.max(max.tree,   h(left[0]));
-    max.locals = Math.max(max.locals, h(left[1]));
-    max.says   = Math.max(max.says,   h(left[2]));
-    max.code   = Math.max(max.code,   h(right[0]));
+    max.code   = Math.max(max.code,   h(codeCol[0]));
+    max.tree   = Math.max(max.tree,   h(graphCol[0]));
+    max.locals = Math.max(max.locals, h(graphCol[1]));
+    max.says   = Math.max(max.says,   h(graphCol[2]));
   });
 
   document.body.removeChild(ghost);
