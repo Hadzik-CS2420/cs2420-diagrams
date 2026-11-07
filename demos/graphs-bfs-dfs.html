@@ -94,11 +94,16 @@
 
   /* Which TODO the current step belongs to. Sits with the controls because
      it is the one thing a student acts on rather than reads. */
-  .todobar { font-size:.84rem; background:#fff8e1; border:1px solid #d6a300;
-             border-left:4px solid #8f6a00; border-radius:7px;
-             padding:.18rem .6rem; white-space:nowrap; }
-  .todobar.bg { background:#f5f6f7; border-color:var(--rule); border-left-color:var(--muted);
-                color:var(--muted); }
+  /* CS 1410's banner, copied so the two courses read as one family. */
+  .todobar { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+             background:#fff8e1; border-left:5px solid #8f6a00;
+             border-radius:0 8px 8px 0; padding:.5rem .85rem; margin-bottom:14px; }
+  .todobar .tag { background:#8f6a00; color:#fff; border-radius:4px;
+                  padding:.1rem .5rem; font-size:.76rem; letter-spacing:.05em;
+                  font-weight:700; flex:0 0 auto; }
+  .todobar .what { font-size:1rem; }
+  .todobar.bg { background:#f5f6f7; border-left-color:var(--muted); }
+  .todobar.bg .tag { background:var(--muted); }
   .todobar code { font-family:Consolas,monospace; font-weight:700; }
 
   /* ---- the rail: what is being worked on, and nothing else ---- */
@@ -339,7 +344,6 @@
       <button class="ctl" id="last">Last &raquo;</button>
       <button class="ctl" id="nextPhase">Next phase &raquo;&raquo;</button>
       <span class="count" id="frameCount"></span>
-      <span id="todoRow"></span>
     </div>
   </div>
 
@@ -1155,17 +1159,19 @@ var TODO_AT = {
 
 function todoBarHtml(f) {
   if (state.mode === "compare") {
-    return '<span class="todobar bg">comparing <code>bfs</code> and <code>dfs</code> ' +
-           '&mdash; nothing to write on this tab</span>';
+    return '<div class="todobar bg"><span class="tag">NOTHING TO WRITE HERE</span>' +
+           '<span class="what">Both walks side by side &mdash; this tab is for comparing ' +
+           '<code>bfs</code> and <code>dfs</code>, not for writing either.</span></div>';
   }
   var pick = TODO_AT[state.mode];
   if (!pick) return "";
   var t = pick(f ? f.line : 0);
-  // The label plus what it is. "TODO 2b" alone is a lookup; naming the
-  // function too means nobody has to go and check mid-step.
-  return '<span class="todobar" title="Walkthrough Part ' + t.part +
-         ' on the assignment page explains this one">\u270E <b>TODO ' + t.todo +
-         '</b> &mdash; <code>' + t.fn + '</code> in <code>Graph.cpp</code></span>';
+  // Part leads: that is what they go and read on the assignment page. The
+  // TODO label is what they search the file for, and the function name saves
+  // anyone having to look up which one it is.
+  return '<div class="todobar"><span class="tag">THIS STEP IS FOR</span>' +
+         '<span class="what">Part ' + t.part + ' &mdash; <code>src/Graph.cpp</code>, ' +
+         'TODO ' + t.todo + ' (<code>' + t.fn + '</code>)</span></div>';
 }
 
 // The phase a FRAME is in. A line can belong to more than one phase -- the
@@ -1501,7 +1507,8 @@ function soloTitle() {
 function renderSolo() {
   var key = codeKey();
   var f = frameAt(state.mode, state.step);
-  document.getElementById("stage").innerHTML = soloHtml(f, key, soloTitle());
+  document.getElementById("stage").innerHTML =
+    todoBarHtml(f) + soloHtml(f, key, soloTitle());
   wireCode(key);
   wireRail();
 }
@@ -1511,7 +1518,7 @@ function renderCompare() {
   // result rows diverge while the code shape stays identical.
   var lanes = [["bfs", "BFS &mdash; queue, marked at push"],
                ["dfs", "DFS &mdash; stack, marked at pop"]];
-  document.getElementById("stage").innerHTML =
+  document.getElementById("stage").innerHTML = todoBarHtml(null) +
     '<div class="lanes">' + lanes.map(function (pair) {
       var run = state.runs[pair[0]];
       var f = run[Math.min(state.step, run.length - 1)];
@@ -1554,9 +1561,6 @@ function render() {
   extraControls();
   if (!state.mh && state.mode !== "compare") { renderSolo(); measureRun(); }
   if (state.mode === "compare") renderCompare(); else renderSolo();
-
-  document.getElementById("todoRow").innerHTML =
-    todoBarHtml(state.mode === "compare" ? null : frameAt(state.mode, state.step));
 
   var g = GUIDE[state.mode];
   document.getElementById("watch").innerHTML = g
