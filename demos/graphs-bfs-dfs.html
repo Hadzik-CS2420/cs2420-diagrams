@@ -249,12 +249,16 @@
                         border-radius:3px; padding:.02em .3em; }  .nowbox .lt { display:block; font-family:system-ui,sans-serif; font-weight:800;
                 font-size:.62rem; letter-spacing:.06em; text-transform:uppercase;
                 color:#6b4f04; margin-bottom:.2rem; }  .solo > .col { display:flex; flex-direction:column; gap:1.1rem; min-width:0;
-                 container-type:inline-size; }  .code div.calc { background:#f9e2af; color:#1e1e2e; font-size:.88rem;
+                 container-type:inline-size; }  .code div.calc { background:#f9e2af; color:#1e1e2e;
+                   /* inherit, not a second copy of the code's clamp: the band
+                      sits inside .code, so this keeps the two the same size at
+                      every width with no formula to fall out of step. */
+                   font-size:inherit;
                    font-weight:600; white-space:pre; cursor:default;
                    display:flex; align-items:flex-start; gap:.55rem;
                    padding:.22rem .8rem; margin:.12rem 0;
                    border-left:4px solid #b8860b; }  .code div.calc > .cv { min-width:0; white-space:pre-wrap;
-                         text-indent:-1.1rem; padding-left:1.1rem; }  .code div.calc.art > .cv { white-space:pre; text-indent:0; padding-left:0; }  .code div.calc::before { content:"THIS STEP"; font-size:.62rem; font-weight:800;
+                         text-indent:-1.1em; padding-left:1.1em; }  .code div.calc.art > .cv { white-space:pre; text-indent:0; padding-left:0; }  .code div.calc::before { content:"THIS STEP"; font-size:.62rem; font-weight:800;
                            letter-spacing:.06em; color:#6b4f04;
                            background:rgba(0,0,0,.09); border-radius:3px;
                            padding:.08em .32em; flex:0 0 auto;
