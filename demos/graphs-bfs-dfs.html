@@ -909,10 +909,27 @@ function buildBFS(g, start) {
          head: "Breadth-first from <strong>" + start + "</strong>.",
          why: ["a queue, and a visited set; nothing else",
                "the answer comes out in distance order"] });
+  snap({ line: 1,
+         calc: "result is empty, size 0",
+         head: "The vector the answer goes into. Nothing in it yet.",
+         why: ["vertices are appended to this as they come OUT of the queue",
+               "its final order is what the tests check"] });
+
   snap({ line: 2, look: start,
          calc: '!has_vertex("' + start + '")   →   false, it is in the graph',
          head: "<strong>" + start + "</strong> is a real vertex, so the walk can start.",
          why: ["a missing start would return an empty vector rather than crash"] });
+  snap({ line: 4,
+         calc: "visited is empty, size 0",
+         head: "The set that stops a vertex being handled twice.",
+         why: ["without it a cycle would send the walk round forever",
+               "this, not the queue, is what makes the walk terminate"] });
+  snap({ line: 5,
+         calc: "std::queue   \u2192   first in, first out",
+         head: "The queue &mdash; and <strong>this is the only line that differs from DFS</strong>.",
+         why: ["DFS declares a <code>std::stack</code> here and is otherwise the same shape",
+               "FIFO hands back the oldest discovery, which is why BFS comes out in distance order",
+               "swap this one declaration and the function below becomes a depth-first walk"] });
 
   q.push(start);
   snap({ line: 7, hit: start, carry: { v: start, tag: "queued" },
@@ -1007,10 +1024,26 @@ function buildDFS(g, start) {
          head: "Depth-first from <strong>" + start + "</strong>.",
          why: ["a stack instead of a queue, and the marking moved to the pop",
                "everything else is the same shape as BFS"] });
+  snap({ line: 1,
+         calc: "result is empty, size 0",
+         head: "The vector the answer goes into. Nothing in it yet.",
+         why: ["same line as BFS has, doing the same job"] });
+
   snap({ line: 2, look: start,
          calc: '!has_vertex("' + start + '")   →   false, it is in the graph',
          head: "<strong>" + start + "</strong> is a real vertex, so the walk can start.",
          why: ["same guard as BFS, for the same reason"] });
+  snap({ line: 4,
+         calc: "visited is empty, size 0",
+         head: "The set that stops a vertex being handled twice.",
+         why: ["needed here for a second reason as well: a vertex can be pushed twice",
+               "the guard after the pop reads this set"] });
+  snap({ line: 5,
+         calc: "std::stack   \u2192   last in, first out",
+         head: "The stack &mdash; and <strong>this is the only line that differs from BFS</strong>.",
+         why: ["BFS declares a <code>std::queue</code> here and is otherwise the same shape",
+               "LIFO hands back the newest discovery, which is why this walk goes deep first",
+               "swap this one declaration and the function below becomes a breadth-first walk"] });
 
   st.push(start);
   snap({ line: 7, hit: start, carry: { v: start, tag: "pushed" },
@@ -1688,6 +1721,40 @@ document.addEventListener("keydown", function (e) {
       for (var i = 1; i < bOut.length; i++)
         if (d[bOut[i]] < d[bOut[i - 1]])
           fails.push(name + "/" + s0 + ": BFS is not in distance order");
+
+      // The prologue -- everything before the loop opens -- must run in
+      // increasing line order. Coverage alone said nothing about this: all
+      // three declarations WERE shown, just with line 1 after line 2, so the
+      // highlight walked down and then jumped back up. Loops go backwards
+      // legitimately; straight-line code never does.
+      [["bfs", bfs, 10], ["dfs", dfs, 9]].forEach(function (pair) {
+        var prev = -1;
+        for (var i = 0; i < pair[1].length; i++) {
+          var ln = pair[1][i].line;
+          if (ln >= pair[2]) break;           // the while() -- the loop starts here
+          if (ln < prev) {
+            fails.push(name + ": " + pair[0] + " prologue goes backwards, line " +
+                       prev + " then " + ln);
+            break;
+          }
+          prev = ln;
+        }
+      });
+
+      // Every statement must be shown at least once. Three declarations --
+      // result, visited, and the queue/stack -- ran without ever being
+      // highlighted, and the last of those is the single line that separates
+      // the two algorithms. Closing braces are exempt: punctuation, not steps.
+      [["bfs", bfs], ["dfs", dfs], ["build", buildBuild(p)]].forEach(function (pair) {
+        var shown = {};
+        pair[1].forEach(function (f) { shown[f.line] = 1; });
+        CODE[pair[0]].forEach(function (text, i) {
+          var t = text.trim();
+          if (t === "" || t === "}" || t === "};") return;
+          if (!shown[i]) fails.push(name + ": " + pair[0] + " never shows line " +
+                                    i + ", " + t.slice(0, 34));
+        });
+      });
 
       // every frame must point at a line that exists
       [["bfs", bfs], ["dfs", dfs]].forEach(function (pair) {
