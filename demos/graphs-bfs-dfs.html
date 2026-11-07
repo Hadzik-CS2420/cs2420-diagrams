@@ -184,7 +184,13 @@
   .code div.hit { background:var(--code-hit); border-left:3px solid #f9e2af;
                   padding-left:calc(.9rem - 3px); }
   .code div.pin { outline:1px dashed #f9e2af; outline-offset:-2px; }
-  .code .cm { color:var(--code-dim); }
+  /* Same scheme as the other eleven steppers, so moving between them does
+     not mean learning a second set of colours. */
+  .code .kw { color:#cba6f7; }
+  .code .fn { color:#89dceb; }
+  .code .nm { color:#fab387; }
+  .code .st { color:#a6e3a1; }
+  .code .cm { color:var(--code-dim); font-style:italic; }
 
   .lineinfo { border:1px solid var(--rule); border-left:4px solid var(--deep);
               border-radius:0 8px 8px 0; padding:.6rem .85rem; margin:.7rem 0 0;
@@ -1208,15 +1214,51 @@ function nowBox(f) {
   return '<div class="nowbox"><p class="nownote">' + f.head + "</p>" + nums + "</div>";
 }
 
+// C++ keywords that actually appear in these listings. Anything not here
+// stays plain, which is the right default -- colouring every identifier is
+// noise, and the eye is looking for structure.
+var HL_KW = ("auto bool break case class const continue delete double else false float for " +
+             "if int new nullptr private public return size_t std struct template this throw " +
+             "true typename unsigned using virtual void while").split(" ");
+
+// Colour one raw source line. Works on the RAW text and escapes each piece as
+// it emits: escaping first and matching second means the regex ends up picking
+// through &lt; and &amp; and will eventually colour half an entity.
+function hl(raw) {
+  var cut = raw.indexOf("//");
+  var code = cut === -1 ? raw : raw.slice(0, cut);
+  var note = cut === -1 ? "" : raw.slice(cut);
+
+  var out = "";
+  var re = /("(?:[^"\\]|\\.)*")|(\b\d+(?:\.\d+)?\b)|([A-Za-z_]\w*)|([\s\S]?)/g;
+  var m;
+  while ((m = re.exec(code)) !== null) {
+    if (m[0] === "") { re.lastIndex++; continue; }
+    if (m[1]) { out += '<span class="st">' + esc(m[1]) + "</span>"; continue; }
+    if (m[2]) { out += '<span class="nm">' + esc(m[2]) + "</span>"; continue; }
+    if (m[3]) {
+      // keyword wins over function: "if (" must not come out as a call
+      if (HL_KW.indexOf(m[3]) !== -1) {
+        out += '<span class="kw">' + esc(m[3]) + "</span>";
+      } else if (code.charAt(re.lastIndex) === "(") {
+        out += '<span class="fn">' + esc(m[3]) + "</span>";
+      } else {
+        out += esc(m[3]);
+      }
+      continue;
+    }
+    out += esc(m[4]);
+  }
+  return out + (note ? '<span class="cm">' + esc(note) + "</span>" : "");
+}
+
 function codeHtml(key, hit, frame) {
   var calc = frame && frame.calc;
   return '<div class="code" id="code">' + CODE[key].map(function (ln, i) {
     var cls = [];
     if (i === hit) cls.push("hit");
     if (state.pinned === i) cls.push("pin");
-    var t = esc(ln);
-    var at = t.indexOf("//");
-    if (at !== -1) t = t.slice(0, at) + '<span class="cm">' + t.slice(at) + "</span>";
+    var t = hl(ln);
     return '<div data-line="' + i + '"' + (cls.length ? ' class="' + cls.join(" ") + '"' : "") +
            ' tabindex="0">' + (t === "" ? "&nbsp;" : t) + "</div>" +
            // The live values go under the line that is executing. esc() is
