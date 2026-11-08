@@ -102,7 +102,7 @@
   /* ---- layout ---- */
   /* Code first and widest: it is what you follow, and the longest line
      needs ~920px to reach a size that reads from the back of a room. */
-  .solo { display:grid; grid-template-columns:1.15fr .85fr 210px; gap:1.1rem;
+  .solo { display:grid; grid-template-columns:1.15fr .85fr 290px; gap:1.1rem;
           align-items:start; }
   /* Below 1380 the rail cannot hold its own column, so it spans underneath
      instead -- still small, and still never above the tree. */
@@ -1499,14 +1499,15 @@ function soloHtml(f, key, title) {
           '<div class="adjside"><h5>adj_list_</h5>' + adjHtml(f.g || state.graph, f) + "</div>" +
         "</div>" +
         '<div class="grfoot">' + chipsHtml(f) + testHtml(f) + "</div></div></div>" +
-      '<div class="card"><h2>What the machine is holding</h2><div class="card-body"' + fix("locals") + ">" +
-        localsHtml(f) + "</div></div>" +
       '<div class="card"><h2>What just happened</h2><div class="card-body"' + fix("says") + ">" +
         nowBox(f) +
         (f.why && f.why.length ? '<ul class="why">' + f.why.map(function (w) {
           return "<li>" + w + "</li>"; }).join("") + "</ul>" : "") +
       "</div></div>" +
-    '</div><div class="col railcol">' + railHtml(f) + "</div></div>";
+    '</div><div class="col railcol">' + railHtml(f) +
+      '<div class="card"><h2>What the machine is holding</h2><div class="card-body"' +
+        fix("locals") + ">" + localsHtml(f) + "</div></div>" +
+    "</div></div>";
 }
 
 // Render every frame of the run offscreen at the real width and keep the
@@ -1531,13 +1532,16 @@ function measureRun() {
     // cols[0] is the code column now, cols[1] the graph -- these indices
     // follow the markup, and getting them the wrong way round would lock
     // every panel to another panel's height without moving anything.
+    // Read by position, so these follow the markup: the containers moved to
+    // the rail, and leaving the old indices would lock them to whatever now
+    // sits where they used to -- still frozen, still the wrong size.
     var cols = ghost.querySelectorAll(".col");
-    var codeCol = cols[0].children, graphCol = cols[1].children;
+    var codeCol = cols[0].children, graphCol = cols[1].children, railCol = cols[2].children;
     var h = function (card) { return card ? card.querySelector(".card-body").offsetHeight : 0; };
     max.code   = Math.max(max.code,   h(codeCol[0]));
     max.tree   = Math.max(max.tree,   h(graphCol[0]));
-    max.locals = Math.max(max.locals, h(graphCol[1]));
-    max.says   = Math.max(max.says,   h(graphCol[2]));
+    max.says   = Math.max(max.says,   h(graphCol[1]));
+    max.locals = Math.max(max.locals, h(railCol[1]));
   });
 
   document.body.removeChild(ghost);
