@@ -578,7 +578,7 @@ function adjHtml(g, mark) {
       '<span class="avals">' +
       (g.adj[v].length
         ? g.adj[v].map(function (n) {
-            var cls = mark.nb === n && hot ? "av on" : "av";
+            var cls = mark.neighbor === n && hot ? "av on" : "av";
             return '<span class="' + cls + '">' + n + "</span>";
           }).join("")
         : '<span class="av empty">(none)</span>') +
@@ -623,10 +623,10 @@ var CODE = {
     "        q.pop();",
     "        result.push_back(current);",
     "",
-    "        for (const std::string& nb : neighbors(current)) {",
-    "            if (visited.count(nb) == 0) {",
-    "                visited.insert(nb);    // mark on the way IN",
-    "                q.push(nb);",
+    "        for (const std::string& neighbor : neighbors(current)) {",
+    "            if (visited.count(neighbor) == 0) {",
+    "                visited.insert(neighbor);    // mark on the way IN",
+    "                q.push(neighbor);",
     "            }",
     "        }",
     "    }",
@@ -650,8 +650,8 @@ var CODE = {
     "        visited.insert(current);       // marked when POPPED",
     "        result.push_back(current);",
     "",
-    "        std::vector<std::string> nbs = neighbors(current);",
-    "        for (auto it = nbs.rbegin(); it != nbs.rend(); ++it) {",
+    "        std::vector<std::string> nbrs = neighbors(current);",
+    "        for (auto it = nbrs.rbegin(); it != nbrs.rend(); ++it) {",
     "            if (!visited.count(*it)) s.push(*it);",
     "        }",
     "    }",
@@ -697,12 +697,12 @@ var LINE_INFO = {
       items: [
         ["why", "Because the queue is FIFO, everything one edge from the start comes out before anything two edges away. That is the whole reason BFS answers shortest-path questions on an unweighted graph."]
       ] },
-    16: { src: "if (visited.count(nb) == 0)",
+    16: { src: "if (visited.count(neighbor) == 0)",
       what: "Skip neighbours that are already spoken for.",
       items: [
         ["trap", "Drop this and a cycle makes the queue grow forever &mdash; A queues B, B queues A, and the loop never ends. The visited set, not the queue, is what makes the walk terminate."]
       ] },
-    17: { src: "visited.insert(nb);",
+    17: { src: "visited.insert(neighbor);",
       what: "Mark it now, while it is being queued.",
       items: [
         ["trap", "Move this to the pop, as DFS does, and a vertex with two neighbours already in the queue gets queued twice and emitted twice. BFS has no <code class='inl'>continue</code> guard to catch that."]
@@ -725,7 +725,7 @@ var LINE_INFO = {
       items: [
         ["note", "BFS marks at push, DFS at pop. Everything else about the two functions is the same shape, and this one difference is why one needs a guard and the other does not."]
       ] },
-    17: { src: "for (auto it = nbs.rbegin(); it != nbs.rend(); ++it)",
+    17: { src: "for (auto it = nbrs.rbegin(); it != nbrs.rend(); ++it)",
       what: "Push the neighbours in reverse, so the first one comes off first.",
       items: [
         ["why", "A stack reverses whatever you put in it. Pushing A's neighbours in order B, C means C is explored first. Pushing them backwards puts B on top, and the walk reads left to right like the diagram does."],
@@ -908,13 +908,13 @@ function buildBuild(p) {
               "without that guard this line would empty " + pair[1] + "'s neighbour list"] }));
     });
     g.adj[a].push(b);
-    frames.push(F({ g: snapshot(g), line: 10, hit: a, nb: b, edge: (a < b ? a + "|" + b : b + "|" + a),
+    frames.push(F({ g: snapshot(g), line: 10, hit: a, neighbor: b, edge: (a < b ? a + "|" + b : b + "|" + a),
       calc: 'adj_list_["' + a + '"].push_back("' + b + '")\n' +
             a + " now lists " + g.adj[a].join(", "),
       head: "<strong>" + b + "</strong> is added to <strong>" + a + "</strong>'s list.",
       why: ["half the edge is stored &mdash; " + a + " can reach " + b + " but not yet the other way"] }));
     g.adj[b].push(a);
-    frames.push(F({ g: snapshot(g), line: 11, hit: b, nb: a, edge: (a < b ? a + "|" + b : b + "|" + a),
+    frames.push(F({ g: snapshot(g), line: 11, hit: b, neighbor: a, edge: (a < b ? a + "|" + b : b + "|" + a),
       calc: 'adj_list_["' + b + '"].push_back("' + a + '")\n' +
             b + " now lists " + g.adj[b].join(", "),
       head: "And <strong>" + a + "</strong> is added to <strong>" + b + "</strong>'s list.",
@@ -999,35 +999,35 @@ function buildBFS(g, start) {
            why: ["a vertex is emitted when it comes OUT of the queue, not when it goes in",
                  "position " + result.length + " of " + g.order.length] });
 
-    var nbs = g.adj[cur];
-    for (var i = 0; i < nbs.length; i++) {
-      var nb = nbs[i];
-      var key = cur < nb ? cur + "|" + nb : nb + "|" + cur;
-      snap({ line: 15, hit: cur, nb: nb, look: nb, edge: key,
-             calc: "nb = \"" + nb + "\"   (" + (i + 1) + " of " + nbs.length +
+    var nbrs = g.adj[cur];
+    for (var i = 0; i < nbrs.length; i++) {
+      var neighbor = nbrs[i];
+      var key = cur < neighbor ? cur + "|" + neighbor : neighbor + "|" + cur;
+      snap({ line: 15, hit: cur, neighbor: neighbor, look: neighbor, edge: key,
+             calc: "neighbor = \"" + neighbor + "\"   (" + (i + 1) + " of " + nbrs.length +
                    " neighbours of " + cur + ")",
-             head: "Looking at <strong>" + cur + "</strong>'s neighbour <strong>" + nb + "</strong>.",
+             head: "Looking at <strong>" + cur + "</strong>'s neighbour <strong>" + neighbor + "</strong>.",
              why: ["the neighbours come out in the order the edges were added"] });
-      var seen = visited.indexOf(nb) !== -1;
-      snap({ line: 16, hit: cur, nb: nb, look: nb, edge: key,
-             calc: 'visited.count("' + nb + '") == 0   →   ' +
+      var seen = visited.indexOf(neighbor) !== -1;
+      snap({ line: 16, hit: cur, neighbor: neighbor, look: neighbor, edge: key,
+             calc: 'visited.count("' + neighbor + '") == 0   →   ' +
                    (seen ? "false, already marked" : "true, not seen yet"),
-             head: seen ? "<strong>" + nb + "</strong> is already marked &mdash; skip it."
-                        : "<strong>" + nb + "</strong> has not been seen.",
+             head: seen ? "<strong>" + neighbor + "</strong> is already marked &mdash; skip it."
+                        : "<strong>" + neighbor + "</strong> has not been seen.",
              why: seen ? ["this test is what makes a cycle terminate",
-                          "without it " + nb + " would be queued again and the loop would never end"]
+                          "without it " + neighbor + " would be queued again and the loop would never end"]
                        : ["so it gets marked and queued, in that order"] });
       if (seen) continue;
-      visited.push(nb);
-      snap({ line: 17, hit: nb, carry: { v: nb, tag: "marked" }, edge: key,
-             calc: 'visited.insert("' + nb + '")\nvisited: ' + visited.join(", "),
-             head: "<strong>" + nb + "</strong> is marked now, on the way in.",
+      visited.push(neighbor);
+      snap({ line: 17, hit: neighbor, carry: { v: neighbor, tag: "marked" }, edge: key,
+             calc: 'visited.insert("' + neighbor + '")\nvisited: ' + visited.join(", "),
+             head: "<strong>" + neighbor + "</strong> is marked now, on the way in.",
              why: ["this is the line that differs from DFS",
                    "marked here, it can never be queued by anyone else"] });
-      q.push(nb);
-      snap({ line: 18, hit: nb, carry: { v: nb, tag: "queued" }, edge: key,
-             calc: 'q.push("' + nb + '")\nqueue: ' + q.join(", "),
-             head: "<strong>" + nb + "</strong> joins the back of the queue.",
+      q.push(neighbor);
+      snap({ line: 18, hit: neighbor, carry: { v: neighbor, tag: "queued" }, edge: key,
+             calc: 'q.push("' + neighbor + '")\nqueue: ' + q.join(", "),
+             head: "<strong>" + neighbor + "</strong> joins the back of the queue.",
              why: ["it waits behind everything discovered before it, which is what keeps the order by distance"] });
     }
   }
@@ -1128,34 +1128,34 @@ function buildDFS(g, start) {
            head: "<strong>" + cur + "</strong> is the next vertex in the answer.",
            why: ["position " + result.length + " of " + g.order.length] });
 
-    var nbs = g.adj[cur];
+    var nbrs = g.adj[cur];
     snap({ line: 16, hit: cur,
-           calc: "nbs = neighbors(\"" + cur + "\")   →   " + (nbs.join(", ") || "(none)"),
-           head: "<strong>" + cur + "</strong> touches " + (nbs.join(", ") || "nothing") + ".",
+           calc: "nbrs = neighbors(\"" + cur + "\")   →   " + (nbrs.join(", ") || "(none)"),
+           head: "<strong>" + cur + "</strong> touches " + (nbrs.join(", ") || "nothing") + ".",
            why: ["taken as a vector so it can be walked backwards"] });
-    for (var i = nbs.length - 1; i >= 0; i--) {
-      var nb = nbs[i];
-      var key = cur < nb ? cur + "|" + nb : nb + "|" + cur;
-      var seen = visited.indexOf(nb) !== -1;
-      snap({ line: 17, hit: cur, nb: nb, look: nb, edge: key,
-             calc: "*it = \"" + nb + "\"   (neighbour " + (i + 1) + " of " + nbs.length +
+    for (var i = nbrs.length - 1; i >= 0; i--) {
+      var neighbor = nbrs[i];
+      var key = cur < neighbor ? cur + "|" + neighbor : neighbor + "|" + cur;
+      var seen = visited.indexOf(neighbor) !== -1;
+      snap({ line: 17, hit: cur, neighbor: neighbor, look: neighbor, edge: key,
+             calc: "*it = \"" + neighbor + "\"   (neighbour " + (i + 1) + " of " + nbrs.length +
                    ", walking backwards)",
-             head: "Reverse order: looking at <strong>" + nb + "</strong>.",
+             head: "Reverse order: looking at <strong>" + neighbor + "</strong>.",
              why: ["a stack reverses whatever goes in, so pushing backwards makes it come out forwards",
                    "forward order is still depth-first, just a different branch first"] });
-      snap({ line: 18, hit: seen ? cur : nb, nb: nb, look: nb, edge: key,
-             carry: seen ? undefined : { v: nb, tag: "pushed" },
+      snap({ line: 18, hit: seen ? cur : neighbor, neighbor: neighbor, look: neighbor, edge: key,
+             carry: seen ? undefined : { v: neighbor, tag: "pushed" },
              calc: seen
-               ? '!visited.count("' + nb + '")   →   false, already visited — not pushed'
-               : 's.push("' + nb + '")\nstack: ' + st.concat([nb]).join(", "),
+               ? '!visited.count("' + neighbor + '")   →   false, already visited — not pushed'
+               : 's.push("' + neighbor + '")\nstack: ' + st.concat([neighbor]).join(", "),
              head: seen
-               ? "<strong>" + nb + "</strong> is already visited, so it is not pushed."
-               : "<strong>" + nb + "</strong> goes on the stack, still unmarked.",
+               ? "<strong>" + neighbor + "</strong> is already visited, so it is not pushed."
+               : "<strong>" + neighbor + "</strong> goes on the stack, still unmarked.",
              why: seen
                ? ["this check saves work but it is not the guard &mdash; the one after the pop is"]
                : ["unmarked, so another vertex can push it again before it is popped",
                   "that is exactly the case the guard after the pop handles"] });
-      if (!seen) st.push(nb);
+      if (!seen) st.push(neighbor);
     }
   }
 
