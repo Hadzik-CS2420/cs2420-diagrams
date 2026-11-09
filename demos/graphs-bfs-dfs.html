@@ -1199,7 +1199,7 @@ function whatIsHtml() {
       '<dt>BFS &mdash; breadth first</dt>' +
       '<dd><ul>' +
         '<li class="lead">Uses a <strong>queue</strong> &mdash; first in, first out</li>' +
-        '<li>One step away, then two, then three &mdash; <em>distance order</em></li>' +
+        '<li>Finishes everything one hop out before touching anything two hops out</li>' +
         '<li><strong>Good for:</strong> fewest hops between two places</li>' +
       "</ul></dd>" +
     "</div>" +
@@ -1207,7 +1207,8 @@ function whatIsHtml() {
       '<dt>DFS &mdash; depth first</dt>' +
       '<dd><ul>' +
         '<li class="lead">Uses a <strong>stack</strong> &mdash; last in, first out</li>' +
-        '<li>One path to the end, then back up and try the next</li>' +
+        '<li>Follows one branch to a dead end, then picks up at the newest ' +
+        "place it has not tried yet</li>" +
         '<li><strong>Good for:</strong> is there a route at all, cycles, mazes</li>' +
       "</ul></dd>" +
     "</div>" +
