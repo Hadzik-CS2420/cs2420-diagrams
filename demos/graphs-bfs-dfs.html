@@ -82,6 +82,15 @@
   .whatis .both { grid-column:1 / -1; }
   .whatis dt { font-weight:800; font-size:1.02rem; color:var(--ink); }
   .whatis dd { margin:.1rem 0 0; color:#444; }
+  /* Tight bullets -- this panel is read at a glance, not studied, and every
+     pixel here pushes the queue/stack panel nearer the fold. The marker is a
+     literal bullet rather than an escape, so nothing has to survive quoting. */
+  .whatis ul { margin:.25rem 0 0; padding:0; list-style:none; display:grid; gap:.26rem; }
+  .whatis li { position:relative; padding-left:.95rem; line-height:1.38; }
+  .whatis li::before { content:"•"; position:absolute; left:.1rem; top:-.04em;
+                       color:var(--muted); font-weight:700; }
+  .whatis .on li::before { color:var(--blue); }
+  .whatis li.lead { color:var(--ink); }
   .whatis .on dt { color:var(--blue); }
   .whatis .on { background:var(--tint-blue); border-radius:7px;
                 padding:.35rem .55rem; margin:-.35rem -.55rem; }
@@ -1188,15 +1197,19 @@ function whatIsHtml() {
   return '<dl>' +
     '<div class="' + (bfs ? "on" : "") + '">' +
       '<dt>BFS &mdash; breadth first</dt>' +
-      '<dd>A <strong>queue</strong>. Visits everything one step from the start before ' +
-      'anything two steps away, so the result comes out in distance order &mdash; ' +
-      'this is what gives you the <em>fewest hops</em> between two places.</dd>' +
+      '<dd><ul>' +
+        '<li class="lead">Uses a <strong>queue</strong> &mdash; first in, first out</li>' +
+        '<li>One step away, then two, then three &mdash; <em>distance order</em></li>' +
+        '<li><strong>Good for:</strong> fewest hops between two places</li>' +
+      "</ul></dd>" +
     "</div>" +
     '<div class="' + (dfs ? "on" : "") + '">' +
       '<dt>DFS &mdash; depth first</dt>' +
-      '<dd>A <strong>stack</strong>. Follows one path as deep as it goes, then backs ' +
-      'up and tries the next. Good for &ldquo;is there a route at all&rdquo;, finding ' +
-      'cycles, and solving a maze.</dd>' +
+      '<dd><ul>' +
+        '<li class="lead">Uses a <strong>stack</strong> &mdash; last in, first out</li>' +
+        '<li>One path to the end, then back up and try the next</li>' +
+        '<li><strong>Good for:</strong> is there a route at all, cycles, mazes</li>' +
+      "</ul></dd>" +
     "</div>" +
     '<p class="both">Every vertex once, O(V + E) either way. ' +
     '<strong>They are the same loop</strong> &mdash; the container is the whole ' +
