@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stability Stepper &mdash; Merge Sort vs Heap Sort</title>
+<style>
+  :root {
+    --ink:#2c3e50; --muted:#6e6e6e; --rule:#d8dee6;
+    --green:#1c7e45; --blue:#2573a7; --orange:#a95c19;
+    --red:#c0392b; --purple:#8e44ad; --deep:#4527a0; --teal:#00695c;
+    --tint-green:#f2fbf4; --tint-blue:#eaf2f8; --tint-orange:#fff3e0;
+    --tint-red:#fce4ec; --tint-purple:#ede7f6; --tint-teal:#e0f2f1;
+    --code-bg:#1e1e2e; --code-fg:#cdd6f4; --code-dim:#6c7086; --code-hit:#45475a;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; padding:1.5rem 1.25rem 3rem;
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+    color:var(--ink); background:#fff; line-height:1.5;
+  }
+  /* No max-width: shown on a projector, where a centred column throws away a
+     third of the screen. body padding is the only margin. */
+  .wrap { margin:0 auto; }
+  h1 { font-size:1.35rem; margin:0 0 .2rem; }
+  .sub { color:var(--muted); font-size:.9rem; margin:0 0 1.1rem; }
+
+  .tabs { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:1rem;
+          border-bottom:2px solid var(--rule); padding-bottom:.6rem; }
+  .tabs button {
+    font:inherit; font-size:.9rem; font-weight:600; padding:.45rem 1rem;
+    border:1px solid var(--rule); border-radius:7px 7px 0 0;
+    background:#f7f9fb; color:var(--muted); cursor:pointer;
+  }
+  .tabs button:hover { color:var(--ink); }
+  .tabs button.on { background:#fff; border-bottom-color:#fff; }
+  .tabs button[data-mode="setup"].on   { border-top:3px solid var(--teal);   color:var(--teal); }
+  .tabs button[data-mode="merge"].on   { border-top:3px solid var(--blue);   color:var(--blue); }
+  .tabs button[data-mode="heap"].on    { border-top:3px solid var(--purple); color:var(--purple); }
+  .tabs button[data-mode="verdict"].on { border-top:3px solid var(--deep);   color:var(--deep); }
+  .tabs .spacer { flex:1; }
+  .tabs .step-hint { align-self:center; font-size:.76rem; color:var(--muted); }
+
+  .panel { border:1px solid var(--rule); border-radius:10px;
+           padding:.85rem 1rem; margin-bottom:1.1rem; background:#fcfdfe; }
+  .row { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+  .row + .row { margin-top:.6rem; }
+  .lbl { font-size:.73rem; text-transform:uppercase; letter-spacing:.05em;
+         color:var(--muted); min-width:6.5rem; }
+  button.ctl { font:inherit; font-size:.86rem; padding:.38rem .8rem;
+               border:1px solid var(--rule); border-radius:6px;
+               background:#fff; color:var(--ink); cursor:pointer; }
+  button.ctl:hover:not(:disabled) { border-color:var(--blue); color:var(--blue); }
+  button.ctl:disabled { opacity:.4; cursor:default; }
+  button.ctl.primary { background:var(--deep); border-color:var(--deep); color:#fff; }
+  .count { font-variant-numeric:tabular-nums; font-size:.84rem; color:var(--muted); margin-left:auto; }
+
+  .solo { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+          gap:1.1rem; align-items:start; }
+  .solo > .col { display:flex; flex-direction:column; gap:1.1rem; min-width:0; }
+  @media (max-width:1000px) { .solo { grid-template-columns:minmax(0,1fr); } }
+
+  .card { border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
+  .card > h2 { font-size:.92rem; margin:0; padding:.5rem .85rem;
+               border-bottom:1px solid var(--rule); background:#f7f9fb; }
+  .card-body { padding:.85rem; }
+
+  /* ---- how it works banner ---- */
+  .howto .lead { margin:0 0 .7rem; font-size:.9rem; }
+  .howto-steps { display:grid; gap:.7rem; margin:0 0 .7rem;
+                 grid-template-columns:repeat(auto-fit,minmax(16rem,1fr)); }
+  .hstep { background:#f7f9fb; border:1px solid var(--rule); border-radius:8px;
+           padding:.55rem .7rem .6rem; }
+  .hstep > h4 { margin:0 0 .4rem; font-size:.84rem; display:flex; gap:.45rem;
+                align-items:center; color:var(--ink); }
+  .hnum { flex:0 0 auto; width:1.3rem; height:1.3rem; border-radius:50%;
+          background:var(--deep); color:#fff; font-size:.7rem; font-weight:700;
+          display:flex; align-items:center; justify-content:center; }
+  .hstep ul { margin:0; padding:0; list-style:none; }
+  .hstep li { position:relative; padding-left:.85rem; margin-bottom:.22rem;
+              font-size:.8rem; line-height:1.45; }
+  .hstep li::before { content:""; position:absolute; left:.2rem; top:.52em;
+                      width:.3rem; height:.3rem; border-radius:50%;
+                      background:var(--muted); }
+  .hstep li:last-child { margin-bottom:0; }
+
+  /* ---- runner cells ---- */
+  .cells { display:flex; gap:.3rem; flex-wrap:wrap; min-height:3rem; align-items:stretch; }
+  .cell { position:relative; min-width:4.3rem; padding:.3rem .25rem .22rem;
+          border:2px solid var(--rule); border-radius:6px; text-align:center;
+          font-variant-numeric:tabular-nums; background:#fff; }
+  .cell .grp  { display:block; font-size:1.02rem; font-weight:700; line-height:1.15; }
+  .cell .nm2  { display:block; font-size:.72rem; font-weight:600; color:var(--ink); }
+  .cell .tm   { display:block; font-size:.64rem; font-weight:400; color:var(--muted); }
+  .cell .ix   { display:block; font-size:.57rem; font-weight:400; color:#aab2bd; }
+  .cell.g20 { border-color:var(--blue);   background:var(--tint-blue); }
+  .cell.g30 { border-color:var(--orange); background:var(--tint-orange); }
+  .cell.g40 { border-color:var(--teal);   background:var(--tint-teal); }
+  .cell.outside { opacity:.3; }
+  .cell.compare { box-shadow:0 0 0 3px rgba(37,115,167,.45); }
+  .cell.moved   { box-shadow:0 0 0 3px rgba(192,57,43,.5); }
+  .cell.sorted  { border-color:var(--green); background:var(--tint-green); }
+  .cell.node    { box-shadow:0 0 0 3px rgba(142,68,173,.45); }
+  .cell.largest { box-shadow:0 0 0 3px rgba(169,92,25,.55); }
+  .cell.badorder::after { content:"\2716"; position:absolute; top:-.45rem; right:-.3rem;
+          font-size:.64rem; font-weight:700; color:#fff; background:var(--red);
+          border-radius:50%; width:1rem; height:1rem; line-height:1rem; }
+  .small .cell { min-width:3.6rem; padding:.2rem .15rem .15rem; }
+  .small .cell .grp { font-size:.86rem; }
+
+  .rowlbl { font-size:.7rem; text-transform:uppercase; letter-spacing:.05em;
+            color:var(--muted); min-width:4.2rem; }
+  .beforerow { display:flex; align-items:center; gap:.5rem; margin:0 0 .55rem; }
+  .beforerow .cells { min-height:0; gap:.2rem; }
+
+  .temps { margin-top:.65rem; font-size:.78rem; }
+  .temps .trow { display:flex; align-items:center; gap:.35rem; margin-bottom:.35rem; }
+  .temps .tname { min-width:4.6rem; color:var(--muted); font-family:Consolas,monospace; }
+  .temps .cells { min-height:0; }
+  .temps .cell.cursor { box-shadow:0 0 0 3px rgba(37,115,167,.5); }
+  .temps .cell.used { opacity:.3; }
+
+  .bounds { display:flex; gap:.7rem; flex-wrap:wrap; margin-top:.5rem; min-height:1.15rem;
+            font-size:.74rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .bounds code { background:#eef2f6; border-radius:4px; padding:.05em .35em;
+                 font-family:Consolas,monospace; color:var(--ink); }
+  .note { font-size:.88rem; margin:.65rem 0 0; min-height:4rem; }
+
+  .code { background:var(--code-bg); color:var(--code-fg); border-radius:8px;
+          padding:.6rem 0; overflow-x:auto;
+          font-family:Consolas,"Courier New",monospace; font-size:1.02rem; line-height:1.72; }
+  .code div { padding:0 .8rem; white-space:pre; cursor:pointer; }
+  .code div:hover { background:#313244; }
+  .code div.active { background:var(--code-hit); }
+  .code div.active::before { content:"\25B8 "; color:#f9e2af; }
+  .code div:not(.active)::before { content:"  "; }
+  .code div.cont::before { content:"  " !important; }
+  .code .kw { color:#cba6f7; } .code .fn { color:#89dceb; }
+  .code .nm { color:#fab387; } .code .cm { color:var(--code-dim); font-style:italic; }
+  .code div.calc { background:#f9e2af; color:#1e1e2e; font-size:.88rem;
+                   font-weight:600; white-space:pre; cursor:default;
+                   display:flex; align-items:flex-start; gap:.55rem;
+                   padding:.22rem .8rem; margin:.12rem 0;
+                   border-left:4px solid #b8860b; }
+  .code div.calc > .cv { min-width:0; white-space:pre-wrap;
+                         text-indent:-1.1rem; padding-left:1.1rem; }
+  .code div.calc::before { content:"THIS STEP"; font-size:.62rem; font-weight:800;
+                           letter-spacing:.06em; color:#6b4f04;
+                           background:rgba(0,0,0,.09); border-radius:3px;
+                           padding:.08em .32em; flex:0 0 auto; margin-top:.28em; }
+  .code div.calc:hover { background:#f9e2af; }
+  .codenote { font-size:.78rem; color:var(--muted); margin:0 0 .5rem;
+              border-left:3px solid var(--rule); padding:.15rem 0 .15rem .55rem; }
+  .codenote b { color:var(--ink); }
+
+  /* ---- the stability meter ---- */
+  .stab { margin-top:.7rem; border:1px solid var(--rule); border-left:5px solid var(--green);
+          border-radius:0 8px 8px 0; padding:.55rem .8rem; background:var(--tint-green); }
+  .stab.broken { border-left-color:var(--red); background:var(--tint-red); }
+  .stab h4 { margin:0 0 .3rem; font-size:.84rem; color:var(--ink); }
+  .stab .big { font-family:Consolas,monospace; font-weight:700; font-size:1.05rem;
+               color:var(--green); }
+  .stab.broken .big { color:var(--red); }
+  .stab .pairs { font-size:.78rem; color:var(--ink); margin-top:.2rem; }
+  .stab .pairs code { font-family:Consolas,monospace; background:rgba(255,255,255,.65);
+                      border-radius:4px; padding:.05em .3em; }
+  .stab .why { font-size:.78rem; color:var(--muted); margin-top:.25rem; }
+
+  /* ---- within-group readout ---- */
+  .groups { margin-top:.7rem; font-size:.82rem; }
+  .grow { display:flex; align-items:baseline; gap:.5rem; padding:.18rem .3rem;
+          border-radius:5px; flex-wrap:wrap; }
+  .grow .gname { font-weight:700; min-width:3.1rem; font-variant-numeric:tabular-nums; }
+  .grow .gseq { font-family:Consolas,monospace; font-size:.82rem; }
+  .grow .gverd { font-size:.74rem; font-weight:700; margin-left:auto; white-space:nowrap; }
+  .grow.ok   { background:var(--tint-green); } .grow.ok   .gverd { color:var(--green); }
+  .grow.bad  { background:var(--tint-red); }   .grow.bad  .gverd { color:var(--red); }
+
+  .banner { display:flex; flex-wrap:wrap; align-items:baseline; gap:.2rem .8rem; margin:0 0 .8rem;
+            padding:.5rem .85rem; border-radius:7px; color:#fff; background:var(--deep); }
+  .banner strong { font-size:1.02rem; }
+  .banner span { font-size:.85rem; }
+  .banner.build   { background:var(--blue); }
+  .banner.extract { background:var(--orange); }
+  .banner.done    { background:var(--green); }
+  .banner.split   { background:var(--teal); }
+
+  .locals { display:grid; grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));
+            gap:.5rem 1.1rem; margin:.6rem 0 0; padding:.55rem .7rem;
+            border:1px solid var(--rule); border-radius:8px; background:#fbfcfd; }
+  .locals h5 { margin:0 0 .3rem; font-size:.68rem; font-weight:700; color:var(--muted);
+               text-transform:uppercase; letter-spacing:.06em; }
+  .locals .lv { display:flex; align-items:baseline; gap:.45rem; font-size:.79rem; line-height:1.5; }
+  .locals .ln { font-family:Consolas,monospace; font-weight:650; color:var(--ink); min-width:4.6rem; }
+  .locals .lval { font-family:Consolas,monospace; font-weight:700;
+                  color:var(--blue); background:var(--tint-blue);
+                  border:1px solid rgba(37,115,167,.3); border-radius:999px;
+                  padding:.02rem .45rem; min-width:1.6rem; text-align:center; }
+  .locals .lat { color:var(--muted); font-size:.75rem; }
+
+  table { border-collapse:collapse; width:100%; font-size:.82rem; }
+  th,td { border:1px solid var(--rule); padding:.32rem .5rem; text-align:left; }
+  th { background:#f4f7fa; font-weight:600; }
+  td.num { font-variant-numeric:tabular-nums; }
+  td.yes { color:var(--green); font-weight:700; }
+  td.no  { color:var(--red);   font-weight:700; }
+  .mono { font-family:Consolas,monospace; }
+
+  .facts { display:flex; flex-direction:column; gap:.45rem; }
+  .fact { display:flex; align-items:baseline; gap:.5rem; flex-wrap:wrap; }
+  .fact .fl { flex:0 0 6.8rem; font-size:.78rem; font-weight:600; color:var(--muted); }
+  .fact .fv { font-family:Consolas,monospace; font-size:.84rem; font-weight:700;
+              padding:.12rem .5rem; border-radius:999px; white-space:nowrap;
+              background:var(--tint-blue); color:var(--blue);
+              border:1px solid rgba(37,115,167,.25); }
+  .fact .fv.good { background:var(--tint-green); color:var(--green); border-color:rgba(28,126,69,.3); }
+  .fact .fv.bad  { background:var(--tint-red);   color:var(--red);   border-color:rgba(192,57,43,.3); }
+  .fact .fnote { font-size:.78rem; color:var(--muted); flex:1 1 9rem; min-width:0; }
+
+  .callout { font-size:.85rem; padding:.6rem .8rem; border-radius:6px; margin-top:.7rem;
+             background:var(--tint-purple); border:1px solid #d1c4e9; color:var(--deep); }
+  .callout.warn { background:var(--tint-red); border-color:#f5c6cb; color:var(--red); }
+  .callout.good { background:var(--tint-green); border-color:#b6e0c4; color:var(--green); }
+  .legend { margin-top:.85rem; font-size:.75rem; color:var(--muted); }
+  .legend span { display:inline-block; margin-right:.9rem; white-space:nowrap; }
+  .sw { display:inline-block; width:.7rem; height:.7rem; border-radius:3px;
+        border:2px solid var(--rule); vertical-align:-1px; margin-right:.25rem; }
+  .sw.g20 { border-color:var(--blue);   background:var(--tint-blue); }
+  .sw.g30 { border-color:var(--orange); background:var(--tint-orange); }
+  .sw.g40 { border-color:var(--teal);   background:var(--tint-teal); }
+  .selftest { margin-top:1rem; font-size:.79rem; padding:.5rem .75rem; border-radius:6px;
+              border:1px solid var(--rule); }
+  .selftest.pass { background:var(--tint-green); border-color:var(--green); color:var(--green); }
+  .selftest.fail { background:var(--tint-red);   border-color:var(--red);   color:var(--red); }
+  .hint { margin-top:.9rem; font-size:.83rem; color:var(--muted);
+          border-left:3px solid var(--rule); padding-left:.75rem; }
+  svg.tree { width:100%; height:auto; display:block; }
+  svg.tree text { font-family:"Segoe UI",system-ui,sans-serif; font-weight:600; }
+  .treecap { margin:.3rem 0 0; font-size:.74rem; color:var(--muted); }
+  .qbox { border:1px solid var(--rule); border-left:5px solid var(--deep);
+          border-radius:0 10px 10px 0; background:#faf8ff; padding:.9rem 1.1rem;
+          margin:0 0 1.1rem; }
+  .qbox h3 { margin:0 0 .45rem; font-size:1rem; color:var(--deep); }
+  .qbox p { margin:0 0 .5rem; font-size:.92rem; }
+  .qbox p:last-child { margin-bottom:0; }
+  .answers { list-style:none; margin:.3rem 0 0; padding:0; }
+  .answers li { position:relative; padding:.45rem .6rem .45rem 2rem; margin-bottom:.35rem;
+                border:1px solid var(--rule); border-radius:7px; font-size:.86rem;
+                background:#fff; }
+  .answers li::before { position:absolute; left:.55rem; top:.45rem; font-weight:700; }
+  .answers li.right { border-color:var(--green); background:var(--tint-green); }
+  .answers li.right::before { content:"\2714"; color:var(--green); }
+  .answers li.wrong::before { content:"\2716"; color:var(--red); }
+  .answers li b { display:block; margin-bottom:.15rem; }
+  .answers li .rb { font-size:.81rem; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Why Merge Sort and Not Heap Sort</h1>
+  <p class="sub">Pair Review 21 &mdash; the same eight race results sorted by age group two ways, one line of code at a time. Both are O(n log n). Only one keeps the finish-time order.</p>
+
+  <div class="tabs" id="tabs"></div>
+  <div id="howto"></div>
+  <div class="panel" id="controls" hidden>
+    <div class="row">
+      <span class="lbl">Step</span>
+      <button class="ctl" id="first">&laquo; First</button>
+      <button class="ctl" id="prev">&lsaquo; Prev</button>
+      <button class="ctl primary" id="play">&#9654; Play</button>
+      <button class="ctl" id="next">Next &rsaquo;</button>
+      <button class="ctl" id="last">Last &raquo;</button>
+      <button class="ctl" id="jump">Next tie &raquo;&raquo;</button>
+      <span class="count" id="frameCount"></span>
+    </div>
+  </div>
+  <div id="stage"></div>
+  <div class="selftest" id="selftest"></div>
+  <p class="hint">Arrow keys step, <b>space</b> plays or pauses, <b>Home</b> / <b>End</b> jump to the ends. Click any line of code to make it the current line. Deep links: <code>#setup</code>, <code>#merge</code>, <code>#heap</code>, <code>#verdict</code>. One self-contained file &mdash; it works offline and on a locked-down network.</p>
+</div>
+<script>
+(function () {
+  "use strict";
+
+  // =========================================================================
+  // The data: Lab 6 race results, ALREADY sorted by finish time.
+  // ix is the position in that finish-time order -- the thing a stable sort
+  // has to preserve inside each age group, and the only way to prove it did.
+  // =========================================================================
+  var RUNNERS = [
+    { name: "Ana",  time: "18:42", grp: 30 },
+    { name: "Ben",  time: "19:05", grp: 20 },
+    { name: "Cruz", time: "19:31", grp: 30 },
+    { name: "Dai",  time: "20:14", grp: 20 },
+    { name: "Eve",  time: "20:58", grp: 40 },
+    { name: "Finn", time: "21:20", grp: 30 },
+    { name: "Gus",  time: "22:03", grp: 20 },
+    { name: "Hana", time: "22:47", grp: 40 }
+  ];
+  RUNNERS.forEach(function (r, i) { r.ix = i; });
+
+  var N_ = RUNNERS.length;
+  var GROUPS = [20, 30, 40];
+
+  // What a stable sort by age group must produce: group order, and inside each
+  // group the finish-time order untouched.
+  var STABLE = RUNNERS.slice().sort(function (x, y) {
+    return (x.grp - y.grp) || (x.ix - y.ix);
+  });
+
+  // ---- small helpers -------------------------------------------------------
+  function names(a) { return a.map(function (r) { return r.name; }).join(","); }
+
+  // Every pair of equal-key runners that is out of its original finish-time
+  // order. This is the definition of "unstable", computed, not asserted.
+  function invPairs(a) {
+    var out = [];
+    for (var p = 0; p < a.length; p++) {
+      for (var q = p + 1; q < a.length; q++) {
+        if (a[p].grp === a[q].grp && a[p].ix > a[q].ix) out.push([a[p], a[q]]);
+      }
+    }
+    return out;
+  }
+  function badSet(a) {
+    var s = {};
+    invPairs(a).forEach(function (pr) { s[pr[0].name] = 1; });
+    return s;
+  }
+  function groupedOk(a) {
+    for (var i = 1; i < a.length; i++) if (a[i - 1].grp > a[i].grp) return false;
+    return true;
+  }
+
+  // =========================================================================
+  // The code listings. Same two functions students have in CT 14, with the
+  // comparison reading .age_group instead of comparing bare ints.
+  // =========================================================================
+  var K = '<span class="kw">', F = '<span class="fn">',
+      Nm = '<span class="nm">', C = '<span class="cm">', E = '</span>';
+  var V = 'vector&lt;Runner&gt;&amp;';
+
+  var CODE = {
+    merge: [
+      { k: 'rsig',  t: K + 'static void' + E + ' ' + F + 'merge_sort_recursive' + E + '(' + V + ' data, ' + K + 'int' + E + ' left, ' + K + 'int' + E + ' right) {' },
+      { k: 'base',  t: '  ' + K + 'if' + E + ' (left &gt;= right) ' + K + 'return' + E + ';   ' + C + '// 0 or 1 element' + E },
+      { k: 'mid',   t: '  ' + K + 'int' + E + ' mid = left + (right - left) / ' + Nm + '2' + E + ';' },
+      { k: 'recL',  t: '  ' + F + 'merge_sort_recursive' + E + '(data, left, mid);' },
+      { k: 'recR',  t: '  ' + F + 'merge_sort_recursive' + E + '(data, mid + ' + Nm + '1' + E + ', right);' },
+      { k: 'call',  t: '  ' + F + 'merge' + E + '(data, left, mid, right);' },
+      { k: 'rend',  t: '}' },
+      { k: 'gap',   t: '' },
+      { k: 'msig',  t: K + 'static void' + E + ' ' + F + 'merge' + E + '(' + V + ' data, ' + K + 'int' + E + ' left, ' + K + 'int' + E + ' mid, ' + K + 'int' + E + ' right) {' },
+      { k: 'copy2', t: '  vector&lt;Runner&gt; L(..left..mid), R(..mid+' + Nm + '1' + E + '..right);' },
+      { k: 'cmp',   t: '  ' + K + 'while' + E + ' (i &lt; L.size() &amp;&amp; j &lt; R.size())' },
+      { k: 'take',  t: '    data[k++] = (L[i].age_group &lt;= R[j].age_group) ? L[i++] : R[j++];' },
+      { k: 'take',  c: 1, t: '    ' + C + '//                             ^^  a tie goes LEFT. That is stability.' + E },
+      { k: 'drain', t: '  ' + C + '// drain whichever half still has runners in it' + E },
+      { k: 'mend',  t: '}' },
+      { k: 'gap',   t: '' },
+      { k: 'kick',  t: K + 'void' + E + ' ' + F + 'merge_sort' + E + '(' + V + ' data) {' },
+      { k: 'kick',  c: 1, t: '  ' + F + 'merge_sort_recursive' + E + '(data, ' + Nm + '0' + E + ', data.size() - ' + Nm + '1' + E + '); }' }
+    ],
+    heap: [
+      { k: 'hsig',  t: K + 'static void' + E + ' ' + F + 'heapify_down' + E + '(' + V + ' data, ' + K + 'int' + E + ' heap_size, ' + K + 'int' + E + ' index) {' },
+      { k: 'init',  t: '  ' + K + 'int' + E + ' largest = index, left = ' + Nm + '2' + E + '*index+' + Nm + '1' + E + ', right = ' + Nm + '2' + E + '*index+' + Nm + '2' + E + ';' },
+      { k: 'cmpL',  t: '  ' + K + 'if' + E + ' (left &lt; heap_size &amp;&amp;' },
+      { k: 'cmpL',  c: 1, t: '      data[left].age_group &gt; data[largest].age_group)  largest = left;' },
+      { k: 'cmpR',  t: '  ' + K + 'if' + E + ' (right &lt; heap_size &amp;&amp;' },
+      { k: 'cmpR',  c: 1, t: '      data[right].age_group &gt; data[largest].age_group) largest = right;' },
+      { k: 'cmpR',  c: 1, t: '  ' + C + '//                  ^  strict. A tie never moves, and never has to.' + E },
+      { k: 'sink',  t: '  ' + K + 'if' + E + ' (largest != index) { ' + F + 'swap' + E + '(data[index], data[largest]);' },
+      { k: 'rec',   t: '    ' + F + 'heapify_down' + E + '(data, heap_size, largest); }   ' + C + '// follow it down' + E },
+      { k: 'hend',  t: '}' },
+      { k: 'gap',   t: '' },
+      { k: 'ssig',  t: K + 'void' + E + ' ' + F + 'heap_sort' + E + '(' + V + ' data) {' },
+      { k: 'build', t: '  ' + C + '// phase 1: build the max-heap, last parent upward' + E },
+      { k: 'bloop', t: '  ' + K + 'for' + E + ' (' + K + 'int' + E + ' i = n/' + Nm + '2' + E + '-' + Nm + '1' + E + '; i &gt;= ' + Nm + '0' + E + '; --i) ' + F + 'heapify_down' + E + '(data, n, i);' },
+      { k: 'extr',  t: '  ' + C + '// phase 2: swap the max out, shrink, repair' + E },
+      { k: 'eloop', t: '  ' + K + 'for' + E + ' (' + K + 'int' + E + ' i = n-' + Nm + '1' + E + '; i &gt; ' + Nm + '0' + E + '; --i) {' },
+      { k: 'eswap', t: '    ' + F + 'swap' + E + '(data[' + Nm + '0' + E + '], data[i]);   ' + C + '// a jump the length of the array' + E },
+      { k: 'erep',  t: '    ' + F + 'heapify_down' + E + '(data, i, ' + Nm + '0' + E + '); }   ' + C + '// i, not n' + E },
+      { k: 'send',  t: '}' }
+    ]
+  };
+
+  // =========================================================================
+  // Recorder 1: merge sort
+  // =========================================================================
+  function recordMerge() {
+    var a = RUNNERS.slice(), frames = [], ties = 0, tiesLeft = 0, worst = 0;
+
+    function snap(line, msg, ex) {
+      var f = { line: line, msg: msg, arr: a.slice() };
+      for (var key in ex) f[key] = ex[key];
+      worst = Math.max(worst, invPairs(a).length);
+      frames.push(f);
+    }
+
+    snap('kick', "<strong>merge_sort hands the whole array to the recursive helper.</strong>" +
+      "<br>The array is in <strong>finish-time order</strong> right now &mdash; that is the order we are " +
+      "about to try not to destroy. The key we sort on is <code>.age_group</code>, and nothing in " +
+      "either function ever looks at the finish time.",
+      { seg: [0, N_ - 1], phase: { cls: 'split', strong: 'Start', span: 'sorted by finish time, about to be sorted by age group' } });
+
+    function rec(lo, hi) {
+      if (lo >= hi) {
+        snap('base', "<strong>merge_sort_recursive(" + lo + ", " + hi + ")</strong> &mdash; one element, " +
+          "so it is already sorted. Return.",
+          { seg: [lo, hi], locals: [{ n: 'left', v: lo }, { n: 'right', v: hi }] });
+        return;
+      }
+      var mid = lo + ((hi - lo) >> 1);
+      snap('mid', "<strong>Split " + lo + "&hellip;" + hi + " at mid = " + mid + ".</strong> " +
+        "The split is blind &mdash; straight down the middle, no comparisons. Nothing is sorted here; " +
+        "all the real work happens in <code>merge</code> on the way back up.",
+        { seg: [lo, hi], mid: mid,
+          locals: [{ n: 'left', v: lo }, { n: 'right', v: hi }, { n: 'mid', v: mid }],
+          calc: "mid = " + lo + " + (" + hi + " - " + lo + ") / 2 = " + mid +
+                "   →   left half [" + lo + ".." + mid + "], right half [" + (mid + 1) + ".." + hi + "]",
+          phase: { cls: 'split', strong: 'Dividing', span: 'blind split at the midpoint' } });
+      rec(lo, mid);
+      rec(mid + 1, hi);
+      merge(lo, mid, hi);
+    }
+
+    function merge(lo, mid, hi) {
+      var L = a.slice(lo, mid + 1), R = a.slice(mid + 1, hi + 1);
+      var i = 0, j = 0, k = lo;
+
+      snap('copy2', "<strong>Both halves are copied out before anything is overwritten.</strong> " +
+        "<code>L</code> holds [" + lo + ".." + mid + "], <code>R</code> holds [" + (mid + 1) + ".." + hi + "]. " +
+        "This is merge sort's O(n) extra space &mdash; and it is also what makes the next step possible: " +
+        "the two candidates sit still while we choose between them.",
+        { seg: [lo, hi], L: L.slice(), R: R.slice(), i: i, j: j, k: k,
+          locals: [{ n: 'left', v: lo }, { n: 'mid', v: mid }, { n: 'right', v: hi }],
+          phase: { cls: 'build', strong: 'Merging', span: '[' + lo + '..' + hi + ']' } });
+
+      while (i < L.length && j < R.length) {
+        var lg = L[i].grp, rg = R[j].grp, isTie = (lg === rg);
+        var takeLeft = lg <= rg;
+        if (isTie) { ties++; if (takeLeft) tiesLeft++; }
+        var chosen = takeLeft ? L[i] : R[j];
+        var msg;
+        if (isTie) {
+          msg = "<strong>A tie: both candidates are in the " + lg + "s.</strong>" +
+            "<br><code>L[" + i + "] = " + L[i].name + "</code> finished at " + L[i].time +
+            " and <code>R[" + j + "] = " + R[j].name + "</code> finished at " + R[j].time + ". " +
+            "The test is <code>&lt;=</code>, not <code>&lt;</code>, so the tie goes to the <strong>left half</strong> &mdash; " +
+            "and the left half is the part of the array that came first. " +
+            "<strong>" + L[i].name + " is written, and the finish-time order survives the tie.</strong>";
+        } else {
+          msg = "<code>L[" + i + "].age_group = " + lg + "</code> vs <code>R[" + j + "].age_group = " + rg + "</code>" +
+            " &mdash; no tie, so the smaller key wins outright. <strong>" + chosen.name +
+            " (" + chosen.grp + "s) goes to data[" + k + "].</strong>";
+        }
+        a[k] = chosen;
+        if (takeLeft) i++; else j++;
+        snap('take', msg,
+          { seg: [lo, hi], L: L.slice(), R: R.slice(), i: i, j: j, k: k + 1,
+            hi2: {}, wrote: k, tie: isTie,
+            locals: [{ n: 'i', v: i, at: 'into L' }, { n: 'j', v: j, at: 'into R' }, { n: 'k', v: k + 1, at: 'into data' }],
+            calc: "(L[" + (takeLeft ? i - 1 : i) + "].age_group = " + lg + ")  <=  (R[" +
+                  (takeLeft ? j : j - 1) + "].age_group = " + rg + ")   →   " +
+                  (takeLeft ? "TRUE, take from L" : "false, take from R") +
+                  "   →   data[" + k + "] = " + chosen.name,
+            phase: { cls: isTie ? 'extract' : 'build', strong: isTie ? 'Tie — taken from the left' : 'Merging', span: '[' + lo + '..' + hi + ']' } });
+        k++;
+      }
+
+      var drained = [];
+      while (i < L.length) { drained.push(L[i]); a[k++] = L[i++]; }
+      while (j < R.length) { drained.push(R[j]); a[k++] = R[j++]; }
+      if (drained.length) {
+        snap('drain', "<strong>One half ran out.</strong> " +
+          "Everything still in the other half has a key at least as large as everything already written, " +
+          "so it is copied straight across in order: <strong>" + names(drained).split(",").join(", ") +
+          "</strong>. No comparisons, and no reordering.",
+          { seg: [lo, hi], L: L.slice(), R: R.slice(), i: i, j: j, k: k,
+            phase: { cls: 'build', strong: 'Draining', span: '[' + lo + '..' + hi + ']' } });
+      }
+
+      snap('call', "<strong>data[" + lo + "&hellip;" + hi + "] is now sorted by age group</strong>, and inside every " +
+        "age group it is still in finish-time order. That property held before this merge and it holds " +
+        "after it &mdash; which is the whole induction: a merge of two stable halves is stable, so the " +
+        "finished array is stable.",
+        { seg: [lo, hi],
+          phase: { cls: 'done', strong: 'Merged', span: '[' + lo + '..' + hi + '] is sorted and still stable' } });
+    }
+
+    rec(0, N_ - 1);
+
+    snap('kick', "<strong>Done.</strong> Sorted by age group, and every age group reads " +
+      "in finish-time order &mdash; " + STABLE.map(function (r) { return r.name; }).join(", ") +
+      ". The second sort never knew finish time existed; <strong>stability carried it through</strong>.",
+      { seg: [0, N_ - 1], final: true,
+        phase: { cls: 'done', strong: 'Finished', span: 'stable — 0 ties out of order' } });
+
+    return { frames: frames, result: a.slice(), ties: ties, tiesLeft: tiesLeft, worst: worst };
+  }
+
+  // =========================================================================
+  // Recorder 2: heap sort
+  // =========================================================================
+  function recordHeap() {
+    var a = RUNNERS.slice(), frames = [], breaks = [];
+
+    function snap(line, msg, ex) {
+      var f = { line: line, msg: msg, arr: a.slice() };
+      for (var key in ex) f[key] = ex[key];
+      frames.push(f);
+    }
+    function swapAt(x, y) {
+      var before = invPairs(a).length;
+      var t = a[x]; a[x] = a[y]; a[y] = t;
+      var after = invPairs(a).length;
+      return { broke: after > before, gained: after - before };
+    }
+
+    snap('ssig', "<strong>Same array, same key, same O(n log n).</strong> " +
+      "Heap sort sorts in place &mdash; no second array anywhere &mdash; which is its real advantage over " +
+      "merge sort. Watch what that costs.",
+      { heapSize: N_, sortedFrom: N_,
+        phase: { cls: 'build', strong: 'Start', span: 'sorted by finish time, about to be sorted by age group' } });
+
+    function heapify(size, index, depth) {
+      var largest = index, l = 2 * index + 1, r = 2 * index + 2;
+      snap('init', "<strong>heapify_down at index " + index + "</strong> (" + a[index].name + ", " +
+        a[index].grp + "s). Its children are at <code>" + l + "</code> and <code>" + r + "</code>. " +
+        "The job is to push this one node down until the subtree under it is a valid max-heap.",
+        { heapSize: size, sortedFrom: size, node: index, largest: largest, l: l, r: r,
+          locals: [{ n: 'heap_size', v: size }, { n: 'index', v: index }, { n: 'largest', v: largest },
+                   { n: 'left', v: l, at: l < size ? a[l].name : 'out of heap' },
+                   { n: 'right', v: r, at: r < size ? a[r].name : 'out of heap' }],
+          calc: "left = 2*" + index + "+1 = " + l + ",  right = 2*" + index + "+2 = " + r +
+                "   (heap is 0.." + (size - 1) + ")",
+          phase: { cls: depth === 0 ? 'build' : 'extract', strong: 'heapify_down', span: 'index ' + index + ', heap_size ' + size } });
+
+      if (l < size && a[l].grp > a[largest].grp) {
+        var pl = largest; largest = l;
+        snap('cmpL', "<code>data[" + l + "].age_group = " + a[l].grp + "</code> beats <code>data[" + pl +
+          "].age_group = " + a[pl].grp + "</code>, so <code>largest</code> moves to the left child.",
+          { heapSize: size, sortedFrom: size, node: index, largest: largest, l: l, r: r,
+            calc: "data[" + l + "].age_group (" + a[l].grp + ")  >  data[" + pl + "].age_group (" + a[pl].grp + ")   →   largest = " + l });
+      } else {
+        snap('cmpL', (l >= size
+          ? "No left child inside the heap (<code>" + l + " >= " + size + "</code>), so nothing to compare."
+          : "<code>data[" + l + "].age_group = " + a[l].grp + "</code> does not beat <code>data[" + largest +
+            "].age_group = " + a[largest].grp + "</code>. The comparison is <strong>strict</strong>, so an equal key does " +
+            "not move &mdash; and it does not need to: either arrangement is a valid heap."),
+          { heapSize: size, sortedFrom: size, node: index, largest: largest, l: l, r: r });
+      }
+
+      if (r < size && a[r].grp > a[largest].grp) {
+        var pr = largest; largest = r;
+        snap('cmpR', "<code>data[" + r + "].age_group = " + a[r].grp + "</code> beats <code>data[" + pr +
+          "].age_group = " + a[pr].grp + "</code>, so <code>largest</code> moves to the right child.",
+          { heapSize: size, sortedFrom: size, node: index, largest: largest, l: l, r: r,
+            calc: "data[" + r + "].age_group (" + a[r].grp + ")  >  data[" + pr + "].age_group (" + a[pr].grp + ")   →   largest = " + r });
+      } else {
+        snap('cmpR', (r >= size
+          ? "No right child inside the heap (<code>" + r + " >= " + size + "</code>)."
+          : "<code>data[" + r + "].age_group = " + a[r].grp + "</code> does not beat <code>data[" + largest +
+            "].age_group = " + a[largest].grp + "</code>."),
+          { heapSize: size, sortedFrom: size, node: index, largest: largest, l: l, r: r });
+      }
+
+      if (largest !== index) {
+        var moverA = a[index], moverB = a[largest];
+        var res = swapAt(index, largest);
+        var msg = "<strong>Swap data[" + index + "] with data[" + largest + "]</strong> &mdash; " +
+          moverA.name + " and " + moverB.name + " trade places.";
+        if (res.broke) {
+          msg += " <strong style=\"color:#c0392b\">And there it goes.</strong> That swap jumped one runner " +
+            "past another in the same age group, so two runners who were in finish-time order no longer are. " +
+            "Nothing compared them; nothing checked. The swap is chosen by <em>index arithmetic</em> &mdash; " +
+            "parent and child &mdash; and index arithmetic knows nothing about what order they arrived in.";
+          breaks.push(frames.length);
+        } else {
+          msg += " No tie was disturbed by this one.";
+        }
+        snap('sink', msg,
+          { heapSize: size, sortedFrom: size, node: largest, largest: largest, l: l, r: r,
+            swapped: [index, largest], tiebreak: res.broke,
+            calc: "swap(data[" + index + "], data[" + largest + "])   →   " +
+                  moverB.name + " up to " + index + ",  " + moverA.name + " down to " + largest });
+        snap('rec', "<code>heapify_down</code> calls itself on index " + largest + " to carry on sinking " +
+          moverA.name + ". The displaced node may still be bigger than <em>its</em> new children.",
+          { heapSize: size, sortedFrom: size, node: largest, largest: largest, l: l, r: r,
+            calc: "heapify_down(data, heap_size = " + size + ", index = " + largest + ")" });
+        heapify(size, largest, depth + 1);
+      } else {
+        snap('sink', "<code>largest == index</code>, so there is nothing to swap. This subtree is already " +
+          "a valid max-heap and <code>heapify_down</code> returns.",
+          { heapSize: size, sortedFrom: size, node: index, largest: largest, l: l, r: r });
+      }
+    }
+
+    snap('build', "<strong>Phase 1 &mdash; build the max-heap.</strong> " +
+      "Every parent, from the last one backwards to the root, gets sunk into place. " +
+      "This phase does no sorting at all: it rearranges the array into a tree shape. " +
+      "<strong>It is also where most of the damage to the finish-time order is done.</strong>",
+      { heapSize: N_, sortedFrom: N_,
+        phase: { cls: 'build', strong: 'Phase 1', span: 'build the max-heap' } });
+
+    for (var i = (N_ >> 1) - 1; i >= 0; --i) {
+      snap('bloop', "<strong>i = " + i + "</strong> &mdash; the loop calls <code>heapify_down(data, " + N_ + ", " + i + ")</code>. " +
+        "It runs <strong>backwards</strong> because <code>heapify_down</code> assumes the subtrees below a node are " +
+        "already heaps, and only bottom-up guarantees that.",
+        { heapSize: N_, sortedFrom: N_, node: i,
+          locals: [{ n: 'i', v: i }, { n: 'n', v: N_ }],
+          calc: "i = " + i + "   →   heapify_down(data, heap_size = " + N_ + ", index = " + i + ")",
+          phase: { cls: 'build', strong: 'Phase 1', span: 'build the max-heap' } });
+      heapify(N_, i, 0);
+    }
+
+    snap('extr', "<strong>The heap is built.</strong> The largest key is at the root, and the array no longer " +
+      "resembles the order it came in. Nothing is sorted yet &mdash; phase 2 is what sorts.",
+      { heapSize: N_, sortedFrom: N_,
+        phase: { cls: 'extract', strong: 'Phase 2', span: 'swap the max out, shrink, repair' } });
+
+    for (var e = N_ - 1; e > 0; --e) {
+      var rootName = a[0].name, tailName = a[e].name;
+      var res2 = swapAt(0, e);
+      var m2 = "<strong>" + rootName + " (" + a[e].grp + "s) is the largest key left, so it belongs at data[" + e +
+        "].</strong> Swap it with " + tailName + ", then shrink the heap to " + e + " so nothing can pull it back in.";
+      if (res2.broke) {
+        m2 += " <strong style=\"color:#c0392b\">This swap also broke a tie</strong> &mdash; " + tailName +
+          " was flung from the end of the array to the root, past runners in its own age group.";
+        breaks.push(frames.length);
+      }
+      snap('eswap', m2,
+        { heapSize: e, sortedFrom: e, swapped: [0, e], tiebreak: res2.broke,
+          locals: [{ n: 'i', v: e }],
+          calc: "swap(data[0], data[" + e + "])   →   " + rootName + " is final at " + e +
+                ",  heap shrinks to 0.." + (e - 1),
+          phase: { cls: 'extract', strong: 'Phase 2', span: 'sorted tail: ' + (N_ - e) + ' of ' + N_ } });
+      if (e > 1) {
+        snap('erep', "<code>heapify_down(data, " + e + ", 0)</code> &mdash; repair the heap with the shrunken size. " +
+          "<strong>" + e + ", not " + N_ + "</strong>: that argument is the entire boundary between the heap and the sorted tail.",
+          { heapSize: e, sortedFrom: e, node: 0,
+            calc: "heapify_down(data, heap_size = " + e + ", index = 0)   —   the heap is now 0.." + (e - 1),
+            phase: { cls: 'extract', strong: 'Phase 2', span: 'sorted tail: ' + (N_ - e) + ' of ' + N_ } });
+        heapify(e, 0, 1);
+      }
+    }
+
+    snap('send', "<strong>Done &mdash; and the age groups are perfectly correct.</strong> " +
+      "Heap sort did its job: every 20s runner comes before every 30s runner, every 30s before every 40s. " +
+      "<strong>But look inside a group.</strong> The finish-time order that was there when we started is gone, " +
+      "and no step ever set out to destroy it &mdash; it was destroyed by swaps chosen on index arithmetic.",
+      { heapSize: 0, sortedFrom: 0, final: true,
+        phase: { cls: 'done', strong: 'Finished', span: 'sorted by age group — and not stable' } });
+
+    return { frames: frames, result: a.slice(), breaks: breaks };
+  }
+
+  var MERGE = recordMerge();
+  var HEAP = recordHeap();
+
+  // =========================================================================
+  // Rendering
+  // =========================================================================
+  function cellHTML(r, cls, opts) {
+    opts = opts || {};
+    var c = ['cell', 'g' + r.grp];
+    if (cls) c.push(cls);
+    return '<div class="' + c.join(' ') + '">' +
+      '<span class="grp">' + r.grp + 's</span>' +
+      '<span class="nm2">' + r.name + '</span>' +
+      (opts.noTime ? '' : '<span class="tm">' + r.time + '</span>') +
+      '<span class="ix">was #' + (r.ix + 1) + '</span>' +
+      '</div>';
+  }
+
+  function arrayRow(arr, f, opts) {
+    opts = opts || {};
+    var bad = badSet(arr);
+    var out = '<div class="cells' + (opts.small ? ' small' : '') + '">';
+    for (var x = 0; x < arr.length; x++) {
+      var cls = [];
+      if (f) {
+        if (f.seg && (x < f.seg[0] || x > f.seg[1])) cls.push('outside');
+        // Not on the last frame: everything is sorted there, and painting the
+        // whole row green would hide the age-group colours in the one shot
+        // that exists to show them.
+        if (!f.final && f.sortedFrom !== undefined && x >= f.sortedFrom && f.heapSize !== undefined) cls.push('sorted');
+        if (f.wrote === x) cls.push('moved');
+        if (f.swapped && (f.swapped[0] === x || f.swapped[1] === x)) cls.push('moved');
+        if (f.node === x) cls.push('node');
+        if (f.largest === x && f.largest !== f.node) cls.push('largest');
+      }
+      if (bad[arr[x].name]) cls.push('badorder');
+      out += cellHTML(arr[x], cls.join(' '), opts);
+    }
+    return out + '</div>';
+  }
+
+  function stabHTML(arr, mode) {
+    var pairs = invPairs(arr);
+    var html = '<div class="stab' + (pairs.length ? ' broken' : '') + '">' +
+      '<h4>Age-group ties out of finish-time order: <span class="big">' + pairs.length + '</span></h4>';
+    if (pairs.length) {
+      html += '<div class="pairs">' + pairs.slice(0, 6).map(function (p) {
+        return '<code>' + p[0].name + ' (' + p[0].time + ')</code> now sits before <code>' +
+          p[1].name + ' (' + p[1].time + ')</code>';
+      }).join('<br>') + (pairs.length > 6 ? '<br>&hellip; and ' + (pairs.length - 6) + ' more' : '') + '</div>';
+    } else {
+      html += '<div class="pairs">Every pair of runners in the same age group is still in the order they finished.</div>';
+    }
+    html += '<div class="why">' + (mode === 'merge'
+      ? 'This counter reads 0 at every single step of merge sort &mdash; not just at the end. Nothing is ever written past an equal key.'
+      : 'Counted over the whole array. Mid-run the array is a tree rather than a list, but the transpositions are permanent: once two equal keys cross, no later step puts them back.') +
+      '</div></div>';
+    return html;
+  }
+
+  function groupsHTML(arr) {
+    var html = '<div class="groups">';
+    GROUPS.forEach(function (g) {
+      var mem = arr.filter(function (r) { return r.grp === g; });
+      var ok = true;
+      for (var x = 1; x < mem.length; x++) if (mem[x - 1].ix > mem[x].ix) ok = false;
+      html += '<div class="grow ' + (ok ? 'ok' : 'bad') + '">' +
+        '<span class="gname">' + g + 's</span>' +
+        '<span class="gseq">' + mem.map(function (r) { return r.time; }).join('  →  ') + '</span>' +
+        '<span class="gverd">' + (ok ? '✔ still in finish order' : '✖ scrambled') + '</span>' +
+        '</div>';
+    });
+    return html + '</div>';
+  }
+
+  function tempsHTML(f) {
+    if (!f.L) return '';
+    function half(label, arr, cur) {
+      var out = '<div class="trow"><span class="tname">' + label + '</span><div class="cells small">';
+      for (var x = 0; x < arr.length; x++) {
+        out += cellHTML(arr[x], (x < cur ? 'used' : (x === cur ? 'cursor' : '')), { noTime: false });
+      }
+      return out + '</div></div>';
+    }
+    return '<div class="temps">' + half('L[]', f.L, f.i) + half('R[]', f.R, f.j) + '</div>';
+  }
+
+  function treeHTML(f) {
+    var arr = f.arr, size = f.heapSize === undefined ? arr.length : f.heapSize;
+    var W = 880, H = 320, R = 25;   // 320, not 300: level 3 sits at y=276 and the circle is r=25
+    function pos(ix) {
+      var lvl = Math.floor(Math.log(ix + 1) / Math.LN2);
+      var slot = ix - (Math.pow(2, lvl) - 1);
+      return { x: W * (slot + 0.5) / Math.pow(2, lvl), y: 42 + lvl * 78 };
+    }
+    var svg = '<svg class="tree" viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
+      'aria-label="The array drawn as a binary heap. Each node shows an age group and a runner name; ' +
+      'nodes outside the current heap size are the sorted tail and are drawn in green.">';
+    for (var i = 1; i < arr.length; i++) {
+      var p = pos((i - 1) >> 1), c = pos(i);
+      var out = (i >= size);
+      svg += '<line x1="' + p.x + '" y1="' + p.y + '" x2="' + c.x + '" y2="' + c.y + '" ' +
+        'stroke="' + (out ? '#1c7e45' : '#d8dee6') + '" stroke-width="2"' +
+        (out ? ' stroke-dasharray="4 3"' : '') + '/>';
+    }
+    for (var j2 = 0; j2 < arr.length; j2++) {
+      var q = pos(j2), r = arr[j2], outside = (j2 >= size);
+      var stroke = outside ? '#1c7e45'
+        : (f.largest === j2 && f.largest !== f.node) ? '#a95c19'
+        : (f.node === j2) ? '#8e44ad'
+        : (f.swapped && (f.swapped[0] === j2 || f.swapped[1] === j2)) ? '#c0392b' : '#6e6e6e';
+      var fill = outside ? '#f2fbf4' : '#fff';
+      svg += '<circle cx="' + q.x + '" cy="' + q.y + '" r="' + R + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="3"/>' +
+        '<text x="' + q.x + '" y="' + (q.y + 2) + '" text-anchor="middle" font-size="15" fill="#2c3e50">' + r.grp + 's</text>' +
+        '<text x="' + q.x + '" y="' + (q.y + 17) + '" text-anchor="middle" font-size="11" fill="#6e6e6e">' + r.name + '</text>' +
+        '<text x="' + q.x + '" y="' + (q.y - R - 5) + '" text-anchor="middle" font-size="10" font-weight="400" fill="#aab2bd">[' + j2 + ']</text>';
+    }
+    return svg + '</svg><p class="treecap">The same array, drawn as the tree the index arithmetic implies: ' +
+      'children of <code>i</code> are <code>2i+1</code> and <code>2i+2</code>. Green nodes are the sorted tail, ' +
+      'already outside <code>heap_size</code>.</p>';
+  }
+
+  function codeHTML(mode, f) {
+    var lines = CODE[mode], out = '<div class="code">', inserted = false;
+    var lastActive = -1;
+    for (var i = 0; i < lines.length; i++) if (lines[i].k === f.line) lastActive = i;
+    for (var x = 0; x < lines.length; x++) {
+      var ln = lines[x], act = (ln.k === f.line);
+      out += '<div class="' + (act ? 'active ' : '') + (ln.c ? 'cont' : '') + '" data-k="' + ln.k + '">' +
+        (ln.t === '' ? ' ' : ln.t) + '</div>';
+      if (x === lastActive && f.calc && !inserted) {
+        inserted = true;
+        out += '<div class="calc"><span class="cv">' + f.calc + '</span></div>';
+      }
+    }
+    return out + '</div>';
+  }
+
+  function localsHTML(f) {
+    if (!f.locals || !f.locals.length) return '';
+    var out = '<div class="locals"><div><h5>Locals</h5>';
+    f.locals.forEach(function (v) {
+      out += '<div class="lv"><span class="ln">' + v.n + '</span><span class="lval">' + v.v + '</span>' +
+        (v.at ? '<span class="lat">' + v.at + '</span>' : '') + '</div>';
+    });
+    return out + '</div></div>';
+  }
+
+  var LEGEND = '<div class="legend">' +
+    '<span><i class="sw g20"></i>20s</span>' +
+    '<span><i class="sw g30"></i>30s</span>' +
+    '<span><i class="sw g40"></i>40s</span>' +
+    '<span>&#10006; on a card = this runner is now ahead of someone from the same age group who finished earlier</span>' +
+    '<span>&ldquo;was #n&rdquo; = position in the original finish-time order</span>' +
+    '</div>';
+
+  // =========================================================================
+  // Static tabs: the setup, and the verdict
+  // =========================================================================
+  function setupHTML() {
+    var rows = RUNNERS.map(function (r) {
+      return '<tr><td class="num">' + (r.ix + 1) + '</td><td>' + r.name + '</td>' +
+        '<td class="num mono">' + r.time + '</td><td class="num mono">' + r.grp + 's</td></tr>';
+    }).join('');
+
+    return '' +
+      '<div class="qbox">' +
+      '<h3>The question on the board</h3>' +
+      '<p>Your Lab 6 race results are already sorted by <strong>finish time</strong>. You now need them ' +
+      'grouped by <strong>age group</strong> &mdash; and within each age group, the runners should still ' +
+      'appear in finish-time order.</p>' +
+      '<p>Merge sort and heap sort are both available, and both are O(n log n) in the worst case. ' +
+      '<strong>Which one can you use for this second sort, and why?</strong></p>' +
+      '</div>' +
+
+      '<div class="solo">' +
+      '<div class="col">' +
+      '<div class="card"><h2>The eight runners, in finish-time order</h2><div class="card-body">' +
+      '<table><thead><tr><th>#</th><th>Runner</th><th>Finish</th><th>Age group</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table>' +
+      '<p class="codenote" style="margin-top:.7rem"><b>The key we sort on is the age group.</b> ' +
+      'Three distinct values across eight runners, so there are a lot of ties &mdash; which is exactly when ' +
+      'stability stops being trivia.</p>' +
+      '</div></div>' +
+
+      '<div class="card"><h2>What a stable sort has to produce</h2><div class="card-body">' +
+      arrayRow(STABLE, null) +
+      groupsHTML(STABLE) +
+      '<p class="codenote" style="margin-top:.7rem">Age groups in order, and inside each one the ' +
+      'finish times still climbing. <b>The second sort is never told that finish time exists</b> &mdash; ' +
+      'it only reads <code>.age_group</code>. Stability is the only thing that can carry the first sort through ' +
+      'the second one.</p>' +
+      '</div></div>' +
+      '</div>' +
+
+      '<div class="col">' +
+      '<div class="card"><h2>What the two algorithms promise</h2><div class="card-body">' +
+      '<table><thead><tr><th>&nbsp;</th><th>Merge sort</th><th>Heap sort</th></tr></thead><tbody>' +
+      '<tr><td>Worst case</td><td class="mono">O(n log n)</td><td class="mono">O(n log n)</td></tr>' +
+      '<tr><td>Best case</td><td class="mono">O(n log n)</td><td class="mono">O(n log n)</td></tr>' +
+      '<tr><td>Extra space</td><td class="mono">O(n)</td><td class="mono">O(1) &mdash; in place</td></tr>' +
+      '<tr><td><strong>Stable</strong></td><td class="yes">Yes</td><td class="no">No</td></tr>' +
+      '</tbody></table>' +
+      '<div class="callout">Three of those four rows say the two algorithms are interchangeable. ' +
+      '<strong>The fourth row is the answer.</strong> Big O describes how long a sort takes; it says nothing ' +
+      'about what order it leaves equal keys in. Those are separate columns and you have to read both.</div>' +
+      '</div></div>' +
+
+      '<div class="card"><h2>Where the difference actually lives</h2><div class="card-body">' +
+      '<div class="facts">' +
+      '<div class="fact"><span class="fl">Merge sort</span><span class="fv good">L[i] &lt;= R[j]</span>' +
+      '<span class="fnote">One <code>=</code> in one comparison. On a tie it takes from the <em>left</em> half &mdash; ' +
+      'the part that came first &mdash; so equal keys can never cross.</span></div>' +
+      '<div class="fact"><span class="fl">Heap sort</span><span class="fv bad">swap(data[i], data[largest])</span>' +
+      '<span class="fnote">Swaps chosen by <em>index arithmetic</em> &mdash; parent and child, root and tail. ' +
+      'Those two positions can be the whole length of the array apart, and nothing involved knows which runner arrived first.</span></div>' +
+      '</div>' +
+      '<p class="codenote" style="margin-top:.8rem"><b>Both tabs sort the same eight runners by the same key.</b> ' +
+      'Step them and watch the counter marked <em>&ldquo;ties out of finish-time order&rdquo;</em>. ' +
+      'For merge sort it never leaves 0. For heap sort, watch when it first moves &mdash; it happens while ' +
+      'the heap is still being <em>built</em>, before a single element has been sorted.</p>' +
+      '</div></div>' +
+      '</div></div>';
+  }
+
+  function verdictHTML() {
+    var mi = invPairs(MERGE.result), hi = invPairs(HEAP.result);
+    return '' +
+      '<div class="solo">' +
+      '<div class="col">' +
+      '<div class="card"><h2>Merge sort &mdash; the answer</h2><div class="card-body">' +
+      arrayRow(MERGE.result, null) + groupsHTML(MERGE.result) + stabHTML(MERGE.result, 'merge') +
+      '<p class="codenote" style="margin-top:.7rem">' + MERGE.ties + ' of the comparisons in this run were ' +
+      '<b>ties</b> &mdash; two runners in the same age group. All ' + MERGE.tiesLeft + ' of them were resolved by ' +
+      'taking from the left half, which is what <code>&lt;=</code> does.</p>' +
+      '</div></div>' +
+      '</div>' +
+
+      '<div class="col">' +
+      '<div class="card"><h2>Heap sort &mdash; correct, and still wrong for this job</h2><div class="card-body">' +
+      arrayRow(HEAP.result, null) + groupsHTML(HEAP.result) + stabHTML(HEAP.result, 'heap') +
+      '<p class="codenote" style="margin-top:.7rem"><b>Every age group is in the right place.</b> ' +
+      'Heap sort is not broken and it did not fail &mdash; it sorted by the key it was given. ' +
+      'It simply makes no promise about the runners it considers equal, and ' + hi.length +
+      ' pairs took it up on that.</p>' +
+      '</div></div>' +
+      '</div></div>' +
+
+      '<div class="card" style="margin-top:1.1rem"><h2>The four answers on the quiz</h2><div class="card-body">' +
+      '<ul class="answers">' +
+      '<li class="right"><b>Merge sort &mdash; it is stable, so runners in the same age group stay in the ' +
+      'finish-time order they had.</b><span class="rb">Sort by the secondary key first, then by the primary key ' +
+      'with a stable sort. That is how multi-key sorting is normally built, and it is why <code>std::stable_sort</code> ' +
+      'exists as a separate function from <code>std::sort</code>.</span></li>' +
+      '<li class="wrong"><b>Heap sort &mdash; it sorts in place in O(1) space, and merge sort&rsquo;s scratch array ' +
+      'would disturb the order.</b><span class="rb">This inverts the trade-off. The O(1) space is real, but the ' +
+      'in-place algorithm is the unstable one &mdash; being in place is <em>why</em>: with nowhere to copy to, it has to ' +
+      'move elements by swapping them past each other. Merge sort&rsquo;s scratch array disturbs nothing; it is what ' +
+      'lets the two candidates sit still while <code>&lt;=</code> chooses between them.</span></li>' +
+      '<li class="wrong"><b>Either one &mdash; both are O(n log n) in the worst case, so both leave equal elements ' +
+      'in the same place.</b><span class="rb">The instinct this question exists to break. Both tabs here are ' +
+      'O(n log n) on the same eight elements and they disagree about this array. Complexity and stability are ' +
+      'different properties.</span></li>' +
+      '<li class="wrong"><b>Either one, as long as you sort by age group first and then re-sort by finish time.</b>' +
+      '<span class="rb">That order throws the grouping away. Whichever key you sort by <em>last</em> becomes the ' +
+      'primary key, so finishing with a finish-time sort gives you one flat time-ordered list with the age groups ' +
+      'scattered through it.</span></li>' +
+      '</ul>' +
+      '<div class="callout good" style="margin-top:.9rem"><strong>The one sentence to leave with:</strong> ' +
+      'a stable sort is the only kind you can stack. Sort by the thing you want as a tie-breaker first, then by ' +
+      'the thing you want to group by &mdash; and the second sort will preserve the first for free, provided it is stable.</div>' +
+      '<div class="callout warn"><strong>And the practical version:</strong> when the key you sort on has ties, ' +
+      'check the stability column before you pick the algorithm. In the standard library that means ' +
+      '<code>std::stable_sort</code> rather than <code>std::sort</code> &mdash; and it is the same reason radix sort has ' +
+      'to use a stable counting sort on each digit, which is CT 15.</div>' +
+      '</div></div>' +
+
+      '<p class="legend" style="margin-top:1rem">Merge result: <span class="mono">' + names(MERGE.result).split(',').join(' ') +
+      '</span> &nbsp;&middot;&nbsp; Heap result: <span class="mono">' + names(HEAP.result).split(',').join(' ') + '</span></p>';
+  }
+
+  // =========================================================================
+  // Stage: the two stepping tabs
+  // =========================================================================
+  function stepHTML(mode, f) {
+    var isMerge = (mode === 'merge');
+    var ph = f.phase || { cls: '', strong: isMerge ? 'Merge sort' : 'Heap sort', span: '' };
+    var out = '<div class="banner ' + ph.cls + '"><strong>' + ph.strong + '</strong><span>' + (ph.span || '') + '</span></div>';
+
+    out += '<div class="solo"><div class="col">';
+    out += '<div class="card"><h2>' + (isMerge ? 'data[] &mdash; the array being merged into' : 'data[] &mdash; sorted in place') + '</h2><div class="card-body">';
+    out += '<div class="beforerow"><span class="rowlbl">started</span>' + arrayRow(RUNNERS, null, { small: true }) + '</div>';
+    out += '<div class="beforerow"><span class="rowlbl">now</span></div>';
+    out += arrayRow(f.arr, f);
+    if (isMerge) out += tempsHTML(f);
+    out += localsHTML(f);
+    out += stabHTML(f.arr, mode);
+    out += groupsHTML(f.arr);
+    out += LEGEND;
+    out += '</div></div>';
+    if (!isMerge) {
+      out += '<div class="card"><h2>The same array as a heap</h2><div class="card-body">' + treeHTML(f) + '</div></div>';
+    }
+    out += '</div><div class="col">';
+    out += '<div class="card"><h2>' + (isMerge ? 'merge_sort &mdash; the stable one' : 'heap_sort &mdash; the unstable one') + '</h2><div class="card-body">';
+    out += '<p class="codenote">' + (isMerge
+      ? 'The same <code>merge_sort</code> you wrote in CT 14, with the comparison reading <code>.age_group</code> instead of comparing bare <code>int</code>s. <b>One character &mdash; the <code>=</code> in <code>&lt;=</code> &mdash; is the whole of its stability.</b>'
+      : 'The same <code>heap_sort</code> you wrote in CT 14, with the comparisons reading <code>.age_group</code>. <b>Nothing in it is wrong.</b> It just moves elements by swapping across distances, and that is incompatible with keeping equal keys in order.') + '</p>';
+    out += codeHTML(mode, f);
+    out += '<p class="note">' + f.msg + '</p>';
+    out += '</div></div></div></div>';
+    return out;
+  }
+
+  // =========================================================================
+  // Wiring
+  // =========================================================================
+  var TABS = [
+    { mode: 'setup',   label: 'The setup' },
+    { mode: 'merge',   label: 'Merge sort — stable' },
+    { mode: 'heap',    label: 'Heap sort — not stable' },
+    { mode: 'verdict', label: 'Side by side' }
+  ];
+  var HOWTO = {
+    merge: { lead: 'Merge sort, sorting the eight runners by age group. Watch the counter under the array: it reads 0 now and it will read 0 at every step.',
+      steps: [['Split, blindly', ['the array is halved at the midpoint', 'no comparisons happen on the way down', 'all the work is in <code>merge</code> on the way back up']],
+              ['Merge, with one <code>=</code>', ['two sorted halves become one', 'on a tie the <code>&lt;=</code> takes from <strong>L</strong>', 'L is the half that came first in the array']],
+              ['Press "Next tie"', ['jumps straight to the next tied comparison', 'seven of them in this run', 'every one resolves the same way']]] },
+    heap: { lead: 'Heap sort, same eight runners, same key. The age groups will come out perfectly correct. Watch what happens to the finish times inside them.',
+      steps: [['Phase 1: build', ['every parent is sunk into place, last to first', 'nothing is sorted yet &mdash; this is reshaping', '<strong>the first tie breaks here</strong>, before any sorting']],
+              ['Phase 2: extract', ['root swaps with the last heap slot', 'that is a jump the length of the array', 'the heap shrinks, the sorted tail grows']],
+              ['Press "Next broken tie"', ['jumps to the next swap that crosses two equal keys', 'the message names the two runners', 'nothing in the code intended it']]] }
+  };
+
+  var tabsEl = document.getElementById('tabs'),
+      howtoEl = document.getElementById('howto'),
+      stageEl = document.getElementById('stage'),
+      ctlEl = document.getElementById('controls'),
+      cntEl = document.getElementById('frameCount'),
+      jumpEl = document.getElementById('jump'),
+      playEl = document.getElementById('play');
+
+  var mode = 'setup', idx = 0, timer = null;
+
+  TABS.forEach(function (t) {
+    var b = document.createElement('button');
+    b.textContent = t.label;
+    b.setAttribute('data-mode', t.mode);
+    b.onclick = function () { go(t.mode); };
+    tabsEl.appendChild(b);
+  });
+  var sp = document.createElement('span'); sp.className = 'spacer'; tabsEl.appendChild(sp);
+  var sh = document.createElement('span'); sh.className = 'step-hint';
+  sh.innerHTML = 'eight runners &middot; one key &middot; two algorithms';
+  tabsEl.appendChild(sh);
+
+  function frames() { return mode === 'merge' ? MERGE.frames : HEAP.frames; }
+
+  function howtoBox() {
+    var h = HOWTO[mode];
+    if (!h) { howtoEl.innerHTML = ''; return; }
+    var out = '<div class="panel howto"><p class="lead">' + h.lead + '</p><div class="howto-steps">';
+    h.steps.forEach(function (s, i) {
+      out += '<div class="hstep"><h4><span class="hnum">' + (i + 1) + '</span>' + s[0] + '</h4><ul>' +
+        s[1].map(function (li) { return '<li>' + li + '</li>'; }).join('') + '</ul></div>';
+    });
+    howtoEl.innerHTML = out + '</div></div>';
+  }
+
+  function render() {
+    Array.prototype.forEach.call(tabsEl.querySelectorAll('button'), function (b) {
+      b.classList.toggle('on', b.getAttribute('data-mode') === mode);
+    });
+    howtoBox();
+    if (mode === 'setup') { ctlEl.hidden = true; stageEl.innerHTML = setupHTML(); return; }
+    if (mode === 'verdict') { ctlEl.hidden = true; stageEl.innerHTML = verdictHTML(); return; }
+    ctlEl.hidden = false;
+    var fs = frames();
+    if (idx < 0) idx = 0;
+    if (idx >= fs.length) idx = fs.length - 1;
+    var f = fs[idx];
+    stageEl.innerHTML = stepHTML(mode, f);
+    cntEl.textContent = 'step ' + (idx + 1) + ' of ' + fs.length;
+    jumpEl.textContent = (mode === 'merge' ? 'Next tie »»' : 'Next broken tie »»');
+    document.getElementById('prev').disabled = (idx === 0);
+    document.getElementById('first').disabled = (idx === 0);
+    document.getElementById('next').disabled = (idx === fs.length - 1);
+    document.getElementById('last').disabled = (idx === fs.length - 1);
+    Array.prototype.forEach.call(stageEl.querySelectorAll('.code div[data-k]'), function (d) {
+      d.onclick = function () {
+        var k = d.getAttribute('data-k');
+        for (var x = idx + 1; x < fs.length; x++) if (fs[x].line === k) { idx = x; render(); return; }
+        for (var y = 0; y < fs.length; y++) if (fs[y].line === k) { idx = y; render(); return; }
+      };
+    });
+  }
+
+  function go(m) { stop(); mode = m; idx = 0; if (location.hash !== '#' + m) history.replaceState(null, '', '#' + m); render(); }
+  function step(d) { stop(); idx += d; render(); }
+  function stop() { if (timer) { clearInterval(timer); timer = null; playEl.innerHTML = '&#9654; Play'; } }
+
+  document.getElementById('first').onclick = function () { stop(); idx = 0; render(); };
+  document.getElementById('last').onclick = function () { stop(); idx = frames().length - 1; render(); };
+  document.getElementById('prev').onclick = function () { step(-1); };
+  document.getElementById('next').onclick = function () { step(1); };
+  playEl.onclick = function () {
+    if (timer) { stop(); return; }
+    playEl.innerHTML = '&#10073;&#10073; Pause';
+    timer = setInterval(function () {
+      if (idx >= frames().length - 1) { stop(); return; }
+      idx++; render();
+    }, 850);
+  };
+  jumpEl.onclick = function () {
+    stop();
+    var fs = frames(), hit = -1;
+    for (var x = idx + 1; x < fs.length; x++) {
+      if (mode === 'merge' ? fs[x].tie : fs[x].tiebreak) { hit = x; break; }
+    }
+    if (hit < 0) for (var y = 0; y < fs.length; y++) {
+      if (mode === 'merge' ? fs[y].tie : fs[y].tiebreak) { hit = y; break; }
+    }
+    if (hit >= 0) { idx = hit; render(); }
+  };
+
+  document.addEventListener('keydown', function (e) {
+    if (mode === 'setup' || mode === 'verdict') return;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); step(1); }
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); step(-1); }
+    else if (e.key === ' ') { e.preventDefault(); playEl.onclick(); }
+    else if (e.key === 'Home') { e.preventDefault(); stop(); idx = 0; render(); }
+    else if (e.key === 'End') { e.preventDefault(); stop(); idx = frames().length - 1; render(); }
+  });
+  window.addEventListener('hashchange', function () {
+    var m = location.hash.replace('#', '');
+    if (HOWTO[m] || m === 'setup' || m === 'verdict') go(m);
+  });
+
+  // =========================================================================
+  // Self-test: the claims this page makes, checked against what it just ran.
+  // =========================================================================
+  (function selftest() {
+    var t = [], pass = true;
+    function ck(ok, msg) { t.push((ok ? '✔ ' : '✖ ') + msg); if (!ok) pass = false; }
+
+    ck(names(MERGE.result) === names(STABLE),
+      'merge sort produced the stable order exactly: ' + names(STABLE).split(',').join(' '));
+    ck(invPairs(MERGE.result).length === 0, 'merge sort finished with 0 ties out of finish-time order');
+    ck(MERGE.worst === 0, 'merge sort never had a tie out of order at ANY of its ' + MERGE.frames.length + ' steps');
+    ck(MERGE.ties === MERGE.tiesLeft, 'all ' + MERGE.ties + ' tied comparisons were resolved from the left half');
+    ck(groupedOk(HEAP.result), 'heap sort sorted the age groups correctly (it is not broken)');
+    ck(invPairs(HEAP.result).length > 0,
+      'heap sort finished with ' + invPairs(HEAP.result).length + ' ties out of finish-time order');
+    ck(HEAP.breaks.length > 0, HEAP.breaks.length + ' individual swaps in heap sort each broke at least one tie');
+    ck(groupedOk(MERGE.result), 'merge sort also sorted the age groups correctly');
+
+    var el = document.getElementById('selftest');
+    el.className = 'selftest ' + (pass ? 'pass' : 'fail');
+    el.innerHTML = '<b>' + (pass ? 'Self-test passed' : 'SELF-TEST FAILED') + '</b> &mdash; ' + t.join(' &nbsp;&middot;&nbsp; ');
+  })();
+
+  var start = location.hash.replace('#', '');
+  go((HOWTO[start] || start === 'setup' || start === 'verdict') ? start : 'setup');
+})();
+</script>
+</body>
+</html>

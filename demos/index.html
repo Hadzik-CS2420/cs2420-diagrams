@@ -11,6 +11,7 @@
     --tint-green:#f2fbf4; --tint-blue:#eaf2f8; --tint-purple:#ede7f6;
     --tint-teal:#e0f2f1;
       --tint-orange:#fff3e0;
+      --tint-red:#fce4ec;
   }
   * { box-sizing:border-box; }
   body { margin:0; padding:2rem 1.25rem 3rem;
@@ -34,6 +35,7 @@
   .card.d h2 { background:var(--tint-teal); }
     .card.e h2 { background:var(--tint-orange); }
     .card.f h2 { background:#eaf2f8; }
+    .card.g h2 { background:var(--tint-red); }
   .card .body { padding:.9rem 1rem 1.1rem; flex:1; display:flex; flex-direction:column; }
   .card p { margin:0 0 .75rem; font-size:.93rem; }
   .card ul { margin:0 0 1rem; padding-left:1.15rem; font-size:.88rem; color:var(--muted); }
@@ -66,7 +68,7 @@
 </header>
 
 <div class="lede">
-  <p><strong>Nothing to install.</strong> Click any of the four below and it runs in this browser
+  <p><strong>Nothing to install.</strong> Click any of the seven below and it runs in this browser
   — no account, no download, no setup. Each one is a single self-contained page.</p>
   <p>These were built to solve a specific classroom problem. A sorting algorithm is a process that
   unfolds over time, and a textbook can only show you single frozen frames of it. Each stepper
@@ -168,6 +170,26 @@
           <li>Both walks side by side on the same graph, step for step</li>
         </ul>
         <a class="open" href="graphs-bfs-dfs.html">Open the stepper</a>
+      </div>
+    </div>
+
+    <div class="card g">
+      <h2>Stability &mdash; Merge vs Heap</h2>
+      <div class="body">
+        <p>Eight race results, already in finish-time order, sorted again by age group. Merge sort
+        and heap sort both do it correctly in O(n log n) &mdash; and only one of them leaves the
+        finish times alone.</p>
+        <ul>
+          <li>A live counter of every pair of equal-key runners now out of their original order:
+              <strong>0 at every step of merge sort</strong>, climbing in heap sort</li>
+          <li>The <code>&lt;=</code> in <code>L[i] &lt;= R[j]</code> caught in the act &mdash; seven
+              tied comparisons, every one resolved from the left half</li>
+          <li><strong>Next broken tie</strong> jumps to the exact swap that crosses two equal keys,
+              and names the two runners it just transposed</li>
+          <li>Heap sort's damage starts while the heap is still being <em>built</em>, before a single
+              element has been sorted</li>
+        </ul>
+        <a class="open" href="stability-merge-vs-heap.html">Open the stepper</a>
       </div>
     </div>
 
