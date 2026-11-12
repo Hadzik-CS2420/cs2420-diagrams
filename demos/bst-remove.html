@@ -95,6 +95,10 @@
   .goal code { font-family:Consolas,monospace; font-size:.93em; }
   .goal .tag { display:inline-block; font-size:.62rem; font-weight:800;
                letter-spacing:.09em; color:var(--deep); margin-right:.5rem; }
+  .goal .goalhead { margin:0 0 .4rem; font-weight:600; }
+  .goal ul { margin:0; padding-left:1.2rem; }
+  .goal li { margin-bottom:.25rem; }
+  .goal li:last-child { margin-bottom:0; }
   /* Below 1380 the rail cannot hold its own column, so it spans underneath
      instead -- still small, and still never above the tree. */
   @media (max-width:1380px) { .solo { grid-template-columns:1.05fr .95fr; }
@@ -1429,26 +1433,35 @@ function soloTitle() {
 function goalHtml(key) {
   if (key !== "findmin") return "";
   var root = state.tree, start = root && root.r;
+  var box = function (head, items) {
+    return '<div class="goal"><p class="goalhead"><span class="tag">GOAL</span>' + head + "</p>" +
+           "<ul>" + items.map(function (i) { return "<li>" + i + "</li>"; }).join("") + "</ul></div>";
+  };
+
   if (!root || !start)
-    return '<div class="goal"><span class="tag">GOAL</span>' +
-           "This tree's root has no right subtree to search, so the walk runs from the root " +
-           "and finds the minimum of the whole tree.</div>";
+    return box("Finding the minimum of the whole tree", [
+      "This tree's root has no right subtree to search",
+      "So the walk runs from the root, and the value it returns is the smallest in the tree"
+    ]);
 
   if (twoKids(root))
-    return '<div class="goal"><span class="tag">GOAL</span>' +
-      "We are removing <b>" + root.v + "</b>. It has two children, so it cannot just be " +
-      "unlinked &mdash; <code>remove_</code> first needs " + root.v + "'s <b>successor</b>, the " +
-      "smallest value in its <b>right</b> subtree. Finding it is this function. " +
-      "The walk therefore starts at <b>" + start.v + "</b>, " + root.v + "'s right child &mdash; " +
-      "not at " + root.v + ", and never to the left. " +
-      "<em>Starting at " + root.v + " would walk left instead and return the smallest value in " +
-      "the whole tree, which cannot replace " + root.v + " without breaking the ordering.</em></div>";
+    return box("We are removing <b>" + root.v + "</b> &mdash; this is the search for its successor", [
+      "<b>" + root.v + "</b> has two children, so it cannot just be unlinked",
+      "<code>remove_</code> needs " + root.v + "'s <b>successor</b> first &mdash; the smallest " +
+        "value in its <b>right</b> subtree",
+      "Finding that value is this function, so the walk starts at <b>" + start.v + "</b>, " +
+        root.v + "'s right child &mdash; never to the left",
+      "Starting at " + root.v + " instead would walk <em>left</em> and return the smallest value " +
+        "in the whole tree, which cannot replace " + root.v + " without breaking the ordering"
+    ]);
 
-  return '<div class="goal"><span class="tag">GOAL</span>' +
+  return box("<code>find_min_</code> on its own &mdash; this tree has no two-child root", [
     "<code>find_min_</code> is the helper <code>remove_</code> uses when the node being removed " +
-    "has <b>two</b> children. This tree's root (" + root.v + ") has only a right child, so " +
-    "removing it would never need a successor. The walk below runs the same search over the " +
-    "right subtree, starting at <b>" + start.v + "</b>.</div>";
+      "has <b>two</b> children",
+    "This tree's root (" + root.v + ") has only a right child, so removing it would never need " +
+      "a successor",
+    "The walk below runs the same search over the right subtree, starting at <b>" + start.v + "</b>"
+  ]);
 }
 
 function soloHtml(f, key, title) {
