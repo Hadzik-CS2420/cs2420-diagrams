@@ -1,0 +1,1770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CT 17 Stepper — find_min and the three remove cases</title>
+<style>
+  :root {
+    --ink:#2c3e50; --muted:#6e6e6e; --rule:#d8dee6;
+    --green:#1c7e45; --blue:#2573a7; --orange:#a95c19;
+    --red:#c0392b; --purple:#8e44ad; --deep:#4527a0; --teal:#00695c;
+    --tint-green:#f2fbf4; --tint-blue:#eaf2f8; --tint-orange:#fff3e0;
+    --tint-red:#fce4ec; --tint-purple:#ede7f6; --tint-teal:#e0f2f1;
+    --code-bg:#1e1e2e; --code-fg:#cdd6f4; --code-dim:#9399b2; --code-hit:#45475a;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:1.5rem 1.25rem 3rem;
+         font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+         color:var(--ink); background:#fff; line-height:1.5; }
+  /* No max-width: these are shown on a projector, and a centred column
+     throws away a third of the screen. Matches the CS 1400 steppers,
+     which have no width container at all. body padding is the margin. */
+  .wrap { margin:0 auto; }
+  h1 { font-size:1.35rem; margin:0 0 .2rem; }
+  .sub { color:var(--muted); font-size:.9rem; margin:0 0 1.1rem; }
+
+  /* ---- How it works, variables, callouts ----------------------------
+     Same components as ct15-non-comparison-sorts' stepper, so the two read
+     the same way. Copied rather than retyped, for the same reason. */
+  .callout { font-size:.82rem; padding:.6rem .8rem; border-radius:6px; margin-top:.7rem;
+             background:var(--tint-purple); border:1px solid #d1c4e9; color:var(--deep); }
+  .callout.warn { background:var(--tint-red); border-color:#f5c6cb; color:var(--red); }
+  /* The algorithm-level warning belongs with the conclusions at the bottom,
+     not above the controls where it would be the densest thing on screen. */
+  #watch { margin-top:1.1rem; }
+  .locals { display:grid; grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));
+            gap:.5rem 1.1rem; margin:.6rem 0 0; padding:.55rem .7rem;
+            border:1px solid var(--rule); border-radius:8px; background:#fbfcfd; }
+  .locals h5 { margin:0 0 .3rem; font-size:.68rem; font-weight:700; color:var(--muted);
+               text-transform:uppercase; letter-spacing:.06em; }
+  .locals .lv { display:flex; align-items:baseline; gap:.45rem; font-size:.79rem;
+                line-height:1.5; }
+  .locals .ln { font-family:Consolas,monospace; font-weight:650; color:var(--ink);
+                min-width:4.6rem; }
+  .locals .lval { font-family:Consolas,monospace; font-weight:700;
+                  color:var(--blue); background:var(--tint-blue);
+                  border:1px solid rgba(37,115,167,.3); border-radius:999px;
+                  padding:.02rem .45rem; min-width:1.6rem; text-align:center; }
+  .locals .lval.pend { color:var(--muted); background:#f0f2f5;
+                       border-color:var(--rule); font-weight:600; }
+  .locals .lat { color:var(--muted); font-size:.75rem; }
+  .locals .stackline .ln { font-weight:600; color:var(--teal); min-width:0; }
+  .locals .stackline.here .lat { color:var(--ink); font-weight:600; }
+
+  /* ---- tabs ---- */
+  .tabs { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:1rem;
+          border-bottom:2px solid var(--rule); padding-bottom:.6rem; }
+  .tabs button { font:inherit; font-size:.9rem; font-weight:600; padding:.45rem 1rem;
+                 border:1px solid var(--rule); border-radius:7px 7px 0 0;
+                 background:#f7f9fb; color:var(--muted); cursor:pointer; }
+  .tabs button:hover { color:var(--ink); }
+  .tabs button.on { background:#fff; color:var(--ink); border-bottom-color:#fff; }
+  .tabs button[data-mode="findmin"].on   { border-top:3px solid var(--green);  color:var(--green); }
+  .tabs button[data-mode="remove"].on    { border-top:3px solid var(--red);    color:var(--red); }
+  .tabs button[data-mode="cases"].on     { border-top:3px solid var(--deep);   color:var(--deep); }
+  .tabs .spacer { flex:1; }
+  .tabs .step-hint { align-self:center; font-size:.76rem; color:var(--muted); }
+
+  /* ---- controls ---- */
+  .panel { border:1px solid var(--rule); border-radius:10px;
+           padding:.85rem 1rem; margin-bottom:1.1rem; background:#fcfdfe; }
+  .row { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+  .row + .row { margin-top:.6rem; }
+  .lbl { font-size:.73rem; text-transform:uppercase; letter-spacing:.05em;
+         color:var(--muted); min-width:7.5rem; }
+  button.ctl { font:inherit; font-size:.86rem; padding:.38rem .8rem;
+               border:1px solid var(--rule); border-radius:6px;
+               background:#fff; color:var(--ink); cursor:pointer; }
+  button.ctl:hover:not(:disabled) { border-color:var(--blue); color:var(--blue); }
+  button.ctl:disabled { opacity:.4; cursor:default; }
+  button.ctl.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+  button.ctl.primary { background:var(--deep); border-color:var(--deep); color:#fff; }
+  .count { font-variant-numeric:tabular-nums; font-size:.84rem; color:var(--muted); margin-left:auto; }
+
+  /* ---- layout ---- */
+  .solo { display:grid; grid-template-columns:1fr 1fr 210px; gap:1.1rem; align-items:start; }
+  /* Below 1380 the rail cannot hold its own column, so it spans underneath
+     instead -- still small, and still never above the tree. */
+  @media (max-width:1380px) { .solo { grid-template-columns:1.05fr .95fr; }
+                              .solo > .railcol { grid-column:1 / -1; } }
+  @media (max-width:1040px) { .solo { grid-template-columns:1fr; }
+                              .solo > .railcol { grid-column:auto; } }
+
+  /* ---- the rail: what is being worked on, and nothing else ---- */
+  .rail { font-size:.78rem; }
+  .rail .rlab { font-size:.62rem; letter-spacing:.07em; text-transform:uppercase;
+                color:var(--muted); font-weight:700; margin:0 0 .25rem; }
+  .rail .rnow { font-size:.92rem; font-weight:700; color:#c64500;
+                background:#fff3e0; border:1px solid #a95c19; border-radius:7px;
+                padding:.3rem .5rem; margin:0 0 .9rem; line-height:1.3; }
+  .rail ol { list-style:none; margin:0; padding:0; display:grid; gap:.3rem; }
+  .rail li { border:1px solid var(--rule); border-radius:7px; background:#f7f9fb;
+             padding:.33rem .45rem; cursor:pointer; }
+  .rail li:hover { border-color:var(--deep); }
+  .rail li.on { background:#ede7f6; border-color:var(--deep); }
+  .rail .rt { display:flex; gap:.4rem; align-items:baseline; line-height:1.35; }
+  .rail .rn { flex:0 0 auto; width:1.05rem; height:1.05rem; border-radius:50%;
+              background:var(--muted); color:#fff; font-size:.6rem; font-weight:700;
+              display:flex; align-items:center; justify-content:center;
+              position:relative; top:.15rem; }
+  .rail li.on .rn { background:var(--deep); }
+  .rail ul { margin:.35rem 0 0; padding:0; list-style:none; }
+  .rail ul li { border:0; background:none; padding:0 0 0 .7rem; margin:0 0 .2rem;
+                position:relative; font-size:.74rem; line-height:1.4; cursor:default; }
+  .rail ul li::before { content:""; position:absolute; left:0; top:.5em;
+                        width:.25rem; height:.25rem; border-radius:50%;
+                        background:var(--muted); }
+  .card { border:1px solid var(--rule); border-radius:10px; overflow:hidden; margin-bottom:1.1rem; }
+  .card > h2 { font-size:.92rem; margin:0; padding:.5rem .85rem;
+               border-bottom:1px solid var(--rule); background:#f7f9fb; }
+  .card-body { padding:.85rem; }
+
+  /* ---- the tree ---- */
+  svg.tree { width:100%; height:auto; display:block; }
+  svg.tree text { font-family:"Segoe UI",system-ui,sans-serif; font-size:15px; font-weight:600; }
+  svg.tree text.sub { font-size:10px; font-weight:400; fill:#6e6e6e; }
+
+  .legend { font-size:.72rem; color:var(--muted); margin:.5rem 0 0; }
+  .legend span { display:inline-block; margin-right:.9rem; }
+  .sw { display:inline-block; width:.75rem; height:.75rem; border-radius:50%;
+        border:2px solid var(--rule); vertical-align:-2px; margin-right:.25rem; }
+
+  /* ---- state ---- */
+  .chips { display:flex; flex-wrap:wrap; gap:.5rem; margin:.8rem 0 0; }
+  .chip { font-size:.8rem; padding:.3rem .65rem; border-radius:999px;
+          border:1px solid var(--rule); background:#fff; font-variant-numeric:tabular-nums; }
+  .chip.cur  { border-color:var(--orange); color:var(--orange); background:var(--tint-orange); }
+  .chip.out  { border-color:var(--teal);   color:var(--teal);   background:var(--tint-teal); }
+  .chip.ok   { border-color:var(--green);  color:var(--green);  background:var(--tint-green); }
+  .chip.no   { border-color:var(--red);    color:var(--red);    background:var(--tint-red); }
+
+  .test { margin:.75rem 0 0; font-size:.9rem; padding:.55rem .8rem; border-radius:8px;
+          border:1px solid var(--rule); background:#fbfcfd; }
+  .test .q { font-family:Consolas,monospace; font-weight:700; }
+  .test .yes { color:var(--green); font-weight:700; }
+  .test .no  { color:var(--muted); font-weight:700; }
+
+  /* ---- call stack ---- */
+  .stack { margin:.8rem 0 0; font-size:.78rem; font-family:Consolas,monospace; }
+  .stack div { padding:.16rem .5rem; border-left:3px solid var(--rule); margin-bottom:.1rem;
+               background:#fbfcfd; }
+  .stack div.top { border-left-color:var(--orange); background:var(--tint-orange);
+                   font-weight:700; }
+  .stack .none { color:var(--muted); font-style:italic; border-left-color:transparent;
+                 background:none; font-family:inherit; }
+
+  /* ---- narration ---- */
+  .head { font-size:.98rem; font-weight:600; margin:0 0 .4rem; }
+  .why { margin:0; padding-left:1.1rem; font-size:.86rem; }
+  .why li { margin-bottom:.22rem; }
+
+  /* ---- code ---- */
+  .code { background:var(--code-bg); color:var(--code-fg); border-radius:8px;
+          padding:.6rem 0; font-family:Consolas,"Courier New",monospace;
+          font-size:.82rem; line-height:1.55; overflow-x:auto; }
+  .code div { padding:.02rem .9rem; white-space:pre; cursor:pointer; }
+  .code div:hover { background:#313244; }
+  .code div.hit { background:var(--code-hit); border-left:3px solid #f9e2af;
+                  padding-left:calc(.9rem - 3px); }
+  .code div.pin { outline:1px dashed #f9e2af; outline-offset:-2px; }
+  /* Same scheme as the other eleven steppers, so moving between them does
+     not mean learning a second set of colours. */
+  .code .kw { color:#cba6f7; }
+  .code .fn { color:#89dceb; }
+  .code .nm { color:#fab387; }
+  .code .st { color:#a6e3a1; }
+  .code .cm { color:var(--code-dim); font-style:italic; }
+
+  .lineinfo { border:1px solid var(--rule); border-left:4px solid var(--deep);
+              border-radius:0 8px 8px 0; padding:.6rem .85rem; margin:.7rem 0 0;
+              background:#fcfcfd; font-size:.83rem; }
+  .lineinfo h4 { margin:0 0 .35rem; font-size:.84rem; font-family:Consolas,monospace;
+                 color:var(--deep); }
+  .li-items { margin:.3rem 0 0; padding-left:1.05rem; }
+  .li-items li { margin-bottom:.22rem; }
+  .li-kind { display:inline-block; font-size:.66rem; text-transform:uppercase;
+             letter-spacing:.04em; padding:.03rem .32rem; border-radius:3px;
+             margin-right:.3rem; vertical-align:1px; }
+  .k-why    { background:var(--tint-blue);   color:var(--blue); }
+  .k-trap   { background:var(--tint-red);    color:var(--red); }
+  .k-note   { background:var(--tint-green);  color:var(--green); }
+  .k-syntax { background:var(--tint-purple); color:var(--deep); }
+
+  .facts { font-size:.8rem; margin:0; }
+  .facts dt { font-weight:600; float:left; width:8rem; clear:left; color:var(--muted); }
+  .facts dd { margin:0 0 .3rem 8rem; }
+
+  /* ---- compare lanes ---- */
+  .lanes { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; }
+  @media (max-width:1040px) { .lanes { grid-template-columns:1fr; } }
+  .lane { border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
+  .lane h2 { font-size:.9rem; margin:0; padding:.5rem .85rem; border-bottom:1px solid var(--rule); }
+  .lane.inorder h2   { background:var(--tint-green);  color:var(--green); }
+  .lane.preorder h2  { background:var(--tint-blue);   color:var(--blue); }
+  .lane.postorder h2 { background:var(--tint-orange); color:var(--orange); }
+  .lane .card-body { padding:.7rem; }
+  .lane .mini { font-size:.78rem; color:var(--muted); margin:.5rem 0 0; min-height:2.6rem; }
+  /* chips come and go per frame; the strip does not */
+  .treefoot { min-height:3.6rem; }
+  /* A lane is a third of the page, so its listing is smaller and long lines wrap. */
+  .code.lanecode { margin-top:.5rem; font-size:.72rem; }
+  .code.lanecode div:not(.calc) { white-space:pre-wrap; cursor:default;
+                                  padding-left:calc(.7rem + 6ch); padding-right:.5rem; text-indent:-6ch; }
+  .code.lanecode div.hit { padding-left:calc(.7rem + 6ch - 3px); }
+
+  .verdict { border-left:5px solid var(--deep); background:var(--tint-purple);
+             border-radius:0 8px 8px 0; padding:.9rem 1.1rem; font-size:.88rem; }
+  .verdict p { margin:0 0 .55rem; }
+  .verdict p:last-child { margin:0; }
+  table.v { width:100%; border-collapse:collapse; font-size:.83rem; margin:.3rem 0 .8rem; }
+  table.v th, table.v td { border:1px solid var(--rule); padding:.35rem .55rem; text-align:left; }
+  table.v th { background:#f5f7f9; }
+  .mono { font-family:Consolas,monospace; }
+
+  .selftest { margin-top:1.2rem; font-size:.78rem; color:var(--muted);
+              border-top:1px solid var(--rule); padding-top:.6rem; }
+  .selftest .ok   { color:var(--green); font-weight:600; }
+  .selftest .fail { color:var(--red);   font-weight:700; }
+  code.inl { background:#eef2f6; padding:.08em .32em; border-radius:4px;
+             font-family:Consolas,monospace; font-size:.92em; }
+  /* ---- ported verbatim from the CT 15 stepper ---------------------
+     The THIS STEP band, the yellow note box, the phase rail and the
+     two independent column flows. Copied rather than retyped so the
+     steppers cannot drift apart on spacing. */  .nowbox { background:#f9e2af; color:#1e1e2e; border-left:4px solid #b8860b;
+            border-radius:0 8px 8px 0; padding:.6rem .8rem; margin:.7rem 0 0; }  .nowbox .nownote { margin:0; font-size:.93rem; line-height:1.55; }  .nowbox .nownote code { font-family:Consolas,monospace; font-size:.93em;
+                          background:rgba(0,0,0,.09); border-radius:3px; padding:.03em .3em; }  .nowbox .nownums { margin-top:.5rem; padding-top:.5rem; border-top:1px solid rgba(0,0,0,.18);
+                     font-family:Consolas,"Courier New",monospace; font-size:.84rem;
+                     font-weight:600; line-height:1.65; overflow-x:auto; }  .nowbox .nownums b { font-weight:800; }  .nowbox .nownums em { font-style:normal; background:rgba(0,0,0,.09);
+                        border-radius:3px; padding:.02em .3em; }  .nowbox .lt { display:block; font-family:system-ui,sans-serif; font-weight:800;
+                font-size:.62rem; letter-spacing:.06em; text-transform:uppercase;
+                color:#6b4f04; margin-bottom:.2rem; }  .solo > .col { display:flex; flex-direction:column; gap:1.1rem; min-width:0; }  .code div.calc { background:#f9e2af; color:#1e1e2e;
+                   /* inherit, not a second copy of the code's clamp: the band
+                      sits inside .code, so this keeps the two the same size at
+                      every width with no formula to fall out of step. */
+                   font-size:inherit;
+                   font-weight:600; white-space:pre; cursor:default;
+                   display:flex; align-items:flex-start; gap:.55rem;
+                   padding:.22rem .8rem; margin:.12rem 0;
+                   border-left:4px solid #b8860b; }  .code div.calc > .cv { min-width:0; white-space:pre-wrap;
+                         text-indent:-1.1em; padding-left:1.1em; }  .code div.calc.art > .cv { white-space:pre; text-indent:0; padding-left:0; }  .code div.calc::before { content:"THIS STEP"; font-size:.62rem; font-weight:800;
+                           letter-spacing:.06em; color:#6b4f04;
+                           background:rgba(0,0,0,.09); border-radius:3px;
+                           padding:.08em .32em; flex:0 0 auto;
+                           margin-top:.28em; }  .code div.calc:hover { background:#f9e2af; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>BST remove &mdash; find the node, count its children, then splice it out</h1>
+  <p class="sub">CS 2420 &middot; Module 7 &middot; CT 17. Removal is the only BST operation that
+     has to <strong>change</strong> the tree, and the only one with cases. Every step here shows
+     the tree, the call stack and the line being executed together.
+     <strong>Click any line of code</strong> for a breakdown of it.
+     Take the tabs in order; the last one compares the three cases.</p>
+
+  <div class="tabs" id="tabs">
+    <button data-mode="findmin">1 &middot; find_min_</button>
+    <button data-mode="remove">2 &middot; remove_</button>
+    <button data-mode="cases">3 &middot; All three cases</button>
+    <span class="spacer"></span>
+    <span class="step-hint">&larr; &rarr; arrow keys step &middot; space plays</span>
+  </div>
+
+
+  <div class="panel">
+    <div class="row">
+      <span class="lbl">Tree</span>
+      <button class="ctl" data-preset="classic">50 30 70 20 40 60 80</button>
+      <button class="ctl" data-preset="onechild">&hellip; plus 65</button>
+      <button class="ctl" data-preset="leftchild">&hellip; plus 55</button>
+      <button class="ctl" data-preset="spine">10 20 30 40 50</button>
+      <span class="count" id="treeNote"></span>
+    </div>
+    <div class="row" id="extraRow"></div>
+    <div class="row">
+      <span class="lbl">Step</span>
+      <button class="ctl" id="first">&laquo; First</button>
+      <button class="ctl" id="prev">&lsaquo; Prev</button>
+      <button class="ctl primary" id="play">&#9654; Play</button>
+      <button class="ctl" id="next">Next &rsaquo;</button>
+      <button class="ctl" id="last">Last &raquo;</button>
+      <button class="ctl" id="nextPhase">Next phase &raquo;&raquo;</button>
+      <span class="count" id="frameCount"></span>
+    </div>
+  </div>
+
+  <div id="stage"></div>
+
+  <p class="legend">
+    <span><i class="sw" style="border-color:#a95c19;background:#fff3e0"></i>the node being looked at</span>
+    <span><i class="sw" style="border-color:#2573a7;background:#eaf2f8"></i>on the path taken</span>
+    <span><i class="sw" style="border-color:#1c7e45;background:#f2fbf4"></i>the minimum, or the promoted child</span>
+    <span><i class="sw" style="border-color:#c0392b;background:#fdf0ee;border-style:dashed"></i>deleted</span>
+  </p>
+
+  <div id="watch"></div>
+
+  <div class="selftest" id="selftest"></div>
+</div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// Fixed trees. Nothing random: a number on screen in class is the number that
+// will be there again. Each preset exists to make a particular remove case
+// reachable -- "classic" has no one-child node at all, which is exactly why
+// the second preset inserts 65 under 60.
+// ---------------------------------------------------------------------------
+var PRESETS = {
+  classic:  { label: "balanced",   seq: [50, 30, 70, 20, 40, 60, 80] },
+  onechild: { label: "with 65",    seq: [50, 30, 70, 20, 40, 60, 80, 65] },
+  leftchild: { label: "with 55",   seq: [50, 30, 70, 20, 40, 60, 80, 55] },
+  spine:    { label: "degenerate", seq: [10, 20, 30, 40, 50] }
+};
+
+// ---------------------------------------------------------------------------
+// Code panes
+// ---------------------------------------------------------------------------
+var CODE = {
+  findmin: [
+    "Node* BinarySearchTree::find_min_(Node* node) const {",
+    "    while (node->left) {           // keep going while there is a left",
+    "        node = node->left;         // the smaller value is always left",
+    "    }",
+    "    return node;                   // no left child -- this is the min",
+    "}"
+  ],
+  remove: [
+    "bool BinarySearchTree::remove(int value) {",
+    "    bool removed = false;",
+    "    root_ = remove_(root_, value, removed);",
+    "    return removed;",
+    "}",
+    "",
+    "Node* BinarySearchTree::remove_(Node* node, int value, bool& removed) {",
+    "    if (!node) return nullptr;              // not in the tree",
+    "",
+    "    if (value < node->data) {",
+    "        node->left = remove_(node->left, value, removed);",
+    "    } else if (value > node->data) {",
+    "        node->right = remove_(node->right, value, removed);",
+    "    } else {                                // found it",
+    "        removed = true;",
+    "        if (!node->left && !node->right) {  // case 1: leaf",
+    "            delete node;",
+    "            return nullptr;",
+    "        }",
+    "        if (!node->left) {                  // case 2: one child",
+    "            Node* child = node->right;",
+    "            delete node;",
+    "            return child;",
+    "        }",
+    "        if (!node->right) {                 // case 2: one child",
+    "            Node* child = node->left;",
+    "            delete node;",
+    "            return child;",
+    "        }",
+    "        Node* successor = find_min_(node->right);  // case 3: two children",
+    "        node->data = successor->data;",
+    "        node->right = remove_(node->right, successor->data, removed);",
+    "    }",
+    "    return node;",
+    "}"
+  ]
+};
+
+var LINE_INFO = {
+  findmin: {
+    0: { src: "Node* BinarySearchTree::find_min_(Node* node) const {",
+      what: "Returns the smallest node in the subtree it is handed.",
+      items: [
+        ["why", "It returns a pointer rather than a value because <code class='inl'>remove_</code> needs to read the node's data. It is <code class='inl'>const</code> because walking changes nothing in the tree."],
+        ["note", "<code class='inl'>node</code> is a local copy of the pointer, so moving it down the tree does not touch any pointer stored in the tree."]
+      ] },
+    1: { src: "while (node->left) {",
+      what: "Keep walking while a left child exists.",
+      items: [
+        ["why", "By the BST property every smaller value is to the left, so the leftmost node of a subtree is its minimum. There is nothing to compare &mdash; the shape already encodes the answer."],
+        ["trap", "This reads <code class='inl'>node-&gt;left</code> straight away, so <code class='inl'>node</code> must not be null. It is safe here because <code class='inl'>remove_</code> only calls it in case 3, where the right child is known to exist."]
+      ] },
+    2: { src: "node = node->left;",
+      what: "Move one step down the left edge.",
+      items: [
+        ["note", "One pointer followed, and nothing compared. That is why this costs O(height) and no more."]
+      ] },
+    3: { src: "}",
+      what: "End of the loop body. Control goes back up to the <code class='inl'>while</code> test.",
+      items: [
+        ["note", "This is a loop rather than recursion, because there is nothing to do on the way back up."]
+      ] },
+    4: { src: "return node;",
+      what: "The first node with no left child is the minimum.",
+      items: [
+        ["note", "It may still have a RIGHT child. That is what makes removing the successor in case 3 easy: it is never a two-child node, so that recursive call always lands in case 1 or case 2."]
+      ] },
+    5: { src: "}",
+      what: "End of the function. Execution never reaches it, because the line above always returns.",
+      items: [
+        ["note", "Every path through this function returns a node, which is why <code class='inl'>remove_</code> can read <code class='inl'>successor-&gt;data</code> directly."]
+      ] }
+  },
+  remove: {
+    0: { src: "bool BinarySearchTree::remove(int value) {",
+      what: "The public function. Callers hand over a value and learn whether it was removed.",
+      items: [
+        ["why", "The recursion needs a <code class='inl'>Node*</code> and a place to record success, neither of which belongs in the public interface. So this function sets those up and starts the helper."]
+      ] },
+    1: { src: "bool removed = false;",
+      what: "Assume nothing was removed until a call finds the value.",
+      items: [
+        ["why", "The helper's return value is already taken: it returns the subtree. So success is reported through this variable instead, passed down by reference."]
+      ] },
+    2: { src: "root_ = remove_(root_, value, removed);",
+      what: "Start the recursion at the root, and assign whatever comes back.",
+      items: [
+        ["why", "This is what makes removing the root work. If the root is deleted, the helper returns its replacement, and this assignment is what stores it."],
+        ["trap", "Drop the <code class='inl'>root_ =</code> and removing the root leaves <code class='inl'>root_</code> pointing at freed memory."]
+      ] },
+    3: { src: "return removed;",
+      what: "Report whether the value was found.",
+      items: [
+        ["note", "<code class='inl'>removed</code> was changed through a reference, however deep the recursion went, so this line sees the final answer."]
+      ] },
+    4: { src: "}",
+      what: "End of the public function. Execution never reaches it, because the line above always returns.",
+      items: [
+        ["note", "By this point the tree is finished and every recursive call has returned."]
+      ] },
+    6: { src: "Node* BinarySearchTree::remove_(Node* node, int value, bool& removed) {",
+      what: "Removes the value from this subtree, and returns what the subtree looks like afterwards.",
+      items: [
+        ["why", "It returns a <code class='inl'>Node*</code> because the top of the subtree can change. The caller stores whatever comes back, which is how a node is unlinked with no parent pointers."],
+        ["syntax", "<code class='inl'>bool&amp; removed</code> is a reference, so every call in the recursion is writing to the one variable in <code class='inl'>remove()</code>."]
+      ] },
+    7: { src: "if (!node) return nullptr;",
+      what: "Walked off the tree: the value was never here.",
+      items: [
+        ["why", "<code class='inl'>removed</code> is left alone, so it stays <code class='inl'>false</code> and <code class='inl'>remove()</code> reports failure. Returning <code class='inl'>nullptr</code> is safe because the parent is assigning it back to the same child pointer, which was already null."]
+      ] },
+    9: { src: "if (value < node->data) {",
+      what: "Smaller values can only be in the left subtree.",
+      items: [
+        ["why", "This is the same descent as search: one comparison rules out the other side completely."]
+      ] },
+    10: { src: "node->left = remove_(node->left, value, removed);",
+      what: "Recurse, and reattach whatever comes back.",
+      items: [
+        ["why", "The same return-the-subtree pattern insert uses. The child pointer is reassigned on every level of the way back up, which is how a node several levels down can be spliced out without any parent pointers."],
+        ["trap", "Drop the assignment and the recursion still runs, still deletes the node, and leaves the parent pointing at freed memory. It usually does not crash immediately, which is the worst outcome."]
+      ] },
+    11: { src: "} else if (value > node->data) {",
+      what: "Not smaller, so ask whether it is larger.",
+      items: [
+        ["why", "This has to be a real test, because there is a third possibility: this is the node being looked for."]
+      ] },
+    12: { src: "node->right = remove_(node->right, value, removed);",
+      what: "Recurse into the right subtree, and reattach whatever comes back.",
+      items: [
+        ["note", "Most levels write back the same pointer they already had. Only the level just above the removed node actually changes anything, but no line can tell which level that is."]
+      ] },
+    13: { src: "} else {",
+      what: "Neither smaller nor larger, so this is the node to remove.",
+      items: [
+        ["note", "Everything below this line decides how to remove it, and the only thing that matters now is how many children it has."]
+      ] },
+    14: { src: "removed = true;",
+      what: "Set once, at the moment the value is found.",
+      items: [
+        ["note", "It is a reference parameter precisely so this one assignment is visible to the original caller, however deep the recursion went."],
+        ["why", "Case 3 recurses again to delete the successor, and that call will find its target and set <code class='inl'>removed = true</code> a second time. Harmless &mdash; it is already true."]
+      ] },
+    15: { src: "if (!node->left && !node->right) {",
+      what: "Case 1: a leaf. Nothing hangs off it.",
+      items: [
+        ["why", "Deleting is safe because there are no child pointers to lose."]
+      ] },
+    16: { src: "delete node;",
+      what: "Free the leaf.",
+      items: [
+        ["note", "The parent still points at this memory for a moment. The next line is what fixes that."]
+      ] },
+    17: { src: "return nullptr;",
+      what: "Tell the parent this subtree is now empty.",
+      items: [
+        ["why", "The parent's assignment stores this <code class='inl'>nullptr</code> in its child pointer. That assignment is the moment the node actually leaves the tree."]
+      ] },
+    18: { src: "}",
+      what: "Closes case 1. Execution never reaches it, because the line above always returns.",
+      items: [
+        ["note", "Reaching the next <code class='inl'>if</code> therefore proves this node has at least one child."]
+      ] },
+    19: { src: "if (!node->left) {",
+      what: "Case 2: no left child, so its only child is on the right.",
+      items: [
+        ["note", "Case 1 has already been ruled out, so if the left side is empty, the right side cannot be."]
+      ] },
+    20: { src: "Node* child = node->right;",
+      what: "Save the surviving child before its parent is freed.",
+      items: [
+        ["trap", "Read <code class='inl'>node-&gt;right</code> after <code class='inl'>delete node</code> instead and you are reading freed memory. The order of these two lines matters."]
+      ] },
+    21: { src: "delete node;",
+      what: "Free the node. Its child is safe, because the pointer to it was saved.",
+      items: [
+        ["note", "<code class='inl'>delete</code> frees this one node only. It does not touch the subtree below it."]
+      ] },
+    22: { src: "return child;",
+      what: "Hand the parent the child in place of the deleted node.",
+      items: [
+        ["why", "The BST property still holds: everything in that subtree was already on the correct side of the parent."]
+      ] },
+    23: { src: "}",
+      what: "Closes this branch. Execution never reaches it, because the line above always returns.",
+      items: [
+        ["note", "Reaching the next <code class='inl'>if</code> proves there is a left child."]
+      ] },
+    24: { src: "if (!node->right) {",
+      what: "Case 2 again: no right child, so its only child is on the left.",
+      items: [
+        ["note", "The same three lines as the branch above, mirrored. Try the <strong>plus 55</strong> tree to see this branch run: removing 60 lands here."]
+      ] },
+    25: { src: "Node* child = node->left;",
+      what: "Save the surviving child before its parent is freed.",
+      items: [
+        ["note", "This time the survivor is on the left, which is the only difference from the branch above."]
+      ] },
+    26: { src: "delete node;",
+      what: "Free the node. Its child is safe, because the pointer to it was saved.",
+      items: [
+        ["note", "<code class='inl'>delete</code> frees this one node only. It does not touch the subtree below it."]
+      ] },
+    27: { src: "return child;",
+      what: "Hand the parent the child in place of the deleted node.",
+      items: [
+        ["why", "Everything under the child was already on the correct side of the parent, so nothing needs re-sorting."]
+      ] },
+    28: { src: "}",
+      what: "Closes this branch. Execution never reaches it, because the line above always returns.",
+      items: [
+        ["note", "Getting past this line proves the node has two children, which is case 3."]
+      ] },
+    29: { src: "Node* successor = find_min_(node->right);",
+      what: "Case 3: the in-order successor, the smallest value in the right subtree.",
+      items: [
+        ["why", "The replacement has to be greater than everything on the left and less than everything else on the right. Exactly one value satisfies both, and it is the minimum of the right subtree."],
+        ["note", "Not the maximum of the LEFT subtree &mdash; that also works, and is the other textbook choice. Pick one and be consistent; the tests here expect the successor."]
+      ] },
+    30: { src: "node->data = successor->data;",
+      what: "Copy the value. The node itself does not move.",
+      items: [
+        ["why", "No pointers are touched, so both subtrees stay attached exactly as they were. Only the number inside the node changes."],
+        ["note", "For an instant the tree holds the successor's value twice. The next line is what resolves that."]
+      ] },
+    31: { src: "node->right = remove_(node->right, successor->data, removed);",
+      what: "Delete the original successor from the right subtree.",
+      items: [
+        ["why", "The successor is the minimum of that subtree, so it has no left child &mdash; this recursive call is always case 1 or case 2. It can never recurse into case 3 again."],
+        ["syntax", "Search by <code class='inl'>successor-&gt;data</code>, not by pointer. Searching for the value walks the normal path and reassigns every child pointer correctly on the way back."]
+      ] },
+    32: { src: "}",
+      what: "End of the found-it block, reached only by case 3.",
+      items: [
+        ["note", "Cases 1 and 2 have already returned. Case 3 keeps the same node, so it carries on and returns that node."]
+      ] },
+    33: { src: "return node;",
+      what: "Hand this node back so the parent can reattach it.",
+      items: [
+        ["why", "Nothing changed at this level unless this was case 3, so the parent usually stores the same pointer it already had. It has to happen anyway, because no call knows which level the change was at."]
+      ] },
+    34: { src: "}",
+      what: "End of the helper. Execution never reaches it, because every path has already returned.",
+      items: [
+        ["note", "Every path returns a subtree, which is what lets each caller reattach the result."]
+      ] }
+  }
+};
+
+var GUIDE = {
+  findmin: {
+    idea: "The smallest value in any subtree is its leftmost node. No comparisons needed -- the shape of the tree already knows.",
+    steps: [
+      { t: "Is there a left child?",
+        p: ["while (node->left)"],
+        b: ["every smaller value lives to the left, by the BST property",
+            "so if a left child exists, the minimum is somewhere under it",
+            "<code>node</code> is never null here: <code>remove_</code> only calls this when a right child exists"] },
+      { t: "Walk left, and repeat",
+        p: ["node = node->left"],
+        b: ["one step down per iteration &mdash; this is a loop, not recursion",
+            "nothing is compared and nothing is stored; it just follows pointers",
+            "costs O(height), the same as every other walk in this class"] },
+      { t: "No left child means minimum",
+        p: ["return node"],
+        b: ["the first node without a left child is the smallest in the subtree",
+            "it may still have a <strong>right</strong> child &mdash; that is allowed",
+            "that fact is what makes case 3's follow-up removal easy"] }
+    ],
+    watch: "<strong>This returns the minimum of the subtree you hand it, not of the tree.</strong> <code>remove_</code> calls it as <code>find_min_(node-&gt;right)</code> &mdash; starting at the right child, never at the root. Call it on the root by mistake and you get the smallest value in the whole tree, which is almost never the successor you wanted."
+  },
+  remove: {
+    idea: "Find the node first, then look at how many children it has. The number of children -- zero, one, or two -- is what picks the strategy.",
+    steps: [
+      { t: "Find it, reattaching as you go",
+        p: ["if (value < node->data)",
+            "    node->left = remove_(node->left, value, removed)",
+            "else if (value > node->data)",
+            "    node->right = remove_(node->right, value, removed)"],
+        b: ["the same descent as search &mdash; one comparison per level",
+            "each call assigns the returned subtree back to the child pointer",
+            "walking off the end means the value was never there, and <code>removed</code> stays false"] },
+      { t: "Count the children",
+        p: ["removed = true", "// then: 0 children? 1? 2?"],
+        b: ["this is the only decision in the function that is not a comparison",
+            "zero and one are easy; two is the case the whole lesson is about",
+            "<code>removed</code> is a reference, so setting it here is visible to the original caller"] },
+      { t: "Zero or one child -- splice it out",
+        p: ["if (!left && !right) { delete node; return nullptr; }",
+            "if (!left)  { child = right; delete node; return child; }",
+            "if (!right) { child = left;  delete node; return child; }"],
+        b: ["a leaf: delete it and hand the parent a null",
+            "one child: delete the node and hand the parent that child instead",
+            "either way the parent's assignment on the way back up does the relinking",
+            "the surviving subtree was already on the correct side of the parent, so the BST property holds"] },
+      { t: "Two children -- borrow the successor",
+        p: ["Node* successor = find_min_(node->right)",
+            "node->data = successor->data",
+            "node->right = remove_(node->right, successor->data, removed)"],
+        b: ["the node cannot be deleted &mdash; two subtrees depend on it",
+            "so it <strong>stays</strong>, and only the value inside it changes",
+            "the successor is the one value that is larger than everything left and smaller than everything else right",
+            "then delete the original successor, which is always a case 1 or case 2 removal"] }
+    ],
+    watch: "<strong>Case 3 does not delete the node you asked it to.</strong> It overwrites that node's value and deletes a different node further down. Students look for a <code>delete</code> of the target and do not find one &mdash; the target's memory is reused, and the memory actually freed belonged to the successor."
+  }
+};
+
+var FACTS = {
+  findmin: [
+    ["Cost", "O(h) &mdash; one step per level, down the left edge"],
+    ["Shape", "a loop, not recursion &mdash; there is nothing to unwind"],
+    ["Returns", "the leftmost node; it may still have a right child"],
+    ["Used by", "<code class=\"inl\">remove_</code>, on <code class=\"inl\">node-&gt;right</code>, for case 3"],
+    ["Scored by", "<code class=\"inl\">BSTFindMin</code>"]
+  ],
+  remove: [
+    ["Cost", "O(h) to find it, plus O(h) again for case 3's second removal"],
+    ["Case 1", "leaf &mdash; delete, return nullptr"],
+    ["Case 2", "one child &mdash; delete, return the child"],
+    ["Case 3", "two children &mdash; copy the successor's value, then delete the successor"],
+    ["Not found", "returns false and changes nothing"],
+    ["Scored by", "<code class=\"inl\">BSTRemove</code>"]
+  ]
+};
+
+// Which How-it-works step each highlighted line belongs to.
+var PHASE_OF = {
+  findmin: { 0: 0, 1: 0, 2: 1, 3: 1, 4: 2, 5: 2 },
+  remove:  { 0: 0, 1: 0, 2: 0, 3: 0, 6: 0, 7: 0, 9: 0, 10: 0, 11: 0, 12: 0, 33: 0,
+             13: 1, 14: 1,
+             15: 2, 16: 2, 17: 2, 19: 2, 20: 2, 21: 2, 22: 2, 24: 2, 25: 2, 26: 2, 27: 2,
+             29: 3, 30: 3, 31: 3, 32: 3 }
+};
+
+// What the rail calls each line while it is the one running.
+var STEP_TAG = {
+  findmin: { 0: "entering the call", 1: "is there a left child?", 2: "stepping left",
+             3: "back to the test", 4: "this is the minimum" },
+  remove:  { 0: "the public call", 1: "nothing removed yet", 2: "the top-level call",
+             3: "reporting the answer", 6: "entering the call", 7: "is there a node here?",
+             9: "comparing", 10: "the left call", 11: "comparing", 12: "the right call",
+             13: "found the node", 14: "recording the success", 15: "is it a leaf?",
+             16: "deleting the node", 17: "handing back nothing", 19: "only a right child?",
+             20: "saving the child", 21: "deleting the node", 22: "handing back the child",
+             24: "only a left child?", 25: "saving the child", 26: "deleting the node",
+             27: "handing back the child", 29: "finding the successor",
+             30: "copying its value", 31: "removing the original", 32: "end of the found block",
+             33: "handing it back" }
+};
+
+function phaseOf(key, line) {
+  var m = PHASE_OF[key];
+  if (!m) return 0;
+  return m[line] === undefined ? 0 : m[line];
+}
+
+function codeKey() { return state.mode === "cases" ? "remove" : state.mode; }
+
+// ---------------------------------------------------------------------------
+// Frame builders
+// ---------------------------------------------------------------------------
+function F(o) { return o; }
+
+// Node objects never survive into a frame -- clone(root) makes new ones -- so
+// every mark travels as a value, matched by value in treeSvg.
+function vals(nodes) { return nodes.map(function (n) { return n.v; }); }
+
+// How many children a node has, which is the only thing remove_ branches on.
+function childCount(n) { return (n.l ? 1 : 0) + (n.r ? 1 : 0); }
+
+function findNode(root, v) {
+  var n = root;
+  while (n) {
+    if (v === n.v) return n;
+    n = v < n.v ? n.l : n.r;
+  }
+  return null;
+}
+
+// A call that lands on nullptr is still a call, so it gets its own stack entry.
+function childName(n) { return n ? String(n.v) : "nullptr"; }
+
+// find_min_ as its own walk, for the first tab. It is only ever handed a real
+// node, which is what lets the loop read node->left straight away.
+function buildFindMin(root, startVal) {
+  var frames = [], start = startVal === undefined ? null : findNode(root, startVal);
+  var node = start || root, path = [node.v];
+
+  frames.push(F({ tree: clone(root), line: 0, stack: [node.v], path: path.slice(), hit: node.v,
+    calc: start ? "find_min_(node->right)\nnode = " + node.v + ",  the right child of " + root.v
+                : "find_min_(root_)\nnode = " + node.v + ",  the root",
+    head: "Start at <strong>" + node.v + "</strong>",
+    why: [startVal !== undefined
+            ? "remove_ calls this on node-&gt;right, so the walk starts in the RIGHT subtree"
+            : "called on the root here, so this finds the minimum of the whole tree"] }));
+
+  while (true) {
+    frames.push(F({ tree: clone(root), line: 1, stack: [node.v], path: path.slice(), hit: node.v,
+      calc: "node->left is " + childName(node.l) + "   →   " +
+            (node.l ? "true, so keep going" : "false, so the loop ends"),
+      head: node.l ? "<strong>" + node.v + "</strong> has a left child &mdash; keep going"
+                   : "<strong>" + node.v + "</strong> has no left child &mdash; the loop ends",
+      why: [node.l ? "everything smaller than " + node.v + " is under " + node.l.v + ", so the minimum is too"
+                   : "nothing in this subtree can be smaller than " + node.v] }));
+    if (!node.l) break;
+
+    var from = node.v;
+    node = node.l;
+    path.push(node.v);
+    frames.push(F({ tree: clone(root), line: 2, stack: [node.v], path: path.slice(), hit: node.v,
+      calc: "node = node->left\nnode goes from " + from + " to " + node.v,
+      head: "Step left to <strong>" + node.v + "</strong>",
+      why: ["one pointer followed; nothing compared"] }));
+    frames.push(F({ tree: clone(root), line: 3, stack: [node.v], path: path.slice(), hit: node.v,
+      calc: "end of the loop body\nback up to the while test, with node = " + node.v,
+      head: "Back up to the <code>while</code> test",
+      why: ["this is a loop, so there is nothing to unwind afterwards"] }));
+  }
+
+  frames.push(F({ tree: clone(root), line: 4, stack: [node.v], path: path.slice(),
+    hit: node.v, done: [node.v],
+    calc: "return node\nthe minimum of this subtree is " + node.v,
+    head: "<strong>" + node.v + "</strong> has no left child &mdash; this is the minimum",
+    why: [node.r ? "it still has a right child (" + node.r.v + "), which is allowed"
+                 : "it is a leaf, but it did not have to be",
+          "that is why removing it later is never the two-child case"] }));
+  return frames;
+}
+
+// remove_, with every case it can land in. Case 3 really recurses to remove the
+// successor, so that second walk is on screen rather than summarised.
+function buildRemove(seq, value) {
+  var root = buildTree(seq), frames = [], path = [], removed = false;
+  var caseNo, pendingFreed = null, nextId = 0;
+
+  // In case 3 one value briefly appears twice, so anything that has to mean ONE
+  // node travels as an id. Values still mark the path, where both copies belong.
+  (function tag(n) { if (n) { n.id = nextId++; tag(n.l); tag(n.r); } })(root);
+
+  function snap(o) {
+    o.tree = clone(root);
+    if (!o.stack) o.stack = vals(path);
+    if (!o.path) o.path = vals(path);
+    o.removed = removed;
+    if (caseNo) o.caseNo = caseNo;
+    if (o.node) { o.hit = o.node.v; o.hitId = o.node.id; delete o.node; }
+    if (pendingFreed !== null) o.freedId = pendingFreed;
+    frames.push(F(o));
+  }
+
+  snap({ line: 0, stack: [], path: [],
+    calc: "remove(" + value + ")\nthe public function: the caller never sees a node",
+    head: "remove(<strong>" + value + "</strong>) is called",
+    why: ["this function only sets things up; the helper does the work"] });
+  snap({ line: 1, stack: [], path: [],
+    calc: "bool removed = false\nit stays false unless a call finds the value",
+    head: "Nothing has been removed yet",
+    why: ["the helper returns a subtree, so success has to be reported through this variable"] });
+  snap({ line: 2, stack: [], path: [],
+    calc: "root_ = remove_(root_, " + value + ", removed)\n" +
+          "the right-hand side runs first — root_ is not assigned until it returns",
+    head: "Start the recursion at the root",
+    why: ["remove_ will hand back the root of the finished tree"] });
+
+  var result = (function go(node, val, parent, side) {
+    var isSecond = val !== value;
+    snap({ line: 6, node: node, value: val,
+      stack: node ? vals(path).concat([node.v]) : vals(path).concat(["nullptr"]),
+      path: node ? vals(path).concat([node.v]) : vals(path),
+      calc: "remove_(" + (parent ? "node->" + side : "root_") + ", " + val + ", removed)\n" +
+            "node = " + childName(node) + (parent ? ",  the " + side + " child of " + parent.v : ",  the root"),
+      head: node ? "A new call, on <strong>" + node.v + "</strong>"
+                 : "A new call, on <code>nullptr</code> &mdash; " + parent.v + " has no " + side + " child",
+      why: [isSecond ? "this walk is removing the original " + val + ", the successor that was just copied"
+                     : "each call only ever looks at one node"] });
+
+    if (!node) {
+      snap({ line: 7, value: val, stack: vals(path).concat(["nullptr"]),
+        calc: "!node   →   return nullptr\n" + val + " is not in the tree, so removed stays false",
+        head: "Fell off the tree &mdash; <strong>" + val + "</strong> is not here",
+        why: ["<code>removed</code> is never set, so it stays false and remove() returns false",
+              "nothing in the tree changed"] });
+      return null;
+    }
+
+    path.push(node);
+    snap({ line: 7, node: node, value: val,
+      calc: "!node   →   false, node is " + node.v + "\nso there is a value to compare",
+      head: "<strong>" + node.v + "</strong> is a real node, so keep going",
+      why: ["the guard runs on every call, not only the ones that land on nothing"] });
+
+    var goLeft = val < node.v, goRight = val > node.v;
+    snap({ line: 9, node: node, value: val,
+      calc: val + " < " + node.v + "   →   " + (goLeft ? "true" : "false") + "\n" +
+            (goLeft ? "the whole right subtree is now out of the search" : "so this value is not on the left"),
+      head: goLeft ? val + " &lt; " + node.v + " &mdash; go left" : val + " is not smaller than " + node.v,
+      why: [goLeft ? "the whole right subtree is eliminated without being looked at"
+                   : "next: is it larger, or is this the node?"] });
+    if (!goLeft) {
+      snap({ line: 11, node: node, value: val,
+        calc: val + " > " + node.v + "   →   " + (goRight ? "true" : "false") + "\n" +
+              (goRight ? "the whole left subtree is now out of the search"
+                       : "not smaller and not larger, so this is the node"),
+        head: goRight ? val + " &gt; " + node.v + " &mdash; go right"
+                      : val + " is not larger than " + node.v + " either",
+        why: [goRight ? "the whole left subtree is eliminated" : "only one possibility remains"] });
+    }
+
+    if (goLeft || goRight) {
+      var dir = goLeft ? "left" : "right", line = goLeft ? 10 : 12;
+      var below = goLeft ? node.l : node.r;
+      snap({ line: line, node: node, value: val,
+        calc: "node->" + dir + " = remove_(node->" + dir + ", " + val + ", removed)\n" +
+              "node->" + dir + " is " + childName(below) + "   →   a new call on " + childName(below),
+        head: "From <strong>" + node.v + "</strong>, down the " + dir,
+        why: ["the assignment has to wait: the right-hand side runs first"] });
+      var back = go(below, val, node, dir);
+      if (goLeft) node.l = back; else node.r = back;
+      pendingFreed = null;
+      snap({ line: line, node: node, value: val,
+        calc: "node->" + dir + " = " + childName(back) + "\n" +
+              "the call came back, and " + node.v + "'s " + dir + " pointer stores it",
+        head: "Reattach: <strong>" + node.v + "</strong>&rsquo;s " + dir + " pointer takes the returned subtree",
+        why: ["this assignment is how a node removed further down actually leaves the tree"] });
+    } else {
+      snap({ line: 13, node: node, value: val, found: node.v,
+        calc: "else   →   " + val + " == " + node.v + "\nthis is the node to remove",
+        head: "Found <strong>" + node.v + "</strong>",
+        why: ["what happens next depends only on how many children it has"] });
+
+      var wasRemoved = removed;
+      removed = true;
+      var kids = childCount(node);
+      if (!caseNo) caseNo = kids === 0 ? 1 : kids === 1 ? 2 : 3;
+      snap({ line: 14, node: node, value: val, found: node.v,
+        calc: "removed = true\n" + (wasRemoved ? "it was already true, so this changes nothing"
+                                               : "set through the reference, so remove() will see it"),
+        head: "<strong>" + node.v + "</strong> has <strong>" + kids + "</strong> child" + (kids === 1 ? "" : "ren"),
+        why: ["<code>removed = true</code>, and that is visible to the original caller",
+              kids === 0 ? "no children: case 1" : kids === 1 ? "one child: case 2" : "two children: case 3"] });
+
+      snap({ line: 15, node: node, value: val, found: node.v,
+        calc: "!node->left && !node->right\nleft is " + childName(node.l) + ", right is " + childName(node.r) +
+              "   →   " + (kids === 0 ? "true, it is a leaf" : "false"),
+        head: kids === 0 ? "Case 1 &mdash; leaf" : "<strong>" + node.v + "</strong> is not a leaf",
+        why: [kids === 0 ? "both child pointers are null, so there is nothing to lose by deleting"
+                         : "at least one child depends on this node"] });
+
+      if (kids === 0) {
+        pendingFreed = node.id;
+        snap({ line: 16, value: val, gone: node.v,
+          calc: "delete node\nfrees " + node.v + (parent ? ", though " + parent.v + " still points at it" : ", though root_ still points at it"),
+          head: "<code>delete</code> <strong>" + node.v + "</strong>",
+          why: ["the memory is gone, but the pointer to it is not fixed until the next assignment"] });
+        snap({ line: 17, value: val, gone: node.v,
+          calc: "return nullptr\n" + (parent ? parent.v + "'s assignment will clear its " + side + " pointer"
+                                             : "root_'s assignment will make the tree empty"),
+          head: "Return <code>nullptr</code>",
+          why: ["the parent's assignment turns its child pointer null on the way back up"] });
+        path.pop();
+        return null;
+      }
+
+      var onlyRight = !node.l;
+      snap({ line: 19, node: node, value: val, found: node.v,
+        calc: "!node->left\nleft is " + childName(node.l) + "   →   " + (onlyRight ? "true, its only child is on the right" : "false"),
+        head: onlyRight ? "Case 2 &mdash; its one child is on the right" : "<strong>" + node.v + "</strong> has a left child",
+        why: [onlyRight ? "case 1 already failed, so a right child must exist" : "next: is there a right child too?"] });
+
+      var onlyLeft = false;
+      if (!onlyRight) {
+        onlyLeft = !node.r;
+        snap({ line: 24, node: node, value: val, found: node.v,
+          calc: "!node->right\nright is " + childName(node.r) + "   →   " + (onlyLeft ? "true, its only child is on the left" : "false, so it has two children"),
+          head: onlyLeft ? "Case 2 &mdash; its one child is on the left" : "Two children &mdash; this is case 3",
+          why: [onlyLeft ? "the left child is the only thing that has to survive"
+                         : "it cannot simply be deleted: two subtrees depend on it"] });
+      }
+
+      if (onlyRight || onlyLeft) {
+        var survivor = onlyRight ? node.r : node.l, base = onlyRight ? 20 : 25;
+        var field = onlyRight ? "right" : "left";
+        snap({ line: base, node: survivor, value: val, path: vals(path).concat([survivor.v]),
+          calc: "Node* child = node->" + field + "\nchild = " + survivor.v,
+          head: "Save the surviving child: <strong>" + survivor.v + "</strong>",
+          why: ["it has to be held before the node that points at it is freed"] });
+        pendingFreed = node.id;
+        snap({ line: base + 1, value: val, gone: node.v,
+          calc: "delete node\nfrees " + node.v + ",  child still holds " + survivor.v,
+          head: "<code>delete</code> <strong>" + node.v + "</strong>",
+          why: ["only this one node is freed; the subtree under " + survivor.v + " is untouched"] });
+        snap({ line: base + 2, value: val, gone: node.v, promoted: survivor.v,
+          calc: "return child\n" + (parent ? parent.v + "'s assignment will adopt " + survivor.v
+                                           : "root_'s assignment will make " + survivor.v + " the root"),
+          head: "Return <strong>" + survivor.v + "</strong>",
+          why: [(parent ? "the parent adopts " + survivor.v + ", which was already on the correct side of it"
+                        : survivor.v + " becomes the root, with its whole subtree intact"),
+                "so the BST property still holds without re-sorting anything"] });
+        path.pop();
+        return survivor;
+      }
+
+      // two children
+      var walk2 = [node.r.v], succ = node.r;
+      while (succ.l) { succ = succ.l; walk2.push(succ.v); }
+      snap({ line: 29, node: node, value: val, found: node.v, succ: succ.v, done: [succ.v],
+        calc: "Node* successor = find_min_(node->right)\nwalks " + walk2.join(" → ") + ",  successor = " + succ.v,
+        head: "The in-order successor is <strong>" + succ.v + "</strong>",
+        why: ["find_min_(node-&gt;right) walks left from " + node.r.v + " to " + succ.v,
+              succ.v + " is larger than everything on the left and smaller than everything else on the right"] });
+
+      var oldV = node.v;
+      node.v = succ.v;
+      snap({ line: 30, node: node, value: val, succ: succ.v,
+        path: vals(path),
+        calc: "node->data = successor->data\nthis node's " + oldV + " becomes " + succ.v + ",  so " + succ.v + " now appears twice",
+        head: "Copy <strong>" + succ.v + "</strong> into the node &mdash; " + oldV + " is gone from the tree",
+        why: ["no pointers moved; both subtrees are still attached exactly as they were",
+              "the value " + succ.v + " now appears <strong>twice</strong> &mdash; the next line fixes that"] });
+
+      snap({ line: 31, node: node, value: val, succ: succ.v,
+        calc: "node->right = remove_(node->right, " + succ.v + ", removed)\n" +
+              "node->right is " + childName(node.r) + "   →   a new call, looking for the original " + succ.v,
+        head: "Now remove the original <strong>" + succ.v + "</strong> from the right subtree",
+        why: ["it is the minimum there, so it has no left child &mdash; a case 1 or case 2 removal",
+              "case 3 can never recurse into case 3 again"] });
+      var after = go(node.r, succ.v, node, "right");
+      node.r = after;
+      pendingFreed = null;
+      snap({ line: 31, node: node, value: val, succ: succ.v,
+        calc: "node->right = " + childName(after) + "\nthe original " + succ.v + " is gone, so the value appears only once again",
+        head: "Reattach: <strong>" + node.v + "</strong>&rsquo;s right pointer takes the returned subtree",
+        why: ["the node you asked to remove is still here, holding a different value"] });
+      snap({ line: 32, node: node, value: val,
+        calc: "end of the found-it block\ncases 1 and 2 returned already; case 3 falls through to return node",
+        head: "Case 3 keeps this node, so carry on",
+        why: ["no <code>delete</code> ran at this level: the delete happened on the successor"] });
+    }
+
+    snap({ line: 33, node: node, value: val,
+      calc: "return node\n" + (parent ? node.v + " goes back to the call on " + parent.v
+                                      : node.v + " goes back to remove(), as the root"),
+      head: "Hand <strong>" + node.v + "</strong> back up",
+      why: ["the caller stores this pointer whether or not anything changed here"] });
+    path.pop();
+    return node;
+  })(root, value, null, null);
+
+  root = result;
+  pendingFreed = null;
+  snap({ line: 2, stack: [], path: [],
+    calc: "root_ = " + childName(root) + "\nthe outermost return landed here",
+    head: "<code>root_</code> takes what the outermost call returned",
+    why: ["this assignment is what would store a new root, if the root was the node removed"] });
+  snap({ line: 3, stack: [], path: [],
+    calc: "return removed\nremove(" + value + ") returns " + (removed ? "true" : "false"),
+    head: removed ? "Done &mdash; remove(" + value + ") returned <strong>true</strong>"
+                  : "Done &mdash; remove(" + value + ") returned <strong>false</strong>",
+    why: [removed ? "the tree now has " + countOf(root) + " nodes, height " + heightOf(root)
+                  : "the tree is untouched: " + countOf(root) + " nodes, height " + heightOf(root),
+          "in-order: " + (walk(root, "inorder", []).join(" ") || "empty")] });
+  return frames;
+}
+
+function clone(n) { return n ? { v: n.v, id: n.id, l: clone(n.l), r: clone(n.r) } : null; }
+
+function insertPlain(root, v) {
+  if (!root) return { v: v, l: null, r: null };
+  if (v < root.v) root.l = insertPlain(root.l, v);
+  else if (v > root.v) root.r = insertPlain(root.r, v);
+  return root;
+}
+
+function buildTree(seq) {
+  var root = null;
+  seq.forEach(function (v) { root = insertPlain(root, v); });
+  return root;
+}
+
+function heightOf(n) { return n ? 1 + Math.max(heightOf(n.l), heightOf(n.r)) : -1; }
+function countOf(n) { return n ? 1 + countOf(n.l) + countOf(n.r) : 0; }
+
+function walk(n, order, out) {
+  if (!n) return out;
+  if (order === "preorder") out.push(n.v);
+  walk(n.l, order, out);
+  if (order === "inorder") out.push(n.v);
+  walk(n.r, order, out);
+  if (order === "postorder") out.push(n.v);
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Drawing. x comes from in-order position, y from depth -- the standard layout,
+// and the one that makes "in-order reads left to right" visible rather than
+// asserted.
+// ---------------------------------------------------------------------------
+function layout(root) {
+  var pos = [], i = 0;
+  (function place(n, d) {
+    if (!n) return;
+    place(n.l, d + 1);
+    pos.push({ v: n.v, x: i++, y: d, node: n });
+    place(n.r, d + 1);
+  })(root, 0);
+  var byNode = new Map();
+  pos.forEach(function (p) { byNode.set(p.node, p); });
+  return { pos: pos, byNode: byNode, cols: i, rows: heightOf(root) + 1 };
+}
+
+function treeSvg(root, mark) {
+  mark = mark || {};
+  if (!root) {
+    return '<svg class="tree" viewBox="0 0 400 60" role="img" aria-label="an empty tree">' +
+      '<text x="200" y="34" text-anchor="middle" fill="#6e6e6e" font-weight="400">' +
+      'the tree is empty &#x2014; root is nullptr</text></svg>';
+  }
+  var L = layout(root);
+  var CW = 62, RH = 66, PAD = 30;
+  var W = Math.max(L.cols * CW, 220) + PAD * 2;
+  var H = L.rows * RH + PAD * 2;
+  var X = function (p) { return PAD + p.x * CW + CW / 2; };
+  var Y = function (p) { return PAD + p.y * RH + 20; };
+
+  var edges = "", nodes = "";
+  L.pos.forEach(function (p) {
+    ["l", "r"].forEach(function (side) {
+      var c = p.node[side];
+      if (!c) return;
+      var cp = L.byNode.get(c);
+      var on = mark.path && mark.path.indexOf(p.v) !== -1 &&
+               mark.path.indexOf(c.v) !== -1;
+      edges += '<line x1="' + X(p) + '" y1="' + (Y(p) + 16) + '" x2="' + X(cp) +
+               '" y2="' + (Y(cp) - 16) + '" stroke="' + (on ? "#2573a7" : "#c7cdd1") +
+               '" stroke-width="' + (on ? 3 : 2) + '"/>';
+    });
+  });
+
+  // the empty slot the recursion is currently sitting in, drawn dashed
+  if (mark.slot) {
+    var par = L.pos.filter(function (q) { return q.v === mark.slot.parent; })[0];
+    if (par) {
+      var sx = X(par) + (mark.slot.side === "l" ? -CW / 2 : CW / 2);
+      var sy = Y(par) + RH;
+      edges += '<line x1="' + X(par) + '" y1="' + (Y(par) + 16) + '" x2="' + sx +
+               '" y2="' + (sy - 16) + '" stroke="#c7cdd1" stroke-width="2" stroke-dasharray="4 3"/>';
+      nodes += '<circle cx="' + sx + '" cy="' + sy + '" r="16" fill="#fff" stroke="#c7cdd1" ' +
+               'stroke-width="2" stroke-dasharray="4 3"/>' +
+               '<text x="' + sx + '" y="' + (sy + 5) + '" text-anchor="middle" fill="#6e6e6e" ' +
+               'font-weight="400">?</text>';
+    }
+  }
+
+  L.pos.forEach(function (p) {
+    var fill = "#fff", stroke = "#c7cdd1", tcol = "#2c3e50", sw = 2, dash = null;
+    // Marks are matched by VALUE, never by object identity: the frame carries a
+    // clone of the tree, so a node from the live tree would never be === to the
+    // one being drawn. Values are unique in a BST, which is what makes this work.
+    if (mark.path && mark.path.indexOf(p.v) !== -1)     { fill = "#eaf2f8"; stroke = "#2573a7"; }
+    if (mark.done && mark.done.indexOf(p.v) !== -1)     { fill = "#f2fbf4"; stroke = "#1c7e45"; }
+    if (mark.freedId !== undefined && p.node.id === mark.freedId) { fill = "#fdf0ee"; stroke = "#c0392b";
+                                                          tcol = "#c0392b"; dash = "4 3"; }
+    if (mark.hitId !== undefined ? p.node.id === mark.hitId : mark.hit === p.v)
+                                                        { fill = "#fff3e0"; stroke = "#a95c19"; sw = 3; }
+    if (mark.placed === p.v)                            { fill = "#f2fbf4"; stroke = "#1c7e45"; sw = 3; }
+    nodes += '<circle cx="' + X(p) + '" cy="' + Y(p) + '" r="17" fill="' + fill +
+             '" stroke="' + stroke + '" stroke-width="' + sw + '"' +
+             (dash ? ' stroke-dasharray="' + dash + '"' : "") + "/>" +
+             '<text x="' + X(p) + '" y="' + (Y(p) + 5) + '" text-anchor="middle" fill="' +
+             tcol + '">' + p.v + "</text>";
+
+    // A badge beside the node, for a value the recursion has worked out about it
+    // -- the height it returned, say. Keyed by value, like every other mark.
+    if (mark.labels && mark.labels[p.v] !== undefined) {
+      var bx = X(p) + 13, by = Y(p) - 23;
+      nodes += '<rect x="' + bx + '" y="' + by + '" width="26" height="17" rx="4" ' +
+               'fill="#4527a0" stroke="#fff" stroke-width="1.5"/>' +
+               '<text x="' + (bx + 13) + '" y="' + (by + 12.5) + '" text-anchor="middle" ' +
+               'fill="#fff" font-size="11">' + mark.labels[p.v] + "</text>";
+    }
+  });
+
+  // Every frame of a run shares one box, so the panel never resizes and the
+  // nodes never change scale.
+  var bw = W, bh = H, shift = 0;
+  if (mark.box) {
+    bw = Math.max(W, mark.box.w);
+    bh = Math.max(H, mark.box.h);
+    shift = (bw - W) / 2;   // centred, not pinned left
+  }
+  var body = shift ? '<g transform="translate(' + shift + ',0)">' + edges + nodes + "</g>"
+                   : edges + nodes;
+  return '<svg class="tree" viewBox="0 0 ' + bw + " " + bh +
+    '" role="img" aria-label="the binary search tree, ' + countOf(root) +
+    ' nodes, height ' + heightOf(root) + '">' + body + "</svg>";
+}
+
+// ---------------------------------------------------------------------------
+// Code panes
+// ---------------------------------------------------------------------------
+
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function codeRows(key, hit, frame, pinned) {
+  var calc = frame && frame.calc;
+  return CODE[key].map(function (ln, i) {
+    var cls = [];
+    if (i === hit) cls.push("hit");
+    if (pinned === i) cls.push("pin");
+    var t = hl(ln);
+    return '<div data-line="' + i + '"' + (cls.length ? ' class="' + cls.join(" ") + '"' : "") +
+           ' tabindex="0">' + (t === "" ? "&nbsp;" : t) + "</div>" +
+           // The live values go under the line that is executing. esc() is
+           // deliberate: this band is text, not markup.
+           (i === hit && calc
+              ? '<div class="calc"><span class="cv">' + esc(calc) + "</span></div>" : "");
+  }).join("");
+}
+
+// C++ keywords that actually appear in these listings. Anything not here
+// stays plain, which is the right default -- colouring every identifier is
+// noise, and the eye is looking for structure.
+var HL_KW = ("auto bool break case class const continue delete double else false float for " +
+             "if int new nullptr private public return size_t std struct template this throw " +
+             "true typename unsigned using virtual void while").split(" ");
+
+// Colour one raw source line. Works on the RAW text and escapes each piece as
+// it emits: escaping first and matching second means the regex ends up picking
+// through &lt; and &amp; and will eventually colour half an entity.
+function hl(raw) {
+  var cut = raw.indexOf("//");
+  var code = cut === -1 ? raw : raw.slice(0, cut);
+  var note = cut === -1 ? "" : raw.slice(cut);
+
+  var out = "";
+  var re = /("(?:[^"\\]|\\.)*")|(\b\d+(?:\.\d+)?\b)|([A-Za-z_]\w*)|([\s\S]?)/g;
+  var m;
+  while ((m = re.exec(code)) !== null) {
+    if (m[0] === "") { re.lastIndex++; continue; }
+    if (m[1]) { out += '<span class="st">' + esc(m[1]) + "</span>"; continue; }
+    if (m[2]) { out += '<span class="nm">' + esc(m[2]) + "</span>"; continue; }
+    if (m[3]) {
+      // keyword wins over function: "if (" must not come out as a call
+      if (HL_KW.indexOf(m[3]) !== -1) {
+        out += '<span class="kw">' + esc(m[3]) + "</span>";
+      } else if (code.charAt(re.lastIndex) === "(") {
+        out += '<span class="fn">' + esc(m[3]) + "</span>";
+      } else {
+        out += esc(m[3]);
+      }
+      continue;
+    }
+    out += esc(m[4]);
+  }
+  return out + (note ? '<span class="cm">' + esc(note) + "</span>" : "");
+}
+
+function codeHtml(key, hit, frame) {
+  return '<div class="code" id="code">' + codeRows(key, hit, frame, state.pinned) + "</div>" +
+         lineInfoHtml(key);
+}
+
+function lineInfoHtml(key) {
+  var n = state.pinned;
+  var info = LINE_INFO[key] && LINE_INFO[key][n];
+  if (!info) {
+    return '<p class="legend" style="margin-top:.5rem">Click a line of code for a breakdown of it.</p>';
+  }
+  return '<div class="lineinfo"><h4>' + esc(info.src) + "</h4><p style='margin:0'>" + info.what +
+    "</p><ul class='li-items'>" + info.items.map(function (it) {
+      return '<li><span class="li-kind k-' + it[0] + '">' + it[0] + "</span>" + it[1] + "</li>";
+    }).join("") + "</ul></div>";
+}
+
+
+function localsHtml(f) {
+  var rows = [];
+  function add(name, val, note, pend) {
+    rows.push('<div class="lv"><span class="ln">' + name + '</span>' +
+      '<span class="lval' + (pend ? " pend" : "") + '">' + val + "</span>" +
+      (note ? '<span class="lat">' + note + "</span>" : "") + "</div>");
+  }
+
+  // An empty stack means no call is in progress -- the opening or closing
+  // frame -- which is not the same thing as a call that landed on nullptr.
+  var inCall = !!(f.stack && f.stack.length);
+  var here = inCall ? f.stack[f.stack.length - 1] : null;
+  add("node", inCall ? here : "&mdash;",
+      inCall ? "the call that is executing" : "no call in progress", !inCall);
+
+  if (f.value !== undefined) add("value", f.value, "being removed in this call");
+  if (f.succ !== undefined) add("successor", f.succ, "the smallest value to the right");
+  if (f.removed !== undefined) add("removed", f.removed ? "true" : "false", "shared by every call");
+
+  var stack = '<div class="lv stackline"><span class="ln">root_</span>' +
+              '<span class="lat">the tree</span></div>';
+  if (f.stack) {
+    f.stack.forEach(function (v, d) {
+      var last = d === f.stack.length - 1;
+      stack += '<div class="lv stackline' + (last ? " here" : "") + '" ' +
+               'style="padding-left:' + (0.7 + d * 0.7) + 'rem">' +
+               '<span class="ln">&#x21B3;</span><span class="lat">node ' + v +
+               (last ? " &larr; here" : "") + "</span></div>";
+    });
+  }
+  return '<div class="locals"><div><h5>Variables in scope</h5>' + rows.join("") + "</div>" +
+         '<div><h5>Call stack</h5>' + stack + "</div></div>";
+}
+
+// The note under the tree.
+function nowBox(f) {
+  return '<div class="nowbox"><p class="nownote">' + f.head + "</p></div>";
+}
+
+// The rail. Two facts: the line being executed, and which phase it belongs to.
+// The bullets stay collapsed until clicked, and open into the rail.
+function railHtml(f) {
+  var key = codeKey(), g = GUIDE[key];
+  if (!g) return "";
+  var at = phaseOf(key, f.line);
+  var tag = f.tag || (STEP_TAG[key] && STEP_TAG[key][f.line]);
+  var mode = { findmin: "in find_min_", remove: "in remove_" }[key] || "";
+  return '<div class="card rail"><h2>Where we are</h2><div class="card-body">' +
+    (tag ? '<p class="rlab">this step</p><p class="rnow">' + esc(tag) + "</p>" : "") +
+    '<p class="rlab">' + mode + "</p><ol>" +
+    g.steps.map(function (st, i) {
+      var open = state.peek === i;
+      return '<li class="' + (i === at ? "on" : "") + '" data-step="' + i + '" ' +
+             'role="button" tabindex="0"><span class="rt">' +
+             '<span class="rn">' + (i + 1) + "</span><span>" + st.t + "</span></span>" +
+             (open ? "<ul>" + st.b.map(function (b) { return "<li>" + b + "</li>"; }).join("") +
+                     "</ul>" : "") + "</li>";
+    }).join("") + "</ol></div></div>";
+}
+
+function wireRail() {
+  var root = document.getElementById("stage");
+  Array.prototype.forEach.call(root.querySelectorAll(".rail [data-step]"), function (d) {
+    var n = +d.getAttribute("data-step");
+    var hit = function () { state.peek = state.peek === n ? null : n; render(); };
+    d.addEventListener("click", hit);
+    d.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); hit(); }
+    });
+  });
+}
+
+// Jump to the first frame belonging to a later How-it-works step.
+function nextPhase() {
+  if (state.mode === "cases") { go(state.maxFrames - 1); return; }
+  var key = codeKey();
+  var here = phaseOf(key, frameAt(state.mode, state.step).line);
+  for (var i = state.step + 1; i < state.maxFrames; i++) {
+    if (phaseOf(key, frameAt(state.mode, i).line) !== here) { go(i); return; }
+  }
+  go(state.maxFrames - 1);
+}
+
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+var state = { mode: "findmin", preset: "classic", step: 0, target: null,
+              pinned: null, peek: null, runs: {}, maxFrames: 1, timer: null };
+
+// The three remove cases, picked out of the current tree by child count, so a
+// label can never claim a case the tree does not actually contain.
+function targetsFor(seq) {
+  var root = buildTree(seq), out = { 0: null, 1: null, 2: null };
+  (function go(n) {
+    if (!n) return;
+    var c = childCount(n);
+    if (out[c] === null) out[c] = n.v;
+    go(n.l); go(n.r);
+  })(root);
+  var list = [];
+  if (out[0] !== null) list.push({ v: out[0], label: out[0] + " — leaf", caseNo: 1 });
+  if (out[1] !== null) list.push({ v: out[1], label: out[1] + " — one child", caseNo: 2 });
+  if (out[2] !== null) list.push({ v: out[2], label: out[2] + " — two children", caseNo: 3 });
+  list.push({ v: 99, label: "99 — not in the tree", caseNo: 0 });
+  return list;
+}
+
+function compute() {
+  var seq = PRESETS[state.preset].seq;
+  var opts = targetsFor(seq);
+  if (!opts.some(function (o) { return o.v === state.target; })) {
+    state.target = opts[0].v;
+  }
+  state.tree = buildTree(seq);
+  state.runs = {
+    findmin: buildFindMin(state.tree, state.tree.r ? state.tree.r.v : undefined),
+    remove: buildRemove(seq, state.target)
+  };
+  // the compare tab runs one lane per case the tree can actually show
+  // One lane per case. A case the current tree has no node for still gets a
+  // lane -- saying so is the point, not a gap. The balanced tree genuinely
+  // contains no one-child node, which is why the second preset adds 65.
+  var byCase = {};
+  opts.forEach(function (o) { if (o.caseNo > 0) byCase[o.caseNo] = o; });
+  state.lanes = [1, 2, 3].map(function (c) {
+    var o = byCase[c];
+    if (!o) return { caseNo: c, missing: true };
+    return { label: o.label, caseNo: c, value: o.v, frames: buildRemove(seq, o.v) };
+  });
+  state.maxFrames = state.mode === "cases"
+    ? Math.max.apply(null, state.lanes.filter(function (l) { return !l.missing; })
+        .map(function (l) { return l.frames.length; }))
+    : state.runs[state.mode].length;
+  if (state.step >= state.maxFrames) state.step = state.maxFrames - 1;
+
+  // Size each run's tree panel to its largest frame, read back out of the
+  // rendered viewBox so it cannot drift from what treeSvg actually draws.
+  var fit = function (frames) {
+    var box = null;
+    frames.forEach(function (f) {
+      var vb = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(treeSvg(f.tree, f));
+      if (!vb) return;
+      box = box ? { w: Math.max(box.w, +vb[1]), h: Math.max(box.h, +vb[2]) } : { w: +vb[1], h: +vb[2] };
+    });
+    if (box) frames.forEach(function (f) { f.box = box; });
+  };
+  Object.keys(state.runs).forEach(function (k) { fit(state.runs[k]); });
+  state.lanes.forEach(function (l) { if (!l.missing) fit(l.frames); });
+  state.mh = null;        // the reservation belongs to the run that was just built
+}
+
+function frameAt(key, step) {
+  var r = state.runs[key];
+  return r[Math.min(step, r.length - 1)];
+}
+
+function chipsHtml(f) {
+  var out = [];
+  if (f.caseNo) out.push('<span class="chip cur">case <b>' + f.caseNo + "</b></span>");
+  if (f.succ !== undefined) out.push('<span class="chip">successor <b>' + f.succ + "</b></span>");
+  if (f.gone !== undefined) out.push('<span class="chip no">deleted <b>' + f.gone + "</b></span>");
+  if (f.promoted !== undefined) out.push('<span class="chip ok">promoted <b>' + f.promoted + "</b></span>");
+  if (f.removed !== undefined) {
+    out.push('<span class="chip ' + (f.removed ? "ok" : "no") + '">removed = <b>' +
+             (f.removed ? "true" : "false") + "</b></span>");
+  }
+  return out.length ? '<div class="chips">' + out.join("") + "</div>" : "";
+}
+
+function factsHtml(key) {
+  var k = key === "cases" ? "remove" : key;
+  if (!FACTS[k]) return "";
+  return '<dl class="facts">' + FACTS[k].map(function (p) {
+    return "<dt>" + p[0] + "</dt><dd>" + p[1] + "</dd>";
+  }).join("") + "</dl>";
+}
+
+function soloTitle() {
+  return state.mode === "findmin" ? "find_min_ on the right subtree" : "remove(" + state.target + ")";
+}
+
+function soloHtml(f, key, title) {
+  var mh = state.mh || {};
+  var fix = function (n) { return mh[n] ? ' style="min-height:' + mh[n] + 'px"' : ""; };
+  return '<div class="solo"><div class="col">' +
+      '<div class="card"><h2>' + title + " &mdash; " + PRESETS[state.preset].label + " tree</h2>" +
+        '<div class="card-body"' + fix("tree") + ">" + treeSvg(f.tree, f) +
+        '<div class="treefoot">' + chipsHtml(f) + "</div></div></div>" +
+      '<div class="card"><h2>What the machine is holding</h2><div class="card-body"' + fix("locals") + ">" +
+        localsHtml(f) + "</div></div>" +
+      '<div class="card"><h2>What just happened</h2><div class="card-body"' + fix("says") + ">" +
+        nowBox(f) +
+        (f.why && f.why.length ? '<ul class="why">' + f.why.map(function (w) {
+          return "<li>" + w + "</li>"; }).join("") + "</ul>" : "") +
+      "</div></div>" +
+    "</div><div class=\"col\">" +
+      '<div class="card"><h2>The code</h2><div class="card-body"' + fix("code") + ">" +
+        codeHtml(key, f.line, f) + "</div></div>" +
+      '<div class="card"><h2>What it costs</h2><div class="card-body">' + factsHtml(key) + "</div></div>" +
+    '</div><div class="col railcol">' + railHtml(f) + "</div></div>";
+}
+
+// Render every frame offscreen at the real width and keep the tallest each panel
+// reaches. Redone whenever the answer can change: mode, tree, target or width.
+function measureRun() {
+  var stage = document.getElementById("stage");
+  if (!stage.offsetWidth) return;
+  var ghost = document.createElement("div");
+  ghost.style.cssText = "position:absolute;left:-99999px;top:0;visibility:hidden;width:" +
+                        stage.offsetWidth + "px";
+  document.body.appendChild(ghost);
+
+  if (state.mode === "cases") {
+    var tallest = 0;
+    for (var step = 0; step < state.maxFrames; step++) {
+      ghost.innerHTML = '<div class="lanes">' + lanesHtml(step, null) + "</div>";
+      Array.prototype.forEach.call(ghost.querySelectorAll(".lane"), function (l) {
+        tallest = Math.max(tallest, l.offsetHeight);
+      });
+    }
+    document.body.removeChild(ghost);
+    state.mh = { lane: tallest };
+    return;
+  }
+
+  var key = codeKey(), title = soloTitle();
+  state.mh = null;                       // measure the natural height, not a reserved one
+  var max = { tree: 0, locals: 0, says: 0, code: 0 };
+  state.runs[state.mode].forEach(function (f) {
+    ghost.innerHTML = soloHtml(f, key, title);
+    var cols = ghost.querySelectorAll(".col");
+    var left = cols[0].children, right = cols[1].children;
+    var h = function (card) { return card ? card.querySelector(".card-body").offsetHeight : 0; };
+    max.tree   = Math.max(max.tree,   h(left[0]));
+    max.locals = Math.max(max.locals, h(left[1]));
+    max.says   = Math.max(max.says,   h(left[2]));
+    max.code   = Math.max(max.code,   h(right[0]));
+  });
+  document.body.removeChild(ghost);
+  state.mh = max;
+}
+
+function renderSolo() {
+  var key = codeKey();
+  var f = frameAt(state.mode, state.step);
+  document.getElementById("stage").innerHTML = soloHtml(f, key, soloTitle());
+  wireCode(key);
+  wireRail();
+}
+
+// Why a case is absent depends on which case it is, so each gets its own
+// explanation rather than one sentence that is only true for case 2.
+var WHY_ABSENT = {
+  1: { what: "node without children",
+       note: "Every non-empty tree has at least one leaf, so seeing this is a bug, not a shape." },
+  2: { what: "node with exactly one child",
+       note: "A perfectly balanced tree has only leaves and two-child nodes. Switch to the " +
+             "<strong>&hellip; plus 65</strong> or <strong>&hellip; plus 55</strong> tree, which " +
+             "inserts one node for the sole purpose of giving 60 a single child." },
+  3: { what: "node with two children",
+       note: "Every node in a degenerate tree has at most one child &mdash; that is what makes " +
+             "it a chain. Switch to one of the balanced trees to see case 3." }
+};
+
+function lanesHtml(step, minHeight) {
+  var fix = minHeight ? ' style="min-height:' + minHeight + 'px"' : "";
+  return state.lanes.map(function (l) {
+    var cls = ["", "inorder", "preorder", "postorder"][l.caseNo] || "";
+    if (l.missing) {
+      var w = WHY_ABSENT[l.caseNo];
+      return '<div class="lane ' + cls + '"' + fix + "><h2>Case " + l.caseNo +
+        ' &mdash; not in this tree</h2><div class="card-body">' +
+        '<p class="mini">This tree contains no <strong>' + w.what + '</strong>, so case ' +
+        l.caseNo + ' cannot arise in it. That is a fact about the tree&rsquo;s <em>shape</em>, ' +
+        'not about the code. ' + w.note + '</p></div></div>';
+    }
+    var f = l.frames[Math.min(step, l.frames.length - 1)];
+    return '<div class="lane ' + cls + '"' + fix + "><h2>Case " + l.caseNo + " &mdash; remove(" +
+      l.value + ")</h2><div class='card-body'>" +
+      treeSvg(f.tree, f) + chipsHtml(f) +
+      '<div class="code lanecode">' + codeRows("remove", f.line, f, null) + "</div>" +
+      '<p class="mini">' + f.head + "</p></div></div>";
+  }).join("");
+}
+
+function renderCases() {
+  var live = state.lanes.filter(function (l) { return !l.missing; });
+  var atEnd = live.every(function (l) { return state.step >= l.frames.length - 1; });
+  var lanes = lanesHtml(state.step, state.mh && state.mh.lane);
+
+  document.getElementById("stage").innerHTML =
+    '<div class="lanes">' + lanes + "</div>" +
+    (atEnd ? '<div class="card"><h2>What the three have in common</h2><div class="card-body">' +
+      "<p>Every case ends by <strong>returning a subtree to the parent</strong>, and the parent " +
+      "assigns it back. That single pattern is what lets one function splice a node out of any " +
+      "position without ever holding a parent pointer. What differs is only <em>which</em> " +
+      "subtree comes back: nothing, the one surviving child, or the same node carrying a " +
+      "different value.</p></div></div>" : "");
+}
+
+function wireCode(key) {
+  var code = document.getElementById("code");
+  if (!code) return;
+  Array.prototype.forEach.call(code.children, function (d) {
+    var i = parseInt(d.getAttribute("data-line"), 10);
+    function pick() { state.pinned = (state.pinned === i) ? null : i; render(); }
+    d.addEventListener("click", pick);
+    d.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") { ev.preventDefault(); pick(); }
+    });
+  });
+}
+
+function extraControls() {
+  var row = document.getElementById("extraRow");
+  if (state.mode === "remove") {
+    var opts = targetsFor(PRESETS[state.preset].seq);
+    row.innerHTML = '<span class="lbl">Remove</span>' + opts.map(function (o) {
+      return '<button class="ctl' + (state.target === o.v ? " on" : "") + '" data-target="' +
+        o.v + '">' + o.label + "</button>";
+    }).join("") + '<span class="count">the case is decided by the child count, not by you</span>';
+    Array.prototype.forEach.call(row.querySelectorAll("[data-target]"), function (b) {
+      b.addEventListener("click", function () {
+        stopPlay();
+        state.target = parseInt(b.getAttribute("data-target"), 10);
+        state.step = 0; state.pinned = null; compute(); render();
+      });
+    });
+  } else {
+    row.innerHTML = "";
+  }
+}
+
+function render() {
+  extraControls();
+  if (!state.mh) {
+    if (state.mode === "cases") renderCases(); else renderSolo();
+    measureRun();
+  }
+  if (state.mode === "cases") renderCases(); else renderSolo();
+
+  var g = GUIDE[codeKey()];
+  document.getElementById("watch").innerHTML = g
+    ? '<div class="card"><div class="card-body"><div class="callout warn" style="margin:0">' +
+      g.watch + "</div></div></div>"
+    : "";
+
+  var t = state.tree;
+  document.getElementById("treeNote").textContent =
+    countOf(t) + " nodes, height " + heightOf(t);
+  document.getElementById("frameCount").textContent =
+    "step " + (state.step + 1) + " of " + state.maxFrames;
+  document.getElementById("first").disabled = state.step === 0;
+  document.getElementById("prev").disabled = state.step === 0;
+  document.getElementById("next").disabled = state.step >= state.maxFrames - 1;
+  document.getElementById("last").disabled = state.step >= state.maxFrames - 1;
+  document.getElementById("nextPhase").disabled = state.step >= state.maxFrames - 1;
+
+  Array.prototype.forEach.call(document.querySelectorAll("#tabs [data-mode]"), function (b) {
+    b.classList.toggle("on", b.getAttribute("data-mode") === state.mode);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function (b) {
+    b.classList.toggle("on", b.getAttribute("data-preset") === state.preset);
+  });
+}
+
+function go(n) { state.step = Math.max(0, Math.min(n, state.maxFrames - 1)); render(); }
+function stopPlay() {
+  if (state.timer) { clearInterval(state.timer); state.timer = null; }
+  document.getElementById("play").innerHTML = "&#9654; Play";
+}
+function togglePlay() {
+  if (state.timer) { stopPlay(); return; }
+  if (state.step >= state.maxFrames - 1) state.step = 0;
+  document.getElementById("play").innerHTML = "&#10073;&#10073; Pause";
+  state.timer = setInterval(function () {
+    if (state.step >= state.maxFrames - 1) { stopPlay(); return; }
+    go(state.step + 1);
+  }, 620);
+}
+
+document.getElementById("first").addEventListener("click", function () { stopPlay(); go(0); });
+document.getElementById("prev").addEventListener("click", function () { stopPlay(); go(state.step - 1); });
+document.getElementById("next").addEventListener("click", function () { stopPlay(); go(state.step + 1); });
+document.getElementById("last").addEventListener("click", function () { stopPlay(); go(state.maxFrames - 1); });
+document.getElementById("play").addEventListener("click", togglePlay);
+document.getElementById("nextPhase").addEventListener("click", function () { stopPlay(); nextPhase(); });
+
+Array.prototype.forEach.call(document.querySelectorAll("#tabs [data-mode]"), function (b) {
+  b.addEventListener("click", function () {
+    stopPlay();
+    state.mode = b.getAttribute("data-mode");
+    state.step = 0; state.pinned = null; state.peek = null;
+    if (history.replaceState) history.replaceState(null, "", "#" + state.mode);
+    else location.hash = state.mode;
+    compute(); render();
+  });
+});
+Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function (b) {
+  b.addEventListener("click", function () {
+    stopPlay(); state.preset = b.getAttribute("data-preset");
+    state.step = 0; state.pinned = null; compute(); render();
+  });
+});
+
+document.addEventListener("keydown", function (e) {
+  var onCodeLine = e.target && e.target.parentNode && e.target.parentNode.classList &&
+                   e.target.parentNode.classList.contains("code");
+  if (e.key === "ArrowRight") { stopPlay(); go(state.step + 1); }
+  else if (e.key === "ArrowLeft") { stopPlay(); go(state.step - 1); }
+  else if (e.key === " " && !onCodeLine) { e.preventDefault(); togglePlay(); }
+});
+
+// ---------------------------------------------------------------------------
+// Self-check -- re-derives every trace against a plain recursive remove, so a
+// wrong frame is reported on the page rather than taught from it.
+// ---------------------------------------------------------------------------
+(function selftest() {
+  var fails = [], runs = 0, steppedRemove = {}, steppedFind = {};
+
+  function plainRemove(n, v, box) {
+    if (!n) return null;
+    if (v < n.v) { n.l = plainRemove(n.l, v, box); return n; }
+    if (v > n.v) { n.r = plainRemove(n.r, v, box); return n; }
+    box.hit = true;
+    if (!n.l && !n.r) return null;
+    if (!n.l || !n.r) return n.l ? n.l : n.r;
+    var s = n.r; while (s.l) s = s.l;
+    n.v = s.v;
+    n.r = plainRemove(n.r, s.v, { });
+    return n;
+  }
+
+  Object.keys(PRESETS).forEach(function (name) {
+    var seq = PRESETS[name].seq;
+    var sorted = seq.slice().sort(function (a, b) { return a - b; });
+
+    // find_min_ must return the leftmost node of whatever subtree it starts in
+    var root = buildTree(seq);
+    if (root.r) {
+      var fm = buildFindMin(root, root.r.v);
+      runs++;
+      var want = root.r; while (want.l) want = want.l;
+      var got = fm[fm.length - 1].hit;
+      if (got !== want.v) fails.push(name + "/find_min: got " + got + ", expected " + want.v);
+      fm.forEach(function (f, i) {
+        steppedFind[f.line] = 1;
+        if (!f.calc) fails.push(name + "/find_min frame " + i + ": no THIS STEP band");
+      });
+      if (fm[fm.length - 1].tree && findNode(fm[fm.length - 1].tree, got) === null)
+        fails.push(name + "/find_min: result not in the tree");
+    }
+
+    // every value, plus one that is not there, must match a plain remove
+    seq.concat([99]).forEach(function (v) {
+      var frames = buildRemove(seq, v);
+      runs++;
+      var end = frames[frames.length - 1];
+      var box = {};
+      var expectTree = plainRemove(buildTree(seq), v, box);
+      var expect = walk(expectTree, "inorder", []);
+      var got = walk(end.tree, "inorder", []);
+      if (got.join() !== expect.join())
+        fails.push(name + "/remove " + v + ": got " + got.join(",") + ", expected " + expect.join(","));
+      if (end.removed !== !!box.hit)
+        fails.push(name + "/remove " + v + ": removed=" + end.removed + ", expected " + !!box.hit);
+      // the result must still be a BST
+      if (got.slice().sort(function (a, b) { return a - b; }).join() !== got.join())
+        fails.push(name + "/remove " + v + ": result is not a BST");
+      // and must have lost exactly one node, or none on a miss
+      var expectN = box.hit ? seq.length - 1 : seq.length;
+      if (countOf(end.tree) !== expectN)
+        fails.push(name + "/remove " + v + ": " + countOf(end.tree) + " nodes, expected " + expectN);
+      // every frame must point at a real line and a real phase
+      frames.forEach(function (f, i) {
+        steppedRemove[f.line] = 1;
+        if (!f.calc) fails.push(name + "/remove " + v + " frame " + i + ": no THIS STEP band");
+        else if (/&[a-zA-Z]+;|&#x?[0-9A-Fa-f]+;/.test(f.calc))
+          fails.push(name + "/remove " + v + " frame " + i + ": HTML entity in the band");
+        else if (/\bundefined\b|\bNaN\b/.test(f.calc))
+          fails.push(name + "/remove " + v + " frame " + i + ": bad value in the band");
+        if (CODE.remove[f.line] === undefined)
+          fails.push(name + "/remove " + v + ": frame at line " + f.line);
+        var ph = phaseOf("remove", f.line);
+        if (ph < 0 || ph >= GUIDE.remove.steps.length)
+          fails.push(name + "/remove " + v + ": line " + f.line + " maps to step " + ph);
+      });
+    });
+    void sorted;
+  });
+
+  // Every line that can run has to be stepped on somewhere across these trees.
+  // The rest sit straight after a return, so no input can ever reach them.
+  var UNREACHABLE = { findmin: { 5: 1 }, remove: { 4: 1, 18: 1, 23: 1, 28: 1, 34: 1 } };
+  [["findmin", steppedFind], ["remove", steppedRemove]].forEach(function (pair) {
+    var key = pair[0];
+    CODE[key].forEach(function (ln, i) {
+      if (!ln.trim()) return;
+      if (!pair[1][i] && !UNREACHABLE[key][i]) fails.push(key + ": line " + i + " is never stepped on");
+      var info = LINE_INFO[key][i];
+      if (!info || !info.src || !info.what || !info.items || !info.items.length)
+        fails.push(key + ": line " + i + " has no breakdown");
+      else if (ln.indexOf(info.src) === -1)
+        fails.push(key + ": breakdown for line " + i + " quotes other code");
+    });
+  });
+
+  document.getElementById("selftest").innerHTML = fails.length === 0
+    ? '<span class="ok">&#x2714; Self-check passed</span> &mdash; ' + runs +
+      " runs across " + Object.keys(PRESETS).length +
+      " trees: find_min_ returns the leftmost node of the subtree it was given, every " +
+      "removal matches a plain recursive remove, the result is still a sorted BST with " +
+      "exactly one node fewer, a value that was never there removes nothing and reports " +
+      "false, every step highlights a real line of code mapped to a phase and has a THIS STEP " +
+      "band, every line that can run is stepped on, and every line opens a breakdown of that line."
+    : '<span class="fail">&#x2716; Self-check FAILED (' + fails.length + ")</span>: " +
+      fails.slice(0, 6).join("; ");
+})();
+
+var rt = null;
+window.addEventListener("resize", function () {
+  clearTimeout(rt);
+  rt = setTimeout(function () { state.mh = null; render(); }, 150);
+});
+
+// Deep links: stepper.html#remove opens that tab directly.
+var MODES = ["findmin", "remove", "cases"];
+
+function modeFromHash() {
+  var h = (location.hash || "").replace("#", "");
+  return MODES.indexOf(h) !== -1 ? h : null;
+}
+
+function applyHash() {
+  var m = modeFromHash();
+  if (m && m !== state.mode) {
+    stopPlay();
+    state.mode = m; state.step = 0; state.pinned = null; state.peek = null;
+    compute(); render();
+  }
+}
+
+window.addEventListener("hashchange", applyHash);
+var initial = modeFromHash();
+if (initial) state.mode = initial;
+
+compute();
+render();
+</script>
+</body>
+</html>

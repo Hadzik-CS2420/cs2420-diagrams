@@ -11,6 +11,7 @@
     --tint-green:#f2fbf4; --tint-blue:#eaf2f8; --tint-purple:#ede7f6;
     --tint-teal:#e0f2f1;
       --tint-orange:#fff3e0;
+      --tint-orange-2:#fef5ec;
       --tint-red:#fce4ec;
   }
   * { box-sizing:border-box; }
@@ -36,6 +37,7 @@
     .card.e h2 { background:var(--tint-orange); }
     .card.f h2 { background:#eaf2f8; }
     .card.g h2 { background:var(--tint-red); }
+    .card.h h2 { background:var(--tint-orange-2); }
   .card .body { padding:.9rem 1rem 1.1rem; flex:1; display:flex; flex-direction:column; }
   .card p { margin:0 0 .75rem; font-size:.93rem; }
   .card ul { margin:0 0 1rem; padding-left:1.15rem; font-size:.88rem; color:var(--muted); }
@@ -68,7 +70,7 @@
 </header>
 
 <div class="lede">
-  <p><strong>Nothing to install.</strong> Click any of the seven below and it runs in this browser
+  <p><strong>Nothing to install.</strong> Click any of the eight below and it runs in this browser
   — no account, no download, no setup. Each one is a single self-contained page.</p>
   <p>These were built to solve a specific classroom problem. A sorting algorithm is a process that
   unfolds over time, and a textbook can only show you single frozen frames of it. Each stepper
@@ -154,6 +156,22 @@
         <li>A functor applied through <code>inorder_apply</code> &mdash; print, sum, count</li>
       </ul>
       <a class="open" href="binary-search-trees.html">Open the stepper</a>
+    </div>
+  </div>
+
+  <div class="card h">
+    <h2>Removing from a BST</h2>
+    <div class="body">
+      <p><code>find_min_</code> and the three cases of <code>remove_</code>. Removal is the one BST
+      operation where the node you delete is often not the node you found.</p>
+      <ul>
+        <li>A leaf, one child, two children &mdash; which case you are in, decided on screen</li>
+        <li>The two-child case in full: find the successor, copy its value
+            <em>down</em>, then delete <strong>it</strong> instead</li>
+        <li><code>find_min_</code> walking left, started exactly where <code>remove_</code> starts it</li>
+        <li>All three cases on the same tree, side by side, so the asymmetry is visible at once</li>
+      </ul>
+      <a class="open" href="bst-remove.html">Open the stepper</a>
     </div>
   </div>
 
