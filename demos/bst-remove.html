@@ -84,6 +84,17 @@
 
   /* ---- layout ---- */
   .solo { display:grid; grid-template-columns:1fr 1fr 210px; gap:1.1rem; align-items:start; }
+  /* The goal strip. find_min_ is a helper, and on its own it looks like a walk
+     with no purpose -- the first question asked in review was "why start at
+     the right child instead of the root?". The answer has to be on screen
+     before the walk starts, not in a panel below the tree. */
+  .goal { grid-column:1 / -1; background:var(--tint-purple);
+          border-left:5px solid var(--deep); border-radius:8px;
+          padding:.6rem .9rem; font-size:.88rem; line-height:1.5; margin-bottom:-.1rem; }
+  .goal b { color:var(--deep); }
+  .goal code { font-family:Consolas,monospace; font-size:.93em; }
+  .goal .tag { display:inline-block; font-size:.62rem; font-weight:800;
+               letter-spacing:.09em; color:var(--deep); margin-right:.5rem; }
   /* Below 1380 the rail cannot hold its own column, so it spans underneath
      instead -- still small, and still never above the tree. */
   @media (max-width:1380px) { .solo { grid-template-columns:1.05fr .95fr; }
@@ -723,17 +734,29 @@ function childName(n) { return n ? String(n.v) : "nullptr"; }
 
 // find_min_ as its own walk, for the first tab. It is only ever handed a real
 // node, which is what lets the loop read node->left straight away.
+// Both children present. The degenerate preset's root has only a right child,
+// so it is NOT a two-child removal and must never be described as one.
+function twoKids(n) { return !!(n && n.l && n.r); }
+
 function buildFindMin(root, startVal) {
   var frames = [], start = startVal === undefined ? null : findNode(root, startVal);
   var node = start || root, path = [node.v];
 
   frames.push(F({ tree: clone(root), line: 0, stack: [node.v], path: path.slice(), hit: node.v,
-    calc: start ? "find_min_(node->right)\nnode = " + node.v + ",  the right child of " + root.v
-                : "find_min_(root_)\nnode = " + node.v + ",  the root",
-    head: "Start at <strong>" + node.v + "</strong>",
-    why: [startVal !== undefined
-            ? "remove_ calls this on node-&gt;right, so the walk starts in the RIGHT subtree"
-            : "called on the root here, so this finds the minimum of the whole tree"] }));
+    calc: !start ? "find_min_(root_)\nnode = " + node.v + ",  the root"
+        : twoKids(root)
+            ? "remove_(" + root.v + ")  --  two children, so it needs " + root.v + "'s successor" + "\n" +
+              "find_min_(node->right)" + "\n" + "node = " + node.v + ",  the right child of " + root.v
+            : "find_min_(node->right)\nnode = " + node.v + ",  the right child of " + root.v,
+    head: start && twoKids(root)
+            ? "Looking for " + root.v + "'s successor &mdash; start at <strong>" + node.v + "</strong>"
+            : "Start at <strong>" + node.v + "</strong>",
+    why: [startVal === undefined
+            ? "called on the root here, so this finds the minimum of the whole tree"
+            : twoKids(root)
+                ? "we are removing " + root.v + ", not " + node.v + " &mdash; " + node.v +
+                  " is only where the search for " + root.v + "'s successor begins"
+                : "remove_ calls this on node-&gt;right, so the walk starts in the RIGHT subtree"] }));
 
   while (true) {
     frames.push(F({ tree: clone(root), line: 1, stack: [node.v], path: path.slice(), hit: node.v,
@@ -1398,10 +1421,40 @@ function soloTitle() {
   return state.mode === "findmin" ? "find_min_ on the right subtree" : "remove(" + state.target + ")";
 }
 
+// What this run is FOR. The walk itself cannot say it: find_min_ only ever
+// goes left, so on screen it looks like a search for the smallest value in
+// the tree -- which is a different question, with a different answer (20,
+// not 60). Say the removal out loud, and say which node is being removed
+// versus which node the search starts on, because they are never the same.
+function goalHtml(key) {
+  if (key !== "findmin") return "";
+  var root = state.tree, start = root && root.r;
+  if (!root || !start)
+    return '<div class="goal"><span class="tag">GOAL</span>' +
+           "This tree's root has no right subtree to search, so the walk runs from the root " +
+           "and finds the minimum of the whole tree.</div>";
+
+  if (twoKids(root))
+    return '<div class="goal"><span class="tag">GOAL</span>' +
+      "We are removing <b>" + root.v + "</b>. It has two children, so it cannot just be " +
+      "unlinked &mdash; <code>remove_</code> first needs " + root.v + "'s <b>successor</b>, the " +
+      "smallest value in its <b>right</b> subtree. Finding it is this function. " +
+      "The walk therefore starts at <b>" + start.v + "</b>, " + root.v + "'s right child &mdash; " +
+      "not at " + root.v + ", and never to the left. " +
+      "<em>Starting at " + root.v + " would walk left instead and return the smallest value in " +
+      "the whole tree, which cannot replace " + root.v + " without breaking the ordering.</em></div>";
+
+  return '<div class="goal"><span class="tag">GOAL</span>' +
+    "<code>find_min_</code> is the helper <code>remove_</code> uses when the node being removed " +
+    "has <b>two</b> children. This tree's root (" + root.v + ") has only a right child, so " +
+    "removing it would never need a successor. The walk below runs the same search over the " +
+    "right subtree, starting at <b>" + start.v + "</b>.</div>";
+}
+
 function soloHtml(f, key, title) {
   var mh = state.mh || {};
   var fix = function (n) { return mh[n] ? ' style="min-height:' + mh[n] + 'px"' : ""; };
-  return '<div class="solo"><div class="col">' +
+  return '<div class="solo">' + goalHtml(key) + '<div class="col">' +
       '<div class="card"><h2>' + title + " &mdash; " + PRESETS[state.preset].label + " tree</h2>" +
         '<div class="card-body"' + fix("tree") + ">" + treeSvg(f.tree, f) +
         '<div class="treefoot">' + chipsHtml(f) + "</div></div></div>" +
