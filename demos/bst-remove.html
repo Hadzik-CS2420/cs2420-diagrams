@@ -746,12 +746,48 @@ function buildFindMin(root, startVal) {
   var frames = [], start = startVal === undefined ? null : findNode(root, startVal);
   var node = start || root, path = [node.v];
 
+  // ---- the case determination, on remove_'s listing -----------------------
+  // find_min_ is only ever reached through case 3, and case 3 is a CONCLUSION:
+  // three tests have to come back false first. Opening the tab inside
+  // find_min_ asserted that conclusion instead of showing it, which read as
+  // "we are deleting 70". These frames carry key:"remove", so the code panel,
+  // the rail and the cost panel all switch to remove_ while they run.
+  if (start && twoKids(root)) {
+    var R = root.v, LV = root.l.v, RV = root.r.v;
+    var P = function (line, calc, head, why) {
+      frames.push(F({ tree: clone(root), line: line, key: "remove",
+                      title: "Which case is remove(" + R + ")?",
+                      stack: [R], path: [R], hit: R, value: R,
+                      calc: calc, head: head, why: why }));
+    };
+    P(6, "remove_(root_, " + R + ", removed)\nnode = " + R + ",  the node being removed",
+      "We are removing <strong>" + R + "</strong>",
+      ["how many children it has is not assumed here &mdash; the next three lines work it out"]);
+    P(13, "else   \u2192   " + R + " == " + R + "\nthis is the node to remove",
+      "Found <strong>" + R + "</strong>",
+      ["remove_ now has to decide which of the three cases this is",
+       "the three tests below are the only code that decides it"]);
+    P(15, "!node->left && !node->right\nleft is " + LV + ", right is " + RV + "   \u2192   false",
+      "Not a leaf",
+      [R + " has at least one child, so it cannot simply be deleted"]);
+    P(19, "!node->left\nleft is " + LV + "   \u2192   false",
+      "It has a left child",
+      ["so this is not the one-child case that hands back node-&gt;right"]);
+    P(24, "!node->right\nright is " + RV + "   \u2192   false",
+      "It has a right child too &mdash; <strong>" + R + " has two children</strong>",
+      ["both one-child tests came back false, and that is what case 3 means",
+       "this is the answer the rest of the tab rests on, and it was computed, not assumed"]);
+    P(29, "Node* successor = find_min_(node->right)\ncase 3: " + R +
+          " needs its successor, the smallest value to its right",
+      "Case 3 &mdash; call <code>find_min_</code> on the right subtree",
+      ["node-&gt;right is " + RV + ", so that is where the search begins",
+       "everything after this step is that call"]);
+  }
+
   frames.push(F({ tree: clone(root), line: 0, stack: [node.v], path: path.slice(), hit: node.v,
     calc: !start ? "find_min_(root_)\nnode = " + node.v + ",  the root"
-        : twoKids(root)
-            ? "remove_(" + root.v + ")  --  two children, so it needs " + root.v + "'s successor" + "\n" +
-              "find_min_(node->right)" + "\n" + "node = " + node.v + ",  the right child of " + root.v
-            : "find_min_(node->right)\nnode = " + node.v + ",  the right child of " + root.v,
+                 : "find_min_(node->right)\nnode = " + node.v +
+                   ",  the right child of " + root.v,
     head: start && twoKids(root)
             ? "Looking for " + root.v + "'s successor &mdash; start at <strong>" + node.v + "</strong>"
             : "Start at <strong>" + node.v + "</strong>",
@@ -1285,7 +1321,7 @@ function nowBox(f) {
 // The rail. Two facts: the line being executed, and which phase it belongs to.
 // The bullets stay collapsed until clicked, and open into the rail.
 function railHtml(f) {
-  var key = codeKey(), g = GUIDE[key];
+  var key = f.key || codeKey(), g = GUIDE[key];
   if (!g) return "";
   var at = phaseOf(key, f.line);
   var tag = f.tag || (STEP_TAG[key] && STEP_TAG[key][f.line]);
@@ -1445,14 +1481,16 @@ function goalHtml(key) {
     ]);
 
   if (twoKids(root))
-    return box("We are removing <b>" + root.v + "</b> &mdash; this is the search for its successor", [
-      "<b>" + root.v + "</b> has two children, so it cannot just be unlinked",
-      "<code>remove_</code> needs " + root.v + "'s <b>successor</b> first &mdash; the smallest " +
-        "value in its <b>right</b> subtree",
-      "Finding that value is this function, so the walk starts at <b>" + start.v + "</b>, " +
-        root.v + "'s right child &mdash; never to the left",
-      "Starting at " + root.v + " instead would walk <em>left</em> and return the smallest value " +
-        "in the whole tree, which cannot replace " + root.v + " without breaking the ordering"
+    return box("We are removing <b>" + root.v + "</b> &mdash; first work out which case that is", [
+      "The tab opens inside <code>remove_</code>: the first six steps run the tests that " +
+        "decide how many children <b>" + root.v + "</b> has. Nothing here is assumed",
+      "Both one-child tests come back false, which is what <b>case 3</b> means &mdash; " +
+        root.v + " cannot just be unlinked",
+      "Case 3 needs " + root.v + "'s <b>successor</b>: the smallest value in its <b>right</b> " +
+        "subtree. Finding it is <code>find_min_</code>, and that call is the rest of this tab",
+      "Which is why the walk starts at <b>" + start.v + "</b>, " + root.v + "'s right child. " +
+        "Starting at " + root.v + " would walk <em>left</em> and return the smallest value in " +
+        "the whole tree, which cannot replace " + root.v + " without breaking the ordering"
     ]);
 
   return box("<code>find_min_</code> on its own &mdash; this tree has no two-child root", [
@@ -1466,9 +1504,13 @@ function goalHtml(key) {
 
 function soloHtml(f, key, title) {
   var mh = state.mh || {};
+  // A preamble frame runs on remove_'s listing even though the tab is
+  // find_min_, so the code, the rail and the cost panel follow the FRAME.
+  var k = f.key || key;
   var fix = function (n) { return mh[n] ? ' style="min-height:' + mh[n] + 'px"' : ""; };
   return '<div class="solo">' + goalHtml(key) + '<div class="col">' +
-      '<div class="card"><h2>' + title + " &mdash; " + PRESETS[state.preset].label + " tree</h2>" +
+      '<div class="card"><h2>' + (f.title || title) + " &mdash; " +
+        PRESETS[state.preset].label + " tree</h2>" +
         '<div class="card-body"' + fix("tree") + ">" + treeSvg(f.tree, f) +
         '<div class="treefoot">' + chipsHtml(f) + "</div></div></div>" +
       '<div class="card"><h2>What the machine is holding</h2><div class="card-body"' + fix("locals") + ">" +
@@ -1480,8 +1522,8 @@ function soloHtml(f, key, title) {
       "</div></div>" +
     "</div><div class=\"col\">" +
       '<div class="card"><h2>The code</h2><div class="card-body"' + fix("code") + ">" +
-        codeHtml(key, f.line, f) + "</div></div>" +
-      '<div class="card"><h2>What it costs</h2><div class="card-body">' + factsHtml(key) + "</div></div>" +
+        codeHtml(k, f.line, f) + "</div></div>" +
+      '<div class="card"><h2>What it costs</h2><div class="card-body">' + factsHtml(k) + "</div></div>" +
     '</div><div class="col railcol">' + railHtml(f) + "</div></div>";
 }
 
@@ -1528,8 +1570,16 @@ function measureRun() {
 function renderSolo() {
   var key = codeKey();
   var f = frameAt(state.mode, state.step);
+  var k = f.key || key;
+  // Stepping from remove_ into find_min_ swaps the listing out from under a
+  // pinned line, so the pin is released rather than left pointing at whatever
+  // happens to sit at that index in the other function.
+  if (state.pinned !== null && state.pinnedKey && state.pinnedKey !== k) {
+    state.pinned = null;
+    state.pinnedKey = null;
+  }
   document.getElementById("stage").innerHTML = soloHtml(f, key, soloTitle());
-  wireCode(key);
+  wireCode(k);
   wireRail();
 }
 
@@ -1588,7 +1638,11 @@ function wireCode(key) {
   if (!code) return;
   Array.prototype.forEach.call(code.children, function (d) {
     var i = parseInt(d.getAttribute("data-line"), 10);
-    function pick() { state.pinned = (state.pinned === i) ? null : i; render(); }
+    function pick() {
+      state.pinned = (state.pinned === i) ? null : i;
+      state.pinnedKey = state.pinned === null ? null : key;
+      render();
+    }
     d.addEventListener("click", pick);
     d.addEventListener("keydown", function (ev) {
       if (ev.key === "Enter") { ev.preventDefault(); pick(); }
@@ -1729,9 +1783,33 @@ document.addEventListener("keydown", function (e) {
       var got = fm[fm.length - 1].hit;
       if (got !== want.v) fails.push(name + "/find_min: got " + got + ", expected " + want.v);
       fm.forEach(function (f, i) {
-        steppedFind[f.line] = 1;
+        // Preamble frames run on remove_'s listing; counting their line
+        // numbers as find_min_ coverage would mark find_min_ lines as
+        // stepped on that never were.
+        if (f.key === "remove") steppedRemove[f.line] = 1;
+        else steppedFind[f.line] = 1;
         if (!f.calc) fails.push(name + "/find_min frame " + i + ": no THIS STEP band");
       });
+
+      // The case determination must be present exactly when the root really
+      // has two children, and must end on the line that calls find_min_.
+      var pre = fm.filter(function (f) { return f.key === "remove"; });
+      var wantPre = !!(root.l && root.r);
+      if (wantPre && pre.length !== 6)
+        fails.push(name + "/find_min: " + pre.length + " case-determination frames, expected 6");
+      if (!wantPre && pre.length !== 0)
+        fails.push(name + "/find_min: root has one child but the tab claims case 3");
+      if (wantPre) {
+        if (pre[pre.length - 1].line !== 29)
+          fails.push(name + "/find_min: preamble ends on line " + pre[pre.length - 1].line +
+                     ", expected the find_min_ call");
+        if (fm[pre.length].key !== undefined)
+          fails.push(name + "/find_min: the walk does not resume on find_min_'s listing");
+        pre.forEach(function (f) {
+          if (f.hit !== root.v)
+            fails.push(name + "/find_min: preamble highlights " + f.hit + ", not the node being removed");
+        });
+      }
       if (fm[fm.length - 1].tree && findNode(fm[fm.length - 1].tree, got) === null)
         fails.push(name + "/find_min: result not in the tree");
     }
