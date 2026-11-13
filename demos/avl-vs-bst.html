@@ -540,44 +540,123 @@ function summaryHtml(f) {
     '&mdash; only how deep you have to go to reach it.</p></div></div>';
 }
 
+// The insertion order that builds a perfectly balanced BST with no help:
+// the middle value, then the middles of each half, then of each quarter --
+// level by level. This is the order that makes AVL's bookkeeping pure
+// overhead, and it is the same shape as tab 1's "already well ordered".
+//
+// Level order, NOT middle-then-recurse. Both end at the same tree, but
+// middle-then-recurse goes 4, 2, 1, ... and after that 1 the tree leans far
+// enough to trigger a rotation -- so it is balanced at the END without being
+// balanced ALONG THE WAY, and AVL has plenty to do. Only level order keeps
+// every prefix balanced. Sizes here are all 2^k - 1, so it comes out exact.
+function balancedOrder(n) {
+  var out = [], step = (n + 1) / 2, i;
+  while (step >= 1) {
+    for (i = 1; i * step <= n; i += 2) out.push(i * step);
+    step = step / 2;
+  }
+  return out;
+}
+
+// Run both trees over a sequence and count what each one actually did.
+// `checks` is the number of nodes an AVL insert has to re-examine on the way
+// back up -- one per level of the insertion path. That is the work a plain
+// BST never does, and it happens on every insert whether or not a rotation
+// follows.
+function tally(seq) {
+  var bst = null, avl = null, checks = 0, rots = 0;
+  seq.forEach(function (v) {
+    bst = plainInsert(bst, v);
+    avl = plainInsert(avl, v);
+    reheightAll(avl);
+    checks += pathTo(avl, v).length;
+    var r = rebalanceOnce(avl, v);
+    avl = r.root;
+    if (r.ev) rots++;
+  });
+  reheightAll(bst);
+  return { n: seq.length, bstH: heightOf(bst), avlH: heightOf(avl),
+           checks: checks, rots: rots };
+}
+
 // Tab 3: no stepping, just the arithmetic at sizes you cannot draw.
 function costHtml() {
-  var rows = [7, 15, 31, 63, 255, 1023].map(function (n) {
-    var avl = null, i;
-    for (i = 1; i <= n; i++) {
-      avl = plainInsert(avl, i);
-      reheightAll(avl);
-      avl = rebalanceOnce(avl, i).root;
-    }
-    var ha = heightOf(avl);
+  var SIZES = [7, 15, 31, 63, 255, 1023];
+
+  var sortedRows = SIZES.map(function (n) {
+    var seq = [], i;
+    for (i = 1; i <= n; i++) seq.push(i);
+    var r = tally(seq);
     return "<tr><td class='num'>" + n + "</td>" +
-      "<td class='num lose'>" + (n - 1) + "</td><td class='num win'>" + ha + "</td>" +
-      "<td class='num lose'>" + n + "</td><td class='num win'>" + (ha + 1) + "</td></tr>";
+      "<td class='num lose'>" + r.bstH + "</td><td class='num win'>" + r.avlH + "</td>" +
+      "<td class='num lose'>" + (r.bstH + 1) + "</td><td class='num win'>" + (r.avlH + 1) +
+      "</td><td class='num'>" + r.rots + "</td></tr>";
   }).join("");
 
+  var kindRows = SIZES.map(function (n) {
+    var r = tally(balancedOrder(n));
+    return "<tr><td class='num'>" + n + "</td>" +
+      "<td class='num'>" + r.bstH + "</td><td class='num'>" + r.avlH + "</td>" +
+      "<td class='num'>" + (r.bstH + 1) + "</td><td class='num'>" + (r.avlH + 1) +
+      "</td><td class='num lose'>" + r.checks + "</td><td class='num'>" + r.rots +
+      "</td></tr>";
+  }).join("");
+
+  var big = tally(balancedOrder(1023));
+
   return '<div class="goal"><p class="goalhead"><span class="tag">GOAL</span>' +
-    "What the shape is worth, at sizes too big to draw</p><ul>" +
-    "<li>Every row is <b>sorted input</b> &mdash; 1, 2, 3, &hellip; n &mdash; which is the " +
-      "worst thing you can hand a plain BST and costs an AVL tree nothing but rotations</li>" +
-    "<li>The AVL heights below are <b>measured</b>, by actually running the insertions, not " +
+    "Both ends of the argument, at sizes too big to draw</p><ul>" +
+    "<li>The first table is <b>AVL at its best</b> and a plain BST at its worst &mdash; " +
+      "sorted input, 1, 2, 3, &hellip; n</li>" +
+    "<li>The second is <b>AVL at its worst</b>: input that already arrives in an order a " +
+      "plain BST handles perfectly, so every check AVL makes buys nothing</li>" +
+    "<li>Every height below is <b>measured</b>, by actually running the insertions, not " +
       "taken from a formula</li>" +
-    "<li>A worst-case lookup is height + 1 comparisons, because you compare at every level " +
-      "and then once more where the node is or is not</li></ul></div>" +
-    '<div class="card"><h2>Sorted input, both trees</h2><div class="card-body">' +
-    '<table class="score"><thead><tr><th>values inserted</th>' +
+    "<li>A worst-case lookup is height + 1 comparisons &mdash; one per level, and one more " +
+      "where the value is or is not</li></ul></div>" +
+
+    '<div class="card"><h2>Sorted input &mdash; where AVL pays off</h2><div class="card-body">' +
+    '<table class="score"><thead><tr><th>values</th>' +
     "<th>BST height</th><th>AVL height</th>" +
-    "<th>BST worst lookup</th><th>AVL worst lookup</th></tr></thead><tbody>" +
-    rows + "</tbody></table>" +
-    '<p class="legend">The BST column is not an approximation: sorted input gives it exactly ' +
-    'one node per level, so it is a linked list with extra steps, and height is n &minus; 1.</p>' +
+    "<th>BST worst lookup</th><th>AVL worst lookup</th><th>AVL rotations</th>" +
+    "</tr></thead><tbody>" + sortedRows + "</tbody></table>" +
+    '<p class="legend">The BST column is not an approximation. Sorted input gives it exactly ' +
+    'one node per level, so it is a linked list with extra steps and its height is ' +
+    'n&nbsp;&minus;&nbsp;1. At 1023 values that is 1023 comparisons against 10.</p>' +
     "</div></div>" +
+
+    '<div class="card"><h2>Already well-ordered input &mdash; where AVL earns nothing' +
+    "</h2><div class=\"card-body\">" +
+    '<table class="score"><thead><tr><th>values</th>' +
+    "<th>BST height</th><th>AVL height</th>" +
+    "<th>BST worst lookup</th><th>AVL worst lookup</th>" +
+    "<th>AVL balance checks</th><th>AVL rotations</th>" +
+    "</tr></thead><tbody>" + kindRows + "</tbody></table>" +
+    '<p class="legend">Same values, inserted middle-first so a plain BST comes out perfectly ' +
+    'balanced on its own. <strong>Every height column is identical</strong> &mdash; the two ' +
+    'trees are the same tree. The AVL side still walked back up the insertion path ' +
+    '<strong>' + big.checks.toLocaleString() + ' times</strong> at 1023 values, and rotated ' +
+    big.rots + ' times for it. That column is the price, and here it bought nothing.</p>' +
+    "</div></div>" +
+
     '<div class="card"><h2>So why not always use AVL?</h2><div class="card-body">' +
-    '<div class="callout warn"><b>Because the rebalancing is not free.</b> Every insert and ' +
-    'every removal has to recompute heights back up the path and may rotate, and every node ' +
-    'carries a height field it would not otherwise need. On the "already well ordered" ' +
-    'preset in tab 1, AVL does all of that bookkeeping and finishes with exactly the same ' +
-    'tree a plain BST got for nothing. AVL wins when you cannot control the order the data ' +
-    'arrives in &mdash; which, with real data, is most of the time.</div></div></div>';
+    '<div class="callout warn"><p style="margin:0 0 .4rem;font-weight:700">Because the ' +
+    "balancing is not free, and you pay for it on every operation &mdash; not just the ones " +
+    "that rotate.</p><ul class=\"why\" style=\"color:inherit;margin-top:.3rem\">" +
+    "<li><b>Every insert and every removal walks back up the path</b> rechecking heights. " +
+      "That is the second table's <em>balance checks</em> column, and it happens whether or " +
+      "not a rotation follows.</li>" +
+    "<li><b>Every node carries a height</b> it would not otherwise need &mdash; extra memory " +
+      "on every node in the tree, forever.</li>" +
+    "<li><b>The rotations themselves are cheap</b> &mdash; a handful of pointer writes. The " +
+      "cost is the checking, which is constant and unavoidable.</li>" +
+    "<li><b>When the data already arrives in a good order, all of it buys nothing.</b> Same " +
+      "tree, same height, same lookups &mdash; a plain BST got there for free. That is the " +
+      "second table, and the <em>already well ordered</em> preset on tab 1.</li>" +
+    "<li><b>AVL wins when you cannot control the arrival order</b> &mdash; and the first " +
+      "table is what that protects you from. With real data, you usually cannot.</li>" +
+    "</ul></div></div></div>";
 }
 
 function render() {
@@ -772,6 +851,33 @@ document.addEventListener("keydown", function (ev) {
       fails.push(r.key + ": the rotation frame does not name " + r.key);
   });
 
+  // Tab 3's two tables are claims about numbers, so check the numbers. The
+  // well-ordered table in particular says "identical trees, zero rotations,
+  // and this many checks for nothing" -- if any part of that stops being
+  // true the table is an argument for the wrong conclusion.
+  [7, 15, 31, 255].forEach(function (n) {
+    var seq = [], i;
+    for (i = 1; i <= n; i++) seq.push(i);
+    var s = tally(seq), k = tally(balancedOrder(n));
+    runs += 2;
+
+    if (s.bstH !== n - 1)
+      fails.push("cost/sorted " + n + ": BST height " + s.bstH + ", expected " + (n - 1));
+    if (s.avlH >= s.bstH)
+      fails.push("cost/sorted " + n + ": AVL height " + s.avlH + " is no better than the BST");
+
+    if (balancedOrder(n).length !== n)
+      fails.push("cost/ordered " + n + ": level order produced " + balancedOrder(n).length +
+                 " values, expected " + n);
+    if (k.rots !== 0)
+      fails.push("cost/ordered " + n + ": " + k.rots + " rotations on input that needs none");
+    if (k.bstH !== k.avlH)
+      fails.push("cost/ordered " + n + ": heights differ (" + k.bstH + " vs " + k.avlH +
+                 ") on input both trees should handle identically");
+    if (k.checks <= n)
+      fails.push("cost/ordered " + n + ": " + k.checks + " balance checks, too few to be real");
+  });
+
   // the balanced preset must fire none -- the honest case for AVL
   var bal = buildRun(RACE.filter(function (p) { return p.key === "balanced"; })[0].seq);
   runs++;
@@ -786,7 +892,10 @@ document.addEventListener("keydown", function (ev) {
       "trees, the AVL tree is within &plusmn;1 at every settled step and is never taller than " +
       "the BST, sorted input gives the BST a height of exactly n&minus;1 while the AVL tree " +
       "stays under its log bound, each of the four rotation cases fires exactly once and is " +
-      "named correctly, and already-ordered input fires none at all."
+      "named correctly, already-ordered input fires none at all, and tab 3's two tables " +
+      "hold up: sorted input really does give the BST a height of n&minus;1, and " +
+      "well-ordered input really does leave both trees identical while AVL still pays " +
+      "for every check."
     : '<span class="fail">&#x2716; Self-check FAILED (' + fails.length + ")</span>: " +
       fails.slice(0, 6).join("; ");
 })();
