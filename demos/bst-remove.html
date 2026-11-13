@@ -267,13 +267,13 @@
                            background:rgba(0,0,0,.09); border-radius:3px;
                            padding:.08em .32em; flex:0 0 auto;
                            margin-top:.28em; }  .code div.calc:hover { background:#f9e2af; }
-  /* The folded wrapper. Dim, so it reads as "still here, not running" rather
-     than as a line of code you are meant to be following. */
-  .code div.fold { color:var(--code-dim); font-style:italic; cursor:pointer;
-                   border-top:1px dashed #45475a; border-bottom:1px dashed #45475a;
-                   padding-top:.18rem; padding-bottom:.18rem; }
-  .code div.fold:hover, .code div.fold:focus { background:#313244; color:#cdd6f4; }
-  .code div.fold .foldn { font-style:normal; font-size:.82em; opacity:.8; margin-left:.6rem; }
+  /* The fold marker, sitting on the header line of a collapsed block -- the
+     editor convention, so it reads as "there is more here" rather than as
+     code. Click to open the block, click again to close it. */
+  .code .foldmark { display:inline-block; margin-left:.5rem; padding:0 .4rem;
+                    border-radius:4px; background:#45475a; color:#cdd6f4;
+                    cursor:pointer; font-size:.85em; line-height:1.35; vertical-align:.05em; }
+  .code .foldmark:hover, .code .foldmark:focus { background:#7f849c; color:#1e1e2e; }
 </style>
 </head>
 <body>
@@ -757,12 +757,43 @@ var FINDMIN_CALL_LINE = 29;
 // blank line 5. It runs for three frames and is then dead for the rest of the
 // trace, so it folds once control is inside remove_. find_min_'s listing is
 // six lines long and has nothing worth folding.
-var FOLD_TOP = { remove: { lines: 6, label: "bool BinarySearchTree::remove(int value) { ... }" } };
+// Foldable blocks in remove_'s listing. `head` stays on screen -- it is the
+// line that says what the block was FOR -- and `from`..`to` collapse behind a
+// marker once execution has gone past `to`. This is the editor behaviour: you
+// keep the `if`, you lose the body you are no longer in.
+//
+// On the two-child path all three case blocks are tested, rejected and then
+// just sit there; folding them is the difference between the executing line
+// being on screen and being below the fold on a projector.
+//
+// find_min_'s listing is six lines with a two-line loop body, so it has none.
+var FOLDS = {
+  remove: [
+    { head: 0,  from: 1,  to: 5,  what: "the public wrapper" },
+    { head: 9,  from: 10, to: 10, what: "the left branch" },
+    { head: 11, from: 12, to: 12, what: "the right branch" },
+    { head: 15, from: 16, to: 18, what: "case 1" },
+    { head: 19, from: 20, to: 23, what: "case 2" },
+    { head: 24, from: 25, to: 28, what: "case 2" }
+  ]
+};
 
-function foldInfo(key, hit) {
-  var ft = FOLD_TOP[key];
-  if (!ft || !state.foldTop) return null;
-  return hit >= ft.lines ? ft : null;   // never fold the line that is executing
+// A block folds once the executing line is past its last line -- so the line
+// being run is never inside a fold -- unless it has been clicked open.
+function foldedRegions(key, hit) {
+  var list = FOLDS[key] || [], out = [];
+  for (var i = 0; i < list.length; i++) {
+    var r = list[i];
+    if (hit > r.to && !state.openFolds[key + ":" + r.head]) out.push(r);
+  }
+  return out;
+}
+
+// Frames that fold the same way can share one reserved height; frames that
+// fold differently must not, or the panel keeps the tallest and the folding
+// shows up as blank space instead of a shorter block.
+function foldSig(key, hit) {
+  return key + "|" + foldedRegions(key, hit).map(function (r) { return r.head; }).join(",");
 }
 
 function buildFindMin(root, startVal, seq) {
@@ -1226,21 +1257,23 @@ function esc(s) {
 
 function codeRows(key, hit, frame, pinned) {
   var calc = frame && frame.calc;
-  var fold = foldInfo(key, hit);
+  var folded = foldedRegions(key, hit), hidden = {}, heads = {};
+  folded.forEach(function (r) {
+    for (var i = r.from; i <= r.to; i++) hidden[i] = 1;
+    heads[r.head] = r;
+  });
   return CODE[key].map(function (ln, i) {
-    if (fold && i < fold.lines) {
-      // One row stands in for the whole wrapper, on the first line only.
-      return i === 0
-        ? '<div class="fold" role="button" tabindex="0" data-fold="1">' + esc(fold.label) +
-          '<span class="foldn">' + fold.lines + " lines &mdash; click to show</span></div>"
-        : "";
-    }
+    if (hidden[i]) return "";
     var cls = [];
     if (i === hit) cls.push("hit");
     if (pinned === i) cls.push("pin");
     var t = hl(ln);
     return '<div data-line="' + i + '"' + (cls.length ? ' class="' + cls.join(" ") + '"' : "") +
-           ' tabindex="0">' + (t === "" ? "&nbsp;" : t) + "</div>" +
+           ' tabindex="0">' + (t === "" ? "&nbsp;" : t) +
+           (heads[i] ? '<span class="foldmark" role="button" tabindex="0" ' +
+                       'data-foldhead="' + i + '" title="click to show ' +
+                       (heads[i].to - heads[i].from + 1) + ' hidden lines">&#x22EF;</span>' : "") +
+           "</div>" +
            // The live values go under the line that is executing. esc() is
            // deliberate: this band is text, not markup.
            (i === hit && calc
@@ -1393,7 +1426,7 @@ function nextPhase() {
 // ---------------------------------------------------------------------------
 var state = { mode: "findmin", preset: "classic", step: 0, target: null,
               pinned: null, peek: null, runs: {}, maxFrames: 1, timer: null,
-              foldTop: true };
+              openFolds: {} };
 
 // The three remove cases, picked out of the current tree by child count, so a
 // label can never claim a case the tree does not actually contain.
@@ -1536,7 +1569,9 @@ function soloHtml(f, key, title) {
   // find_min_, so the code, the rail and the cost panel follow the FRAME.
   var k = f.key || key;
   var fix = function (n) { return mh[n] ? ' style="min-height:' + mh[n] + 'px"' : ""; };
-  var codeFix = fix(foldInfo(k, f.line) ? "codeFolded" : "code");
+  var sig = foldSig(k, f.line);
+  var codeH = mh.code && mh.code[sig];
+  var codeFix = codeH ? ' style="min-height:' + codeH + 'px"' : "";
   return '<div class="solo">' + goalHtml(key) + '<div class="col">' +
       '<div class="card"><h2>' + (f.title || title) + " &mdash; " +
         PRESETS[state.preset].label + " tree</h2>" +
@@ -1581,7 +1616,7 @@ function measureRun() {
 
   var key = codeKey(), title = soloTitle();
   state.mh = null;                       // measure the natural height, not a reserved one
-  var max = { tree: 0, locals: 0, says: 0, code: 0, codeFolded: 0 };
+  var max = { tree: 0, locals: 0, says: 0, code: {} };
   state.runs[state.mode].forEach(function (f) {
     ghost.innerHTML = soloHtml(f, key, title);
     var cols = ghost.querySelectorAll(".col");
@@ -1590,11 +1625,11 @@ function measureRun() {
     max.tree   = Math.max(max.tree,   h(left[0]));
     max.locals = Math.max(max.locals, h(left[1]));
     max.says   = Math.max(max.says,   h(left[2]));
-    // Folded and unfolded frames reserve height separately: one number for
-    // both would hold the panel at the unfolded height and the fold would
-    // show as blank space instead of a shorter block.
-    var ck = foldInfo(f.key || key, f.line) ? "codeFolded" : "code";
-    max[ck] = Math.max(max[ck], h(right[0]));
+    // Keyed by which blocks are folded, so each distinct shape of the panel
+    // reserves its own height: steady while the fold state holds, and free to
+    // shrink when a block collapses.
+    var sig = foldSig(f.key || key, f.line);
+    max.code[sig] = Math.max(max.code[sig] || 0, h(right[0]));
   });
   document.body.removeChild(ghost);
   state.mh = max;
@@ -1670,15 +1705,22 @@ function wireCode(key) {
   var code = document.getElementById("code");
   if (!code) return;
   Array.prototype.forEach.call(code.children, function (d) {
-    if (d.getAttribute("data-fold")) {
-      var toggle = function () { state.foldTop = !state.foldTop; render(); };
-      d.addEventListener("click", toggle);
-      d.addEventListener("keydown", function (ev) {
-        if (ev.key === "Enter") { ev.preventDefault(); toggle(); }
-      });
-      return;
-    }
     if (d.getAttribute("data-line") === null) return;   // the calc band
+    var mark = d.querySelector ? d.querySelector(".foldmark") : null;
+    if (mark) {
+      var head = mark.getAttribute("data-foldhead");
+      var flip = function (ev) {
+        ev.stopPropagation();          // the row's own click pins the line
+        var id = key + ":" + head;
+        if (state.openFolds[id]) delete state.openFolds[id];
+        else state.openFolds[id] = 1;
+        render();
+      };
+      mark.addEventListener("click", flip);
+      mark.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter") { ev.preventDefault(); flip(ev); }
+      });
+    }
     var i = parseInt(d.getAttribute("data-line"), 10);
     function pick() {
       state.pinned = (state.pinned === i) ? null : i;
