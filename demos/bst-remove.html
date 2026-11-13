@@ -287,7 +287,7 @@
      Take the tabs in order; the last one compares the three cases.</p>
 
   <div class="tabs" id="tabs">
-    <button data-mode="findmin">1 &middot; find_min_</button>
+    <button data-mode="findmin">1 &middot; find_min_ inside remove_</button>
     <button data-mode="remove">2 &middot; remove_</button>
     <button data-mode="cases">3 &middot; All three cases</button>
     <span class="spacer"></span>
@@ -811,8 +811,9 @@ function buildFindMin(root, startVal, seq) {
   // sliced at the line that calls find_min_, so the two tabs cannot drift
   // apart. They carry key:"remove", so the code panel, the rail and the cost
   // panel follow the frame rather than the tab.
+  var rm = null, cut = -1;
   if (start && twoKids(root) && seq) {
-    var rm = buildRemove(seq, root.v), cut = -1;
+    rm = buildRemove(seq, root.v);
     for (var i = 0; i < rm.length; i++) {
       if (rm[i].line === FINDMIN_CALL_LINE) { cut = i; break; }
     }
@@ -876,6 +877,35 @@ function buildFindMin(root, startVal, seq) {
     why: [node.r ? "it still has a right child (" + node.r.v + "), which is allowed"
                  : "it is a leaf, but it did not have to be",
           "that is why removing it later is never the two-child case"] }));
+
+  // ---- back into remove_, and on to the end -------------------------------
+  // Stopping at find_min_'s return left the value with nothing to do and sent
+  // you to another tab to find out what it was for. Instead the call returns
+  // here: the same line 29, now with the successor in hand, and then the rest
+  // of the removal -- copy the value down, delete the original node, unwind.
+  if (rm && cut >= 0) {
+    var landing = {};
+    for (var lp in rm[cut]) if (rm[cut].hasOwnProperty(lp)) landing[lp] = rm[cut][lp];
+    landing.key = "remove";
+    landing.title = "remove(" + root.v + ")";
+    // rm[cut] carries remove_'s own summary of the call -- "walks 70 -> 60,
+    // successor = 60". Withheld on the way in, it is exactly right on the way
+    // out: it is what the walk just worked out.
+    landing.head = "<strong>find_min_</strong> returns " + node.v +
+                   " &mdash; back in <code>remove_</code>, on the line that called it";
+    landing.why = ["the walk is over; " + node.v + " is the successor of " + root.v,
+                   "nothing has changed in the tree yet &mdash; the next line is the one that does"];
+    frames.push(landing);
+
+    for (var k = cut + 1; k < rm.length; k++) {
+      var tailCopy = {};
+      for (var tp in rm[k]) if (rm[k].hasOwnProperty(tp)) tailCopy[tp] = rm[k][tp];
+      tailCopy.key = "remove";
+      tailCopy.title = "remove(" + root.v + ")";
+      frames.push(tailCopy);
+    }
+  }
+
   return frames;
 }
 
@@ -1548,7 +1578,8 @@ function goalHtml(key) {
         "both one-child tests all come back false, which is what <b>case 3</b> means &mdash; " +
         root.v + " cannot just be unlinked",
       "Case 3 needs " + root.v + "'s <b>successor</b>: the smallest value in its <b>right</b> " +
-        "subtree. Finding it is <code>find_min_</code>, and that call is the rest of this tab",
+        "subtree. Finding it is <code>find_min_</code>, and the tab follows that call in &mdash; " +
+        "then back out to finish the removal, without changing tabs",
       "Which is why the walk starts at <b>" + start.v + "</b>, " + root.v + "'s right child. " +
         "Starting at " + root.v + " would walk <em>left</em> and return the smallest value in " +
         "the whole tree, which cannot replace " + root.v + " without breaking the ordering"
@@ -1864,8 +1895,13 @@ document.addEventListener("keydown", function (e) {
       var fm = buildFindMin(root, root.r.v, seq);
       runs++;
       var want = root.r; while (want.l) want = want.l;
-      var got = fm[fm.length - 1].hit;
+      // find_min_'s own frames are the ones with no key; the rest of the tab
+      // is remove_ on either side of them.
+      var fmWalk = fm.filter(function (f) { return f.key === undefined; });
+      var got = fmWalk.length ? fmWalk[fmWalk.length - 1].hit : undefined;
       if (got !== want.v) fails.push(name + "/find_min: got " + got + ", expected " + want.v);
+      if (fmWalk[fmWalk.length - 1].line !== 4)
+        fails.push(name + "/find_min: the walk does not end on its return line");
       fm.forEach(function (f, i) {
         // Preamble frames run on remove_'s listing; counting their line
         // numbers as find_min_ coverage would mark find_min_ lines as
@@ -1877,7 +1913,10 @@ document.addEventListener("keydown", function (e) {
 
       // The case determination must be present exactly when the root really
       // has two children, and must end on the line that calls find_min_.
-      var pre = fm.filter(function (f) { return f.key === "remove"; });
+      // Everything before find_min_'s first frame is the lead-in; everything
+      // after its last is the removal being finished.
+      var firstWalk = fm.indexOf(fmWalk[0]), lastWalk = fm.indexOf(fmWalk[fmWalk.length - 1]);
+      var pre = fm.slice(0, firstWalk), post = fm.slice(lastWalk + 1);
       var wantPre = !!(root.l && root.r);
       if (!wantPre && pre.length !== 0)
         fails.push(name + "/find_min: root has one child but the tab claims case 3");
@@ -1915,8 +1954,33 @@ document.addEventListener("keydown", function (e) {
         }
         if (fm[pre.length] && fm[pre.length].key !== undefined)
           fails.push(name + "/find_min: the walk does not resume on find_min_'s listing");
+
+        // The tab must not stop at the walk: it comes back to the calling
+        // line and runs the removal out to the end, matching remove()'s own
+        // trace frame for frame.
+        if (stop >= 0) {
+          if (post.length !== rmRef.length - stop)
+            fails.push(name + "/find_min: " + post.length + " frames after the walk, expected " +
+                       (rmRef.length - stop));
+          else {
+            if (post[0].line !== FINDMIN_CALL_LINE)
+              fails.push(name + "/find_min: the walk returns to line " + post[0].line +
+                         ", expected the line that called it");
+            if (post[post.length - 1].line !== rmRef[rmRef.length - 1].line)
+              fails.push(name + "/find_min: the tab stops on line " + post[post.length - 1].line +
+                         ", not where remove() ends");
+            post.forEach(function (f, q) {
+              if (f.key !== "remove")
+                fails.push(name + "/find_min: frame after the walk is not on remove_'s listing");
+              if (f.line !== rmRef[stop + q].line)
+                fails.push(name + "/find_min: tail frame " + q + " is line " + f.line +
+                           ", but remove() runs line " + rmRef[stop + q].line);
+            });
+          }
+        }
       }
-      if (fm[fm.length - 1].tree && findNode(fm[fm.length - 1].tree, got) === null)
+      var endOfWalk = fmWalk[fmWalk.length - 1];
+      if (endOfWalk.tree && findNode(endOfWalk.tree, got) === null)
         fails.push(name + "/find_min: result not in the tree");
     }
 
