@@ -742,46 +742,44 @@ function childName(n) { return n ? String(n.v) : "nullptr"; }
 // so it is NOT a two-child removal and must never be described as one.
 function twoKids(n) { return !!(n && n.l && n.r); }
 
-function buildFindMin(root, startVal) {
+// remove_'s listing: the line that calls find_min_. The find_min_ tab is
+// remove_'s trace up to this line, then find_min_'s own.
+var FINDMIN_CALL_LINE = 29;
+
+function buildFindMin(root, startVal, seq) {
   var frames = [], start = startVal === undefined ? null : findNode(root, startVal);
   var node = start || root, path = [node.v];
 
-  // ---- the case determination, on remove_'s listing -----------------------
+  // ---- the removal that calls find_min_, from the top ---------------------
   // find_min_ is only ever reached through case 3, and case 3 is a CONCLUSION:
-  // three tests have to come back false first. Opening the tab inside
-  // find_min_ asserted that conclusion instead of showing it, which read as
-  // "we are deleting 70". These frames carry key:"remove", so the code panel,
-  // the rail and the cost panel all switch to remove_ while they run.
-  if (start && twoKids(root)) {
-    var R = root.v, LV = root.l.v, RV = root.r.v;
-    var P = function (line, calc, head, why) {
-      frames.push(F({ tree: clone(root), line: line, key: "remove",
-                      title: "Which case is remove(" + R + ")?",
-                      stack: [R], path: [R], hit: R, value: R,
-                      calc: calc, head: head, why: why }));
-    };
-    P(6, "remove_(root_, " + R + ", removed)\nnode = " + R + ",  the node being removed",
-      "We are removing <strong>" + R + "</strong>",
-      ["how many children it has is not assumed here &mdash; the next three lines work it out"]);
-    P(13, "else   \u2192   " + R + " == " + R + "\nthis is the node to remove",
-      "Found <strong>" + R + "</strong>",
-      ["remove_ now has to decide which of the three cases this is",
-       "the three tests below are the only code that decides it"]);
-    P(15, "!node->left && !node->right\nleft is " + LV + ", right is " + RV + "   \u2192   false",
-      "Not a leaf",
-      [R + " has at least one child, so it cannot simply be deleted"]);
-    P(19, "!node->left\nleft is " + LV + "   \u2192   false",
-      "It has a left child",
-      ["so this is not the one-child case that hands back node-&gt;right"]);
-    P(24, "!node->right\nright is " + RV + "   \u2192   false",
-      "It has a right child too &mdash; <strong>" + R + " has two children</strong>",
-      ["both one-child tests came back false, and that is what case 3 means",
-       "this is the answer the rest of the tab rests on, and it was computed, not assumed"]);
-    P(29, "Node* successor = find_min_(node->right)\ncase 3: " + R +
-          " needs its successor, the smallest value to its right",
-      "Case 3 &mdash; call <code>find_min_</code> on the right subtree",
-      ["node-&gt;right is " + RV + ", so that is where the search begins",
-       "everything after this step is that call"]);
+  // the public call has to run, remove_ has to locate the node, and three
+  // tests have to come back false first. Opening the tab inside find_min_
+  // asserted all of that instead of showing it, which read as "we are
+  // deleting 70".
+  //
+  // These are not a retelling of remove_ -- they are remove_'s own frames,
+  // sliced at the line that calls find_min_, so the two tabs cannot drift
+  // apart. They carry key:"remove", so the code panel, the rail and the cost
+  // panel follow the frame rather than the tab.
+  if (start && twoKids(root) && seq) {
+    var rm = buildRemove(seq, root.v), cut = -1;
+    for (var i = 0; i < rm.length; i++) {
+      if (rm[i].line === FINDMIN_CALL_LINE) { cut = i; break; }
+    }
+    for (var j = 0; cut >= 0 && j <= cut; j++) {
+      var copy = {};
+      for (var prop in rm[j]) if (rm[j].hasOwnProperty(prop)) copy[prop] = rm[j][prop];
+      copy.key = "remove";
+      copy.title = "remove(" + root.v + ")";
+      // On the remove_ tab this band summarises the call -- "walks 70 -> 60,
+      // successor = 60" -- because find_min_ is a black box there. Here the
+      // walk is the next eighteen inches of the page, so that summary is a
+      // spoiler. Say what the call is for and let the walk answer it.
+      if (j === cut)
+        copy.calc = "Node* successor = find_min_(node->right)" + "\n" +
+                    "case 3: " + root.v + " needs its successor, the smallest value to its right";
+      frames.push(copy);
+    }
   }
 
   frames.push(F({ tree: clone(root), line: 0, stack: [node.v], path: path.slice(), hit: node.v,
@@ -1395,7 +1393,7 @@ function compute() {
   }
   state.tree = buildTree(seq);
   state.runs = {
-    findmin: buildFindMin(state.tree, state.tree.r ? state.tree.r.v : undefined),
+    findmin: buildFindMin(state.tree, state.tree.r ? state.tree.r.v : undefined, seq),
     remove: buildRemove(seq, state.target)
   };
   // the compare tab runs one lane per case the tree can actually show
@@ -1482,9 +1480,11 @@ function goalHtml(key) {
 
   if (twoKids(root))
     return box("We are removing <b>" + root.v + "</b> &mdash; first work out which case that is", [
-      "The tab opens inside <code>remove_</code>: the first six steps run the tests that " +
-        "decide how many children <b>" + root.v + "</b> has. Nothing here is assumed",
-      "Both one-child tests come back false, which is what <b>case 3</b> means &mdash; " +
+      "The tab starts where the removal does &mdash; the public <code>remove(" + root.v +
+        ")</code> call &mdash; and steps <code>remove_</code> until it has found <b>" +
+        root.v + "</b>. Nothing here is assumed",
+      "<code>remove_</code> then runs its three case tests on " + root.v + ": the leaf test and " +
+        "both one-child tests all come back false, which is what <b>case 3</b> means &mdash; " +
         root.v + " cannot just be unlinked",
       "Case 3 needs " + root.v + "'s <b>successor</b>: the smallest value in its <b>right</b> " +
         "subtree. Finding it is <code>find_min_</code>, and that call is the rest of this tab",
@@ -1777,7 +1777,7 @@ document.addEventListener("keydown", function (e) {
     // find_min_ must return the leftmost node of whatever subtree it starts in
     var root = buildTree(seq);
     if (root.r) {
-      var fm = buildFindMin(root, root.r.v);
+      var fm = buildFindMin(root, root.r.v, seq);
       runs++;
       var want = root.r; while (want.l) want = want.l;
       var got = fm[fm.length - 1].hit;
@@ -1795,20 +1795,42 @@ document.addEventListener("keydown", function (e) {
       // has two children, and must end on the line that calls find_min_.
       var pre = fm.filter(function (f) { return f.key === "remove"; });
       var wantPre = !!(root.l && root.r);
-      if (wantPre && pre.length !== 6)
-        fails.push(name + "/find_min: " + pre.length + " case-determination frames, expected 6");
       if (!wantPre && pre.length !== 0)
         fails.push(name + "/find_min: root has one child but the tab claims case 3");
       if (wantPre) {
-        if (pre[pre.length - 1].line !== 29)
-          fails.push(name + "/find_min: preamble ends on line " + pre[pre.length - 1].line +
-                     ", expected the find_min_ call");
-        if (fm[pre.length].key !== undefined)
+        // The preamble must BE the removal's own trace, not a copy that can
+        // drift from it: same frames, same order, cut at the find_min_ call.
+        var rmRef = buildRemove(seq, root.v), stop = -1;
+        for (var q = 0; q < rmRef.length; q++) {
+          if (rmRef[q].line === FINDMIN_CALL_LINE) { stop = q; break; }
+        }
+        if (stop < 0)
+          fails.push(name + "/find_min: remove(" + root.v + ") never reaches the find_min_ call");
+        else if (pre.length !== stop + 1)
+          fails.push(name + "/find_min: " + pre.length + " lead-in frames, expected " + (stop + 1));
+        else {
+          if (pre[0].line !== 0)
+            fails.push(name + "/find_min: lead-in starts on line " + pre[0].line +
+                       ", expected the public remove() call");
+          if (pre[pre.length - 1].line !== FINDMIN_CALL_LINE)
+            fails.push(name + "/find_min: lead-in ends on line " + pre[pre.length - 1].line +
+                       ", expected the find_min_ call");
+          pre.forEach(function (f, q) {
+            if (f.line !== rmRef[q].line)
+              fails.push(name + "/find_min: lead-in frame " + q + " is line " + f.line +
+                         ", but remove() runs line " + rmRef[q].line);
+            // Every frame but the hand-off must be remove()'s own, word for
+            // word. The hand-off is deliberately reworded, and must NOT name
+            // the value the walk is about to find.
+            if (q < stop && f.calc !== rmRef[q].calc)
+              fails.push(name + "/find_min: lead-in frame " + q + " has drifted from remove()");
+            if (q === stop && f.calc.indexOf(String(want.v)) !== -1)
+              fails.push(name + "/find_min: the hand-off frame gives away the answer (" +
+                         want.v + ")");
+          });
+        }
+        if (fm[pre.length] && fm[pre.length].key !== undefined)
           fails.push(name + "/find_min: the walk does not resume on find_min_'s listing");
-        pre.forEach(function (f) {
-          if (f.hit !== root.v)
-            fails.push(name + "/find_min: preamble highlights " + f.hit + ", not the node being removed");
-        });
       }
       if (fm[fm.length - 1].tree && findNode(fm[fm.length - 1].tree, got) === null)
         fails.push(name + "/find_min: result not in the tree");
