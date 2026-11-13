@@ -38,6 +38,7 @@
     .card.f h2 { background:#eaf2f8; }
     .card.g h2 { background:var(--tint-red); }
     .card.h h2 { background:var(--tint-orange-2); }
+    .card.i h2 { background:var(--tint-teal); }
   .card .body { padding:.9rem 1rem 1.1rem; flex:1; display:flex; flex-direction:column; }
   .card p { margin:0 0 .75rem; font-size:.93rem; }
   .card ul { margin:0 0 1rem; padding-left:1.15rem; font-size:.88rem; color:var(--muted); }
@@ -70,7 +71,7 @@
 </header>
 
 <div class="lede">
-  <p><strong>Nothing to install.</strong> Click any of the eight below and it runs in this browser
+  <p><strong>Nothing to install.</strong> Click any of the nine below and it runs in this browser
   — no account, no download, no setup. Each one is a single self-contained page.</p>
   <p>These were built to solve a specific classroom problem. A sorting algorithm is a process that
   unfolds over time, and a textbook can only show you single frozen frames of it. Each stepper
@@ -172,6 +173,23 @@
         <li>All three cases on the same tree, side by side, so the asymmetry is visible at once</li>
       </ul>
       <a class="open" href="bst-remove.html">Open the stepper</a>
+    </div>
+  </div>
+
+  <div class="card i">
+    <h2>AVL vs BST</h2>
+    <div class="body">
+      <p>The same numbers, in the same order, into both trees at once. Only one of them does
+      anything about the result &mdash; and what that is worth is the whole argument for AVL.</p>
+      <ul>
+        <li>Sorted input turns a plain BST into a <strong>linked list with extra steps</strong>
+            &mdash; height 6 on seven values, while the AVL tree holds at 2</li>
+        <li>Balance factors drawn on every AVL node, turning red the moment one goes out of
+            range &mdash; which is the signal to rotate</li>
+        <li>All four rotations (LL, RR, LR, RL) on the smallest tree that produces each</li>
+        <li>An input where AVL earns <em>nothing</em>, because the honest case matters too</li>
+      </ul>
+      <a class="open" href="avl-vs-bst.html">Open the stepper</a>
     </div>
   </div>
 

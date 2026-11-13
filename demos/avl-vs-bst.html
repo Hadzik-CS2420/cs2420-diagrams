@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AVL vs BST — the same insertions, two shapes</title>
+<style>
+  :root {
+    --ink:#2c3e50; --muted:#6e6e6e; --rule:#d8dee6;
+    --green:#1c7e45; --blue:#2573a7; --orange:#a95c19; --dkorange:#c64500;
+    --red:#c0392b; --purple:#8e44ad; --deep:#4527a0; --teal:#00695c;
+    --tint-green:#f2fbf4; --tint-blue:#eaf2f8; --tint-orange:#fff3e0;
+    --tint-red:#fce4ec; --tint-purple:#ede7f6; --tint-teal:#e0f2f1;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:1rem 1.1rem 2.5rem;
+         font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+         color:var(--ink); background:#fff; line-height:1.5; }
+
+  h1 { font-size:1.35rem; margin:0 0 .15rem; }
+  .sub { color:var(--muted); margin:0 0 .8rem; font-size:.92rem; }
+
+  /* ---- self-check banner ---- */
+  #selftest { font-size:.78rem; margin:0 0 .7rem; padding:.4rem .7rem;
+              border-radius:6px; background:#f6f8fa; border:1px solid var(--rule); }
+  #selftest .ok { color:var(--green); font-weight:700; }
+  #selftest .fail { color:var(--red); font-weight:700; }
+
+  /* ---- tabs ---- */
+  .tabs { display:flex; flex-wrap:wrap; gap:.3rem; align-items:center;
+          border-bottom:2px solid var(--rule); margin-bottom:.7rem; }
+  .tabs button { font:inherit; font-size:.9rem; padding:.45rem .9rem; cursor:pointer;
+                 background:#f6f8fa; color:var(--muted); border:1px solid var(--rule);
+                 border-bottom:none; border-radius:7px 7px 0 0; margin-bottom:-2px; }
+  .tabs button.on { background:#fff; color:var(--ink); font-weight:600; }
+  .tabs button[data-mode="race"].on   { border-top:3px solid var(--blue);  color:var(--blue); }
+  .tabs button[data-mode="rot"].on    { border-top:3px solid var(--green); color:var(--green); }
+  .tabs button[data-mode="cost"].on   { border-top:3px solid var(--deep);  color:var(--deep); }
+  .tabs .spacer { flex:1; }
+  .step-hint { font-size:.76rem; color:var(--muted); }
+
+  /* ---- controls ---- */
+  .bar { display:flex; flex-wrap:wrap; gap:.45rem; align-items:center; margin-bottom:.8rem; }
+  .ctl { font:inherit; font-size:.86rem; padding:.35rem .8rem; cursor:pointer;
+         background:#fff; border:1px solid var(--rule); border-radius:6px; color:var(--ink); }
+  .ctl:hover:not(:disabled) { background:#f6f8fa; }
+  .ctl:disabled { opacity:.4; cursor:default; }
+  .ctl.primary { background:var(--deep); border-color:var(--deep); color:#fff; font-weight:600; }
+  .ctl.primary:hover { background:#38208a; }
+  .preset { font:inherit; font-size:.8rem; padding:.3rem .7rem; cursor:pointer;
+            background:#fff; border:1px solid var(--rule); border-radius:999px; color:var(--muted); }
+  .preset.on { background:var(--tint-purple); border-color:var(--deep);
+               color:var(--deep); font-weight:600; }
+  .counter { font-size:.82rem; color:var(--muted); margin-left:.2rem; }
+  .barlab { font-size:.78rem; color:var(--muted); margin-right:.1rem; }
+
+  /* ---- cards ---- */
+  .card { border:1px solid var(--rule); border-radius:10px; overflow:hidden; margin-bottom:1rem; }
+  .card > h2 { font-size:.92rem; margin:0; padding:.5rem .85rem;
+               background:#f6f8fa; border-bottom:1px solid var(--rule); }
+  .card.bst > h2 { background:var(--tint-blue);  color:var(--blue); }
+  .card.avl > h2 { background:var(--tint-green); color:var(--green); }
+  .card-body { padding:.7rem .85rem .85rem; }
+
+  /* ---- the two-tree stage ---- */
+  .pair { display:grid; grid-template-columns:1fr 1fr; gap:1rem; align-items:start; }
+  @media (max-width:980px) { .pair { grid-template-columns:1fr; } }
+  svg.tree { display:block; width:100%; height:auto; }
+  .treefoot { display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.4rem; }
+  .chip { font-size:.75rem; padding:.16rem .55rem; border-radius:999px;
+          background:#f1f3f5; color:var(--muted); border:1px solid var(--rule); }
+  .chip b { color:var(--ink); }
+  .chip.bad  { background:var(--tint-red);   border-color:var(--red);   color:var(--red); }
+  .chip.good { background:var(--tint-green); border-color:var(--green); color:var(--green); }
+
+  /* ---- narration ---- */
+  .nowbox { background:var(--tint-orange); border-left:5px solid var(--dkorange);
+            border-radius:8px; padding:.55rem .85rem; }
+  .nowbox p { margin:0; font-size:.95rem; font-weight:600; }
+  .why { margin:.5rem 0 0; padding-left:1.15rem; font-size:.87rem; color:var(--muted); }
+  .why li { margin-bottom:.22rem; }
+  .why li:last-child { margin-bottom:0; }
+
+  /* ---- the goal strip ---- */
+  .goal { background:var(--tint-purple); border-left:5px solid var(--deep);
+          border-radius:8px; padding:.6rem .9rem; font-size:.88rem; margin-bottom:1rem; }
+  .goal .tag { display:inline-block; font-size:.62rem; font-weight:800;
+               letter-spacing:.09em; color:var(--deep); margin-right:.5rem; }
+  .goal .goalhead { margin:0 0 .4rem; font-weight:600; }
+  .goal ul { margin:0; padding-left:1.2rem; }
+  .goal li { margin-bottom:.25rem; }
+  .goal li:last-child { margin-bottom:0; }
+  .goal b { color:var(--deep); }
+
+  /* ---- scoreboard ---- */
+  table.score { border-collapse:collapse; width:100%; font-size:.88rem; }
+  table.score th, table.score td { border:1px solid var(--rule); padding:.4rem .7rem; text-align:left; }
+  table.score th { background:#f6f8fa; font-size:.8rem; }
+  table.score td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  table.score tr.hl td { background:var(--tint-orange); font-weight:600; }
+  .win  { color:var(--green); font-weight:700; }
+  .lose { color:var(--red);   font-weight:700; }
+
+  .callout { border-radius:8px; padding:.6rem .9rem; font-size:.87rem; }
+  .callout.warn { background:var(--tint-red); border-left:5px solid var(--red); }
+  .legend { font-size:.78rem; color:var(--muted); margin:.4rem 0 0; }
+</style>
+</head>
+<body>
+
+<h1>AVL vs BST &mdash; the same insertions, two shapes</h1>
+<p class="sub">Both trees are fed exactly the same numbers in exactly the same order. Only one of
+them does anything about the result.</p>
+
+<div id="selftest">checking&hellip;</div>
+
+<div class="tabs" id="tabs">
+  <button data-mode="race">1 &middot; Side by side</button>
+  <button data-mode="rot">2 &middot; The four rotations</button>
+  <button data-mode="cost">3 &middot; What it costs</button>
+  <span class="spacer"></span>
+  <span class="step-hint">&larr; &rarr; arrow keys step &middot; space plays</span>
+</div>
+
+<div class="bar" id="presetBar"></div>
+
+<div class="bar" id="ctlBar">
+  <button class="ctl" id="first">&laquo; First</button>
+  <button class="ctl" id="prev">&lsaquo; Prev</button>
+  <button class="ctl primary" id="play">&#9654; Play</button>
+  <button class="ctl" id="next">Next &rsaquo;</button>
+  <button class="ctl" id="last">Last &raquo;</button>
+  <button class="ctl" id="nextVal">Next number &raquo;&raquo;</button>
+  <span class="counter" id="counter"></span>
+</div>
+
+<div id="stage"></div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// Trees
+//
+// Both sides use the same node shape and the same insert-by-comparison walk.
+// The ONLY difference is that the AVL side, after placing a node, looks at
+// what the placement did to the heights and fixes it. Keeping the two inserts
+// otherwise identical is the whole point of the page -- any difference you
+// see on screen has to come from the rebalancing, because nothing else
+// differs.
+// ---------------------------------------------------------------------------
+function mk(v) { return { v: v, l: null, r: null, h: 0 }; }
+function clone(n) { return n ? { v: n.v, l: clone(n.l), r: clone(n.r), h: n.h } : null; }
+function H(n) { return n ? n.h : -1; }
+function reh(n) { n.h = 1 + Math.max(H(n.l), H(n.r)); }
+function bf(n) { return n ? H(n.l) - H(n.r) : 0; }
+function heightOf(n) { return n ? 1 + Math.max(heightOf(n.l), heightOf(n.r)) : -1; }
+function countOf(n) { return n ? 1 + countOf(n.l) + countOf(n.r) : 0; }
+function inorder(n, out) { if (n) { inorder(n.l, out); out.push(n.v); inorder(n.r, out); } return out; }
+
+// The comparison path a lookup for v would take. Used for both trees, so the
+// "comparisons" figure on each side is measured the same way.
+function pathTo(root, v) {
+  var p = [], n = root;
+  while (n) { p.push(n.v); if (v === n.v) break; n = v < n.v ? n.l : n.r; }
+  return p;
+}
+
+// Plain insert, no rebalancing. This is the BST, and it is also step one of
+// the AVL insert -- the AVL tree is a BST until the moment it is not.
+function plainInsert(root, v) {
+  if (!root) return mk(v);
+  var n = root;
+  while (true) {
+    if (v < n.v) { if (!n.l) { n.l = mk(v); break; } n = n.l; }
+    else if (v > n.v) { if (!n.r) { n.r = mk(v); break; } n = n.r; }
+    else return root;                       // duplicates are not inserted
+  }
+  return root;
+}
+
+function reheightAll(n) { if (!n) return; reheightAll(n.l); reheightAll(n.r); reh(n); }
+
+function rotR(n) { var p = n.l; n.l = p.r; p.r = n; reh(n); reh(p); return p; }
+function rotL(n) { var p = n.r; n.r = p.l; p.l = n; reh(n); reh(p); return p; }
+
+// Rebalance the ONE deepest node that insertion of v put out of range. An AVL
+// insert never needs more than that: the rotation restores the subtree to the
+// height it had before, so nothing above it is disturbed.
+//
+// Which rotation is decided by heights, not by comparing v against the child.
+// Both work for insertion, but the height test is the one that stays true if
+// this is ever reused for deletion.
+function rebalanceOnce(root, v) {
+  var ev = null;
+  function go(n) {
+    if (!n) return null;
+    if (v < n.v) n.l = go(n.l);
+    else if (v > n.v) n.r = go(n.r);
+    reh(n);
+    if (!ev && Math.abs(bf(n)) > 1) {
+      var b = bf(n), kind;
+      if (b > 1) kind = H(n.l.l) >= H(n.l.r) ? "LL" : "LR";
+      else       kind = H(n.r.r) >= H(n.r.l) ? "RR" : "RL";
+      ev = { at: n.v, bf: b, kind: kind,
+             pivot: b > 1 ? n.l.v : n.r.v,
+             grand: kind === "LL" ? n.l.l.v : kind === "LR" ? n.l.r.v
+                  : kind === "RR" ? n.r.r.v : n.r.l.v };
+      if (kind === "LL") return rotR(n);
+      if (kind === "RR") return rotL(n);
+      if (kind === "LR") { n.l = rotL(n.l); return rotR(n); }
+      n.r = rotR(n.r); return rotL(n);
+    }
+    return n;
+  }
+  return { root: go(root), ev: ev };
+}
+
+var ROT_NAME = {
+  LL: "Left-Left &mdash; one right rotation",
+  RR: "Right-Right &mdash; one left rotation",
+  LR: "Left-Right &mdash; rotate the child left, then this node right",
+  RL: "Right-Left &mdash; rotate the child right, then this node left"
+};
+var ROT_SHORT = { LL: "LL", RR: "RR", LR: "LR", RL: "RL" };
+
+// ---------------------------------------------------------------------------
+// Frame builder
+//
+// One pass over the insertion order. Per number: a frame for the comparison
+// walk, a frame for the placement, and -- only when the AVL side has gone out
+// of range -- a frame naming the imbalance and a frame showing it fixed.
+// ---------------------------------------------------------------------------
+function buildRun(seq) {
+  var frames = [], bstRoot = null, avlRoot = null, rots = 0;
+
+  function snap(o) {
+    o.bst = clone(bstRoot); o.avl = clone(avlRoot); o.rots = rots;
+    frames.push(o);
+  }
+
+  seq.forEach(function (v, idx) {
+    var bstPath = pathTo(bstRoot, v), avlPath = pathTo(avlRoot, v);
+
+    snap({ phase: 0, value: v, bstPath: bstPath, avlPath: avlPath, incoming: v, settled: true,
+      head: "Insert <b>" + v + "</b> &mdash; both trees walk down to find its slot",
+      why: bstRoot
+        ? ["the walk is the same on both sides: smaller goes left, larger goes right",
+           "BST compares against " + (bstPath.length || 0) + " node" +
+             (bstPath.length === 1 ? "" : "s") + ", AVL against " + (avlPath.length || 0) +
+             " &mdash; the trees are different shapes, so the walks can differ in length"]
+        : ["both trees are empty, so " + v + " becomes the root of each"] });
+
+    bstRoot = plainInsert(bstRoot, v);
+    avlRoot = plainInsert(avlRoot, v);
+    reheightAll(bstRoot); reheightAll(avlRoot);
+
+    var worst = null;
+    (function findWorst(n) {
+      if (!n) return;
+      if (Math.abs(bf(n)) > 1 && worst === null) worst = n.v;
+      findWorst(n.l); findWorst(n.r);
+    })(avlRoot);
+
+    var hb = heightOf(bstRoot), ha = heightOf(avlRoot);
+    snap({ phase: 1, value: v, newV: v, bstPath: bstPath.concat([v]),
+      avlPath: avlPath.concat([v]), showBF: true, settled: worst === null,
+      head: "<b>" + v + "</b> is placed &mdash; now the AVL tree checks what that did",
+      why: worst === null
+        ? ["every balance factor on the AVL side is still &minus;1, 0 or +1, so there is " +
+             "nothing to fix",
+           "when the input happens to arrive in a good order, AVL does no extra work at all"]
+        : ["the AVL tree carries a <b>balance factor</b> on each node: height of the left " +
+             "subtree minus height of the right",
+           "node " + worst + " is now out of range, and a node out of range is the signal " +
+             "to rotate",
+           "the BST has no such check, which is why nothing happens on the left"] });
+
+    if (worst !== null) {
+      var before = clone(avlRoot);
+      var res = rebalanceOnce(avlRoot, v);
+      var ev = res.ev;
+      avlRoot = res.root;
+      rots++;
+
+      frames.push({ phase: 2, value: v, bst: clone(bstRoot), avl: before, rots: rots - 1,
+        showBF: true, rotAt: ev.at, newV: v, settled: false,
+        head: "Node <b>" + ev.at + "</b> has balance factor " + (ev.bf > 0 ? "+" : "") + ev.bf +
+              " &mdash; this is " + ROT_SHORT[ev.kind],
+        why: ["the two steps from " + ev.at + " down towards " + v + " go <b>" +
+                (ev.kind[0] === "L" ? "left" : "right") + "</b> then <b>" +
+                (ev.kind[1] === "L" ? "left" : "right") + "</b>, which names the case",
+              ROT_NAME[ev.kind],
+              "only the subtree under " + ev.at + " moves; everything above it is untouched"] });
+
+      snap({ phase: 3, value: v, showBF: true, rotAt: ev.at, settled: true,
+        head: "Rotated &mdash; the AVL tree is back in range, height " + heightOf(avlRoot),
+        why: ["the rotation put " + ev.pivot + " where " + ev.at + " was, and " + ev.at +
+                " became its child",
+              "in-order is unchanged, so it is still the same search tree &mdash; only the " +
+                "shape moved",
+              "one rotation is always enough after an insertion: the subtree is back to the " +
+                "height it had before, so nothing above it notices"] });
+    }
+
+    void idx;
+  });
+
+  var hb2 = heightOf(bstRoot), ha2 = heightOf(avlRoot), n = countOf(bstRoot);
+  frames.push({ phase: 4, bst: clone(bstRoot), avl: clone(avlRoot), rots: rots,
+    showBF: true, done: true, settled: true,
+    head: hb2 === ha2
+      ? "Done &mdash; same shape, " + rots + " rotation" + (rots === 1 ? "" : "s")
+      : "Done &mdash; BST height " + hb2 + ", AVL height " + ha2 + " after " + rots +
+        " rotation" + (rots === 1 ? "" : "s"),
+    why: hb2 === ha2
+      ? ["this input arrived in an order that keeps a plain BST balanced, so AVL had nothing " +
+           "to improve",
+         "that is the honest case for AVL: when the data is already kind to you, the extra " +
+           "machinery earns nothing"]
+      : ["same " + n + " values, same order, same in-order traversal &mdash; different shape",
+         "a lookup that misses costs " + (hb2 + 1) + " comparisons in the BST and " +
+           (ha2 + 1) + " in the AVL tree",
+         "the BST did no work to get this shape; the AVL tree did " + rots + " rotation" +
+           (rots === 1 ? "" : "s") + ", and that is the whole price"] });
+  return frames;
+}
+
+// ---------------------------------------------------------------------------
+// Drawing
+// ---------------------------------------------------------------------------
+function layout(root) {
+  var pos = [], i = 0, byNode = new Map();
+  (function place(n, d) {
+    if (!n) return;
+    place(n.l, d + 1);
+    var p = { v: n.v, x: i++, y: d, node: n };
+    pos.push(p); byNode.set(n, p);
+    place(n.r, d + 1);
+  })(root, 0);
+  return { pos: pos, byNode: byNode, cols: i, rows: heightOf(root) + 1 };
+}
+
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// `cols` and `rows` are forced to the WIDEST the run ever gets, so the two
+// trees stay on one scale and a node does not jump sideways between steps
+// just because the other side grew.
+function treeSvg(root, o, fixed) {
+  o = o || {};
+  var accent = o.kind === "avl" ? "#1c7e45" : "#2573a7";
+  if (!root) {
+    return '<svg class="tree" viewBox="0 0 420 70" role="img" aria-label="an empty tree">' +
+      '<text x="210" y="40" text-anchor="middle" fill="#6e6e6e" font-size="15">' +
+      'empty</text></svg>';
+  }
+  var L = layout(root);
+  var CW = 56, RH = 62, PAD = 26;
+  var cols = Math.max(fixed && fixed.cols || 0, L.cols);
+  var rows = Math.max(fixed && fixed.rows || 0, L.rows);
+  var W = Math.max(cols * CW, 240) + PAD * 2;
+  var Hh = rows * RH + PAD * 2;
+  var X = function (p) { return PAD + p.x * CW + CW / 2; };
+  var Y = function (p) { return PAD + p.y * RH + 18; };
+
+  var edges = "", nodes = "";
+  L.pos.forEach(function (p) {
+    ["l", "r"].forEach(function (side) {
+      var c = p.node[side]; if (!c) return;
+      var cp = L.byNode.get(c);
+      var on = o.path && o.path.indexOf(p.v) !== -1 && o.path.indexOf(c.v) !== -1;
+      edges += '<line x1="' + X(p) + '" y1="' + (Y(p) + 15) + '" x2="' + X(cp) +
+               '" y2="' + (Y(cp) - 15) + '" stroke="' + (on ? accent : "#c7cdd1") +
+               '" stroke-width="' + (on ? 3 : 2) + '"/>';
+    });
+  });
+
+  L.pos.forEach(function (p) {
+    var isNew = o.newV === p.v, isRot = o.rotAt === p.v;
+    var onPath = o.path && o.path.indexOf(p.v) !== -1;
+    var b = bf(p.node), out = Math.abs(b) > 1;
+    var ring = isRot ? "#c0392b" : isNew ? "#a95c19" : onPath ? accent : "#c7cdd1";
+    var rw = (isRot || isNew) ? 4 : onPath ? 3 : 2;
+    nodes += '<circle cx="' + X(p) + '" cy="' + Y(p) + '" r="15" fill="#fff" stroke="' + ring +
+             '" stroke-width="' + rw + '"/>' +
+             '<text x="' + X(p) + '" y="' + (Y(p) + 5) + '" text-anchor="middle" ' +
+             'font-size="14" font-weight="600" fill="#2c3e50">' + esc(p.v) + "</text>";
+    if (o.showBF && o.kind === "avl") {
+      nodes += '<text x="' + (X(p) + 19) + '" y="' + (Y(p) - 13) + '" text-anchor="middle" ' +
+               'font-size="11" font-weight="700" fill="' + (out ? "#c0392b" : "#6e6e6e") +
+               '">' + (b > 0 ? "+" : "") + b + "</text>";
+    }
+  });
+
+  var label = (o.kind === "avl" ? "AVL tree" : "binary search tree") + " with " +
+    countOf(root) + " nodes and height " + heightOf(root) + ", values in order: " +
+    inorder(root, []).join(", ") +
+    (o.kind === "avl" ? ". Each node is labelled with its balance factor." : "");
+
+  return '<svg class="tree" viewBox="0 0 ' + W + " " + Hh + '" role="img" aria-label="' +
+    esc(label) + '">' + edges + nodes + "</svg>";
+}
+
+function chips(root, other, kind, rots) {
+  var h = heightOf(root), n = countOf(root), ho = heightOf(other);
+  var cls = h === ho ? "" : (h < ho ? " good" : " bad");
+  var out = '<span class="chip">nodes <b>' + n + "</b></span>" +
+            '<span class="chip' + cls + '">height <b>' + h + "</b></span>" +
+            '<span class="chip' + cls + '">worst-case lookup <b>' + (h + 1) +
+              "</b> comparisons</span>";
+  if (kind === "avl") out += '<span class="chip">rotations <b>' + rots + "</b></span>";
+  else out += '<span class="chip">rotations <b>&mdash;</b></span>';
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Presets
+// ---------------------------------------------------------------------------
+var RACE = [
+  { key: "sorted",   label: "1&hellip;7 in order",
+    seq: [1, 2, 3, 4, 5, 6, 7],
+    note: "The motivating case. Sorted input is not exotic &mdash; it is what you get " +
+          "reading an already-ordered file, or inserting primary keys." },
+  { key: "reverse",  label: "7&hellip;1 backwards",
+    seq: [7, 6, 5, 4, 3, 2, 1],
+    note: "The same disaster mirrored: every node hangs off the left instead of the right." },
+  { key: "balanced", label: "already well ordered",
+    seq: [50, 30, 70, 20, 40, 60, 80],
+    note: "The case where AVL earns nothing. The input arrives in an order that keeps a " +
+          "plain BST balanced, so no rotation ever fires." },
+  { key: "mixed",    label: "a realistic jumble",
+    seq: [15, 75, 35, 45, 25, 65, 55, 85],
+    note: "Neither sorted nor conveniently ordered &mdash; what real data usually looks like. " +
+          "This one fires both of the <b>double</b> rotations, RL and LR, which are the two " +
+          "worth slowing down for." }
+];
+
+var ROTS = [
+  { key: "RR", label: "RR &mdash; one left rotation",  seq: [10, 20, 30] },
+  { key: "LL", label: "LL &mdash; one right rotation", seq: [30, 20, 10] },
+  { key: "RL", label: "RL &mdash; right, then left",   seq: [10, 30, 20] },
+  { key: "LR", label: "LR &mdash; left, then right",   seq: [30, 10, 20] }
+];
+
+var state = { mode: "race", preset: "sorted", rot: "RR", step: 0, frames: [], timer: null,
+              maxFrames: 1, fixed: { cols: 0, rows: 0 } };
+
+function currentSeq() {
+  if (state.mode === "rot") {
+    return ROTS.filter(function (r) { return r.key === state.rot; })[0].seq;
+  }
+  return RACE.filter(function (p) { return p.key === state.preset; })[0].seq;
+}
+
+function compute() {
+  state.frames = buildRun(currentSeq());
+  state.maxFrames = state.frames.length;
+  if (state.step >= state.maxFrames) state.step = state.maxFrames - 1;
+  // one scale for the whole run, both trees
+  var c = 0, r = 0;
+  state.frames.forEach(function (f) {
+    [f.bst, f.avl].forEach(function (t) {
+      var L = layout(t);
+      c = Math.max(c, L.cols); r = Math.max(r, L.rows);
+    });
+  });
+  state.fixed = { cols: c, rows: r };
+}
+
+// ---------------------------------------------------------------------------
+// Render
+// ---------------------------------------------------------------------------
+function goalHtml() {
+  if (state.mode === "rot") {
+    var r = ROTS.filter(function (x) { return x.key === state.rot; })[0];
+    return '<div class="goal"><p class="goalhead"><span class="tag">GOAL</span>' +
+      "The " + r.key + " case, on the smallest tree that produces it</p><ul>" +
+      "<li>Three nodes is all it takes: two that lean the same way make a " +
+        "<b>single</b> rotation, two that zig-zag make a <b>double</b> one</li>" +
+      "<li>The name is the path from the unbalanced node down to the one just inserted &mdash; " +
+        "<b>" + r.key[0] + "</b> then <b>" + r.key[1] + "</b></li>" +
+      "<li>Watch the BST on the left: it makes the same three comparisons and then simply " +
+        "keeps the shape it was handed</li></ul></div>";
+  }
+  if (state.mode === "cost") return "";
+  var p = RACE.filter(function (x) { return x.key === state.preset; })[0];
+  return '<div class="goal"><p class="goalhead"><span class="tag">GOAL</span>' +
+    "Same numbers, same order, into both trees at once</p><ul>" +
+    "<li>" + p.note + "</li>" +
+    "<li>Both sides place a value the same way &mdash; walk down comparing, hang it off a " +
+      "leaf. <b>Everything you see differ comes from the rebalancing</b>, because nothing " +
+      "else differs</li>" +
+    "<li>The number to watch is <b>height</b>: it is what a lookup costs, and it is the only " +
+      "thing AVL is buying</li></ul></div>";
+}
+
+function stageHtml(f) {
+  var fx = state.fixed;
+  return goalHtml() +
+    '<div class="pair">' +
+      '<div class="card bst"><h2>Binary search tree &mdash; no rebalancing</h2>' +
+        '<div class="card-body">' +
+          treeSvg(f.bst, { kind: "bst", path: f.bstPath, newV: f.newV }, fx) +
+          '<div class="treefoot">' + chips(f.bst, f.avl, "bst", 0) + "</div>" +
+        "</div></div>" +
+      '<div class="card avl"><h2>AVL tree &mdash; rebalances on insert</h2>' +
+        '<div class="card-body">' +
+          treeSvg(f.avl, { kind: "avl", path: f.avlPath, newV: f.newV,
+                           rotAt: f.rotAt, showBF: f.showBF }, fx) +
+          '<div class="treefoot">' + chips(f.avl, f.bst, "avl", f.rots) + "</div>" +
+        "</div></div>" +
+    "</div>" +
+    '<div class="card"><h2>What just happened</h2><div class="card-body">' +
+      '<div class="nowbox"><p>' + f.head + "</p></div>" +
+      (f.why && f.why.length
+        ? '<ul class="why">' + f.why.map(function (w) { return "<li>" + w + "</li>"; }).join("") +
+          "</ul>"
+        : "") +
+    "</div></div>" +
+    (f.done ? summaryHtml(f) : "");
+}
+
+function summaryHtml(f) {
+  var hb = heightOf(f.bst), ha = heightOf(f.avl), n = countOf(f.bst);
+  return '<div class="card"><h2>Side by side, at the end</h2><div class="card-body">' +
+    '<table class="score"><thead><tr><th></th><th>BST</th><th>AVL</th></tr></thead><tbody>' +
+    "<tr><td>nodes</td><td class='num'>" + n + "</td><td class='num'>" + n + "</td></tr>" +
+    "<tr><td>height</td><td class='num'>" + hb + "</td><td class='num'>" + ha + "</td></tr>" +
+    "<tr class='hl'><td>worst-case lookup</td><td class='num'>" + (hb + 1) +
+      " comparisons</td><td class='num'>" + (ha + 1) + " comparisons</td></tr>" +
+    "<tr><td>rotations done</td><td class='num'>&mdash;</td><td class='num'>" + f.rots +
+      "</td></tr>" +
+    "<tr><td>values, in order</td><td colspan='2'>" + inorder(f.bst, []).join(", ") +
+      "</td></tr>" +
+    "</tbody></table>" +
+    '<p class="legend">Both rows of values are identical, and both trees are valid search ' +
+    'trees. Rebalancing never changes what is in the tree or the order it comes out in ' +
+    '&mdash; only how deep you have to go to reach it.</p></div></div>';
+}
+
+// Tab 3: no stepping, just the arithmetic at sizes you cannot draw.
+function costHtml() {
+  var rows = [7, 15, 31, 63, 255, 1023].map(function (n) {
+    var avl = null, i;
+    for (i = 1; i <= n; i++) {
+      avl = plainInsert(avl, i);
+      reheightAll(avl);
+      avl = rebalanceOnce(avl, i).root;
+    }
+    var ha = heightOf(avl);
+    return "<tr><td class='num'>" + n + "</td>" +
+      "<td class='num lose'>" + (n - 1) + "</td><td class='num win'>" + ha + "</td>" +
+      "<td class='num lose'>" + n + "</td><td class='num win'>" + (ha + 1) + "</td></tr>";
+  }).join("");
+
+  return '<div class="goal"><p class="goalhead"><span class="tag">GOAL</span>' +
+    "What the shape is worth, at sizes too big to draw</p><ul>" +
+    "<li>Every row is <b>sorted input</b> &mdash; 1, 2, 3, &hellip; n &mdash; which is the " +
+      "worst thing you can hand a plain BST and costs an AVL tree nothing but rotations</li>" +
+    "<li>The AVL heights below are <b>measured</b>, by actually running the insertions, not " +
+      "taken from a formula</li>" +
+    "<li>A worst-case lookup is height + 1 comparisons, because you compare at every level " +
+      "and then once more where the node is or is not</li></ul></div>" +
+    '<div class="card"><h2>Sorted input, both trees</h2><div class="card-body">' +
+    '<table class="score"><thead><tr><th>values inserted</th>' +
+    "<th>BST height</th><th>AVL height</th>" +
+    "<th>BST worst lookup</th><th>AVL worst lookup</th></tr></thead><tbody>" +
+    rows + "</tbody></table>" +
+    '<p class="legend">The BST column is not an approximation: sorted input gives it exactly ' +
+    'one node per level, so it is a linked list with extra steps, and height is n &minus; 1.</p>' +
+    "</div></div>" +
+    '<div class="card"><h2>So why not always use AVL?</h2><div class="card-body">' +
+    '<div class="callout warn"><b>Because the rebalancing is not free.</b> Every insert and ' +
+    'every removal has to recompute heights back up the path and may rotate, and every node ' +
+    'carries a height field it would not otherwise need. On the "already well ordered" ' +
+    'preset in tab 1, AVL does all of that bookkeeping and finishes with exactly the same ' +
+    'tree a plain BST got for nothing. AVL wins when you cannot control the order the data ' +
+    'arrives in &mdash; which, with real data, is most of the time.</div></div></div>';
+}
+
+function render() {
+  var pb = document.getElementById("presetBar");
+  if (state.mode === "cost") {
+    pb.innerHTML = "";
+    document.getElementById("ctlBar").style.display = "none";
+    document.getElementById("stage").innerHTML = costHtml();
+  } else {
+    document.getElementById("ctlBar").style.display = "";
+    var list = state.mode === "rot" ? ROTS : RACE;
+    var sel = state.mode === "rot" ? state.rot : state.preset;
+    pb.innerHTML = '<span class="barlab">' +
+      (state.mode === "rot" ? "case:" : "insertion order:") + "</span>" +
+      list.map(function (p) {
+        return '<button class="preset' + (p.key === sel ? " on" : "") +
+               '" data-pick="' + p.key + '">' + p.label + "</button>";
+      }).join("") +
+      (state.mode === "race"
+        ? '<span class="barlab" style="margin-left:.5rem">' +
+          currentSeq().join(", ") + "</span>"
+        : "");
+    var f = state.frames[Math.min(state.step, state.frames.length - 1)];
+    document.getElementById("stage").innerHTML = stageHtml(f);
+    document.getElementById("counter").textContent =
+      "step " + (state.step + 1) + " of " + state.maxFrames;
+    document.getElementById("first").disabled = state.step === 0;
+    document.getElementById("prev").disabled = state.step === 0;
+    document.getElementById("next").disabled = state.step >= state.maxFrames - 1;
+    document.getElementById("last").disabled = state.step >= state.maxFrames - 1;
+    document.getElementById("nextVal").disabled = state.step >= state.maxFrames - 1;
+    Array.prototype.forEach.call(pb.querySelectorAll("[data-pick]"), function (b) {
+      b.addEventListener("click", function () {
+        stopPlay();
+        if (state.mode === "rot") state.rot = b.getAttribute("data-pick");
+        else state.preset = b.getAttribute("data-pick");
+        state.step = 0; compute(); render();
+      });
+    });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("#tabs [data-mode]"), function (b) {
+    b.classList.toggle("on", b.getAttribute("data-mode") === state.mode);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Controls
+// ---------------------------------------------------------------------------
+function go(n) { state.step = Math.max(0, Math.min(n, state.maxFrames - 1)); render(); }
+
+// Skip to the next number arriving, rather than the next frame -- the
+// rotation frames are the interesting ones to linger on, and this is how you
+// get past them quickly on a second pass.
+function nextVal() {
+  var here = state.frames[state.step].value;
+  for (var i = state.step + 1; i < state.maxFrames; i++) {
+    if (state.frames[i].value !== here || state.frames[i].done) { go(i); return; }
+  }
+  go(state.maxFrames - 1);
+}
+
+function stopPlay() {
+  if (state.timer) { clearInterval(state.timer); state.timer = null; }
+  var p = document.getElementById("play");
+  if (p) p.innerHTML = "&#9654; Play";
+}
+function play() {
+  if (state.timer) { stopPlay(); return; }
+  if (state.step >= state.maxFrames - 1) state.step = 0;
+  document.getElementById("play").innerHTML = "&#10073;&#10073; Pause";
+  state.timer = setInterval(function () {
+    if (state.step >= state.maxFrames - 1) { stopPlay(); return; }
+    go(state.step + 1);
+  }, 1100);
+}
+
+document.getElementById("first").addEventListener("click", function () { stopPlay(); go(0); });
+document.getElementById("prev").addEventListener("click", function () { stopPlay(); go(state.step - 1); });
+document.getElementById("next").addEventListener("click", function () { stopPlay(); go(state.step + 1); });
+document.getElementById("last").addEventListener("click", function () { stopPlay(); go(state.maxFrames - 1); });
+document.getElementById("nextVal").addEventListener("click", function () { stopPlay(); nextVal(); });
+document.getElementById("play").addEventListener("click", play);
+
+Array.prototype.forEach.call(document.querySelectorAll("#tabs [data-mode]"), function (b) {
+  b.addEventListener("click", function () {
+    stopPlay();
+    state.mode = b.getAttribute("data-mode");
+    state.step = 0;
+    if (state.mode !== "cost") compute();
+    render();
+  });
+});
+
+document.addEventListener("keydown", function (ev) {
+  if (state.mode === "cost") return;
+  if (ev.key === "ArrowRight") { ev.preventDefault(); stopPlay(); go(state.step + 1); }
+  else if (ev.key === "ArrowLeft") { ev.preventDefault(); stopPlay(); go(state.step - 1); }
+  else if (ev.key === " ") { ev.preventDefault(); play(); }
+});
+
+// ---------------------------------------------------------------------------
+// Self-check -- re-derives every claim the page makes, so a wrong frame is
+// reported on the page rather than taught from it.
+// ---------------------------------------------------------------------------
+(function selftest() {
+  var fails = [], runs = 0;
+
+  function sorted(a) {
+    for (var i = 1; i < a.length; i++) if (a[i - 1] >= a[i]) return false;
+    return true;
+  }
+  function balanced(n) {
+    if (!n) return true;
+    if (Math.abs(heightOf(n.l) - heightOf(n.r)) > 1) return false;
+    return balanced(n.l) && balanced(n.r);
+  }
+  function isBST(n, lo, hi) {
+    if (!n) return true;
+    if (lo !== null && n.v <= lo) return false;
+    if (hi !== null && n.v >= hi) return false;
+    return isBST(n.l, lo, n.v) && isBST(n.r, n.v, hi);
+  }
+
+  RACE.concat(ROTS).forEach(function (p) {
+    var frames = buildRun(p.seq), last = frames[frames.length - 1];
+    runs++;
+    var want = p.seq.slice().sort(function (a, b) { return a - b; });
+
+    // both trees hold the same values, and both are still search trees
+    ["bst", "avl"].forEach(function (side) {
+      var got = inorder(last[side], []);
+      if (got.join(",") !== want.join(","))
+        fails.push(p.key + "/" + side + ": in-order " + got.join(",") +
+                   ", expected " + want.join(","));
+      if (!sorted(got)) fails.push(p.key + "/" + side + ": in-order is not sorted");
+      if (!isBST(last[side], null, null))
+        fails.push(p.key + "/" + side + ": not a valid search tree");
+    });
+
+    // the AVL side is in range at every settled frame, and never taller
+    frames.forEach(function (f, i) {
+      if (!f.head) fails.push(p.key + " frame " + i + ": no narration");
+      // A frame is settled unless it is deliberately showing the moment
+      // between placing a node and fixing the imbalance that caused.
+      if (!f.settled) return;
+      if (!balanced(f.avl))
+        fails.push(p.key + " frame " + i + ": AVL out of range when it should be settled");
+      if (heightOf(f.avl) > heightOf(f.bst))
+        fails.push(p.key + " frame " + i + ": AVL taller than the BST");
+    });
+
+    // ... and every unsettled frame must really be one, or the flag is just
+    // a way of switching the check off.
+    frames.forEach(function (f, i) {
+      if (f.settled === false && balanced(f.avl))
+        fails.push(p.key + " frame " + i + ": marked unsettled but already in range");
+    });
+
+    // the imbalance frames must actually show an imbalance, and name a real case
+    frames.filter(function (f) { return f.phase === 2; }).forEach(function (f) {
+      if (balanced(f.avl))
+        fails.push(p.key + ": a rotation frame whose tree is already in range");
+      if (!ROT_SHORT[f.head.indexOf("LL") > -1 ? "LL" : f.head.indexOf("LR") > -1 ? "LR"
+          : f.head.indexOf("RL") > -1 ? "RL" : f.head.indexOf("RR") > -1 ? "RR" : "?"])
+        fails.push(p.key + ": a rotation frame that names no case");
+    });
+  });
+
+  // sorted input: the BST is a spine, the AVL is not
+  [7, 15, 31].forEach(function (n) {
+    var seq = [], i;
+    for (i = 1; i <= n; i++) seq.push(i);
+    var last = buildRun(seq).pop();
+    runs++;
+    if (heightOf(last.bst) !== n - 1)
+      fails.push("sorted " + n + ": BST height " + heightOf(last.bst) + ", expected " + (n - 1));
+    if (!balanced(last.avl)) fails.push("sorted " + n + ": AVL not in range");
+    // the AVL bound: height < 1.4405 * log2(n + 2) - 0.3277
+    var bound = 1.4405 * (Math.log(n + 2) / Math.log(2)) - 0.3277;
+    if (heightOf(last.avl) > bound)
+      fails.push("sorted " + n + ": AVL height " + heightOf(last.avl) + " exceeds the bound " +
+                 bound.toFixed(2));
+  });
+
+  // the four rotation presets must each fire exactly one rotation, of their name
+  ROTS.forEach(function (r) {
+    var frames = buildRun(r.seq), rot = frames.filter(function (f) { return f.phase === 2; });
+    runs++;
+    if (rot.length !== 1)
+      fails.push(r.key + ": " + rot.length + " rotations, expected exactly 1");
+    else if (rot[0].head.indexOf(r.key) === -1)
+      fails.push(r.key + ": the rotation frame does not name " + r.key);
+  });
+
+  // the balanced preset must fire none -- the honest case for AVL
+  var bal = buildRun(RACE.filter(function (p) { return p.key === "balanced"; })[0].seq);
+  runs++;
+  if (bal.filter(function (f) { return f.phase === 2; }).length !== 0)
+    fails.push("balanced: a rotation fired on input that needs none");
+  if (heightOf(bal[bal.length - 1].bst) !== heightOf(bal[bal.length - 1].avl))
+    fails.push("balanced: the two trees should finish identical");
+
+  document.getElementById("selftest").innerHTML = fails.length === 0
+    ? '<span class="ok">&#x2714; Self-check passed</span> &mdash; ' + runs +
+      " runs: both trees always hold the same values in the same order and stay valid search " +
+      "trees, the AVL tree is within &plusmn;1 at every settled step and is never taller than " +
+      "the BST, sorted input gives the BST a height of exactly n&minus;1 while the AVL tree " +
+      "stays under its log bound, each of the four rotation cases fires exactly once and is " +
+      "named correctly, and already-ordered input fires none at all."
+    : '<span class="fail">&#x2716; Self-check FAILED (' + fails.length + ")</span>: " +
+      fails.slice(0, 6).join("; ");
+})();
+
+compute();
+render();
+</script>
+</body>
+</html>
