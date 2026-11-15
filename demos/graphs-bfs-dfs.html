@@ -345,10 +345,11 @@
 
   <div class="tabs" id="tabs">
     <button data-mode="intro">1 &middot; Graph vs tree</button>
-    <button data-mode="build">2 &middot; Build the list</button>
-    <button data-mode="bfs">3 &middot; BFS</button>
-    <button data-mode="dfs">4 &middot; DFS</button>
-    <button data-mode="compare">5 &middot; BFS vs DFS</button>
+    <button data-mode="repr">2 &middot; List vs matrix</button>
+    <button data-mode="build">3 &middot; Build the list</button>
+    <button data-mode="bfs">4 &middot; BFS</button>
+    <button data-mode="dfs">5 &middot; DFS</button>
+    <button data-mode="compare">6 &middot; BFS vs DFS</button>
     <span class="spacer"></span>
     <span class="step-hint">&larr; &rarr; arrow keys step &middot; space plays</span>
   </div>
@@ -1287,7 +1288,7 @@ function compute() {
   // "intro" is a page, not a run, so it has no frames to count. Without this
   // guard compute() dereferences a run that was never built and the whole
   // stepper dies on load -- which is how it ships if nobody opens it.
-  state.maxFrames = state.mode === "intro" ? 1
+  state.maxFrames = (state.mode === "intro" || state.mode === "repr") ? 1
     : state.mode === "compare"
       ? Math.max(state.runs.bfs.length, state.runs.dfs.length)
       : state.runs[state.mode].length;
@@ -1648,60 +1649,79 @@ function renderIntro() {
       'is no obvious place to begin, and with cycles you have to remember where you ' +
       'have already been or you will loop forever.</p>' +
       INTRO_SVG +
+      '<div class="callout" style="background:#eaf2f8;border-left:5px solid #2573a7;' +
+      'border-radius:8px;padding:.8rem 1.1rem;margin:1rem 0 0">' +
+        '<p style="margin:0 0 .4rem"><strong>Two letters you will see in every cost ' +
+        'from here on:</strong></p>' +
+        '<ul style="margin:0;padding-left:1.25rem">' +
+        '<li><strong>V</strong> &mdash; the number of <em>vertices</em> (the circles). ' +
+        'A tree calls them nodes; same thing.</li>' +
+        '<li><strong>E</strong> &mdash; the number of <em>edges</em> (the lines joining ' +
+        'them).</li>' +
+        '</ul>' +
+        '<p style="margin:.5rem 0 0">In the five-town graph on the next tabs V is 5 and ' +
+        'E is 5. Costs in this module are written in those two letters rather than one ' +
+        '<em>n</em>, because a graph can have few vertices and a great many edges, or ' +
+        'the other way round, and the difference decides which structure to use.</p>' +
+      '</div>' +
       '<p style="margin:1rem 0 0"><strong>The one line to take from this:</strong> ' +
       'a tree <em>is</em> a graph &mdash; a connected, acyclic one with a root chosen. ' +
       'Everything you already know about walking a tree still applies; you just have ' +
       'to carry a <code>visited</code> set now, because nothing else stops you going ' +
       'round in circles.</p>' +
     '</div></div>' +
+    '<div class="card"><h2>Next</h2><div class="card-body">' +
+      '<p style="margin:0">Tab 2 is how a graph gets written down in code. After that ' +
+      'the tabs are traces: building the list, then walking it two ways.</p>' +
+    '</div></div>';
+  document.getElementById("watch").innerHTML = "";
+}
 
-    '<div class="card"><h2>How you store one: the adjacency list</h2>' +
+function renderRepr() {
+  document.getElementById("stage").innerHTML =
+    '<div class="card"><h2>How you store a graph: list or matrix</h2>' +
     '<div class="card-body">' +
       '<p style="margin:0 0 .9rem">A tree node holds pointers to its own children, so ' +
       'the structure <em>is</em> the picture. A graph has no such shape to lean on &mdash; ' +
       'any vertex can connect to any other &mdash; so you have to choose how to write the ' +
       'connections down. There are two usual answers, and this class uses the first.</p>' +
+      '<p style="margin:0 0 .9rem; font-size:.93rem; color:#555">Reminder from tab 1: ' +
+      '<strong>V</strong> is how many vertices the graph has, <strong>E</strong> how many ' +
+      'edges. Both costs below are written in those.</p>' +
       INTRO_ADJ_SVG +
       '<p style="margin:1rem 0 .5rem"><strong>An adjacency list is a map from each vertex ' +
       'to the list of vertices it touches.</strong> In this CT that is literally ' +
       '<code>unordered_map&lt;string, vector&lt;string&gt;&gt; adj_list_</code>: the key is ' +
       'a vertex name, the value is its neighbours.</p>' +
       '<ul style="margin:0;padding-left:1.25rem">' +
-      '<li><strong>Why a list and not a matrix here.</strong> A matrix is a V&times;V grid, ' +
-      'so it costs O(V&sup2;) whether or not the edges exist. Real graphs are mostly ' +
-      '<em>sparse</em> &mdash; far fewer edges than V&sup2; &mdash; and the list only pays ' +
-      'for edges that are actually there, O(V&nbsp;+&nbsp;E).</li>' +
+      '<li><strong>Why a list and not a matrix here.</strong> A matrix is a grid with one ' +
+      'row and one column per vertex &mdash; V&times;V cells &mdash; so it costs ' +
+      'O(V&sup2;) whether or not the edges exist. At V&nbsp;=&nbsp;200 that is 40,000 ' +
+      'cells, nearly all of them 0. The list only pays for edges that are actually ' +
+      'there: O(V&nbsp;+&nbsp;E), one entry per vertex plus one per edge end.</li>' +
       '<li><strong>What you give up.</strong> "Is there an edge A&ndash;B?" is one lookup ' +
       'in a matrix and a scan of A&rsquo;s neighbour list here. That is the trade, and it ' +
-      'is worth it when the lists are short.</li>' +
+      'is worth it when the lists are short &mdash; which is what <em>sparse</em> means: ' +
+      'E is much smaller than V&sup2;.</li>' +
       '<li><strong>Undirected means stored twice.</strong> One edge A&ndash;B puts B in ' +
-      'A&rsquo;s list <em>and</em> A in B&rsquo;s. Store it once and the walk only works in ' +
-      'one direction &mdash; tab 2 shows both halves going in.</li>' +
+      'A&rsquo;s list <em>and</em> A in B&rsquo;s, so E edges make 2E entries. Store it ' +
+      'once and the walk only works in one direction &mdash; the next tab shows both ' +
+      'halves going in.</li>' +
       '</ul>' +
-    '</div></div>' +
-    '<div class="card"><h2>What the next four tabs do</h2><div class="card-body">' +
-      '<ol style="margin:0;padding-left:1.25rem">' +
-      '<li><strong>Build the list</strong> &mdash; an <code>unordered_map&lt;string, ' +
-      'vector&lt;string&gt;&gt;</code> filled one <code>push_back</code> at a time, with ' +
-      'the picture and the map side by side.</li>' +
-      '<li><strong>BFS</strong> &mdash; a queue, and the result in the order it comes out.</li>' +
-      '<li><strong>DFS</strong> &mdash; the same loop with a stack instead, which is the ' +
-      'entire difference.</li>' +
-      '<li><strong>BFS vs DFS</strong> &mdash; both walks on the same graph, step for step.</li>' +
-      '</ol></div></div>';
+    '</div></div>';
   document.getElementById("watch").innerHTML = "";
 }
 
 function render() {
   // The intro is a page, not a trace: no presets, no step controls, no legend
   // about colours that nothing on screen is using.
-  var isIntro = state.mode === "intro";
+  var isIntro = state.mode === "intro" || state.mode === "repr";
   var panel = document.querySelector(".panel");
   var legend = document.querySelector("p.legend");
   if (panel) panel.style.display = isIntro ? "none" : "";
   if (legend) legend.style.display = isIntro ? "none" : "";
   if (isIntro) {
-    renderIntro();
+    if (state.mode === "repr") renderRepr(); else renderIntro();
     Array.prototype.forEach.call(document.querySelectorAll("#tabs [data-mode]"),
       function (b) { b.classList.toggle("on", b.getAttribute("data-mode") === state.mode); });
     return;
@@ -1781,7 +1801,7 @@ document.addEventListener("keydown", function (e) {
   // A focused code line handles its own Enter; everything else is navigation.
   var onCodeLine = e.target && e.target.parentNode && e.target.parentNode.classList &&
                    e.target.parentNode.classList.contains("code");
-  if (state.mode === "intro") return;      // nothing to step through
+  if (state.mode === "intro" || state.mode === "repr") return;   // no steps here
   if (e.key === "ArrowRight") { stopPlay(); go(state.step + 1); }
   else if (e.key === "ArrowLeft") { stopPlay(); go(state.step - 1); }
   else if (e.key === " " && !onCodeLine) { e.preventDefault(); togglePlay(); }
@@ -1951,7 +1971,7 @@ document.addEventListener("keydown", function (e) {
 
 // Deep links: stepper.html#dfs opens that tab directly, so a Canvas page or a
 // lecture slide can point at one walk instead of "then click tab 3".
-var MODES = ["intro", "build", "bfs", "dfs", "compare"];
+var MODES = ["intro", "repr", "build", "bfs", "dfs", "compare"];
 
 function modeFromHash() {
   var h = (location.hash || "").replace("#", "");
