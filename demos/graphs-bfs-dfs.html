@@ -344,10 +344,11 @@
      line that is running, what the containers hold, and which vertex is being looked at.</p>
 
   <div class="tabs" id="tabs">
-    <button data-mode="build">1 &middot; Build the list</button>
-    <button data-mode="bfs">2 &middot; BFS</button>
-    <button data-mode="dfs">3 &middot; DFS</button>
-    <button data-mode="compare">4 &middot; BFS vs DFS</button>
+    <button data-mode="intro">1 &middot; Graph vs tree</button>
+    <button data-mode="build">2 &middot; Build the list</button>
+    <button data-mode="bfs">3 &middot; BFS</button>
+    <button data-mode="dfs">4 &middot; DFS</button>
+    <button data-mode="compare">5 &middot; BFS vs DFS</button>
     <span class="spacer"></span>
     <span class="step-hint">&larr; &rarr; arrow keys step &middot; space plays</span>
   </div>
@@ -1254,7 +1255,7 @@ function codeKey() { return state.mode === "compare" ? "bfs" : state.mode; }
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
-var state = { mode: "build", preset: "utah", step: 0, start: "Ogden",
+var state = { mode: "intro", preset: "utah", step: 0, start: "Ogden",
               pinned: null, peek: null,
               runs: {}, maxFrames: 1, timer: null };
 
@@ -1283,9 +1284,13 @@ function compute() {
     if (box) state.runs[k].forEach(function (f) { f.box = box; });
   });
 
-  state.maxFrames = state.mode === "compare"
-    ? Math.max(state.runs.bfs.length, state.runs.dfs.length)
-    : state.runs[state.mode].length;
+  // "intro" is a page, not a run, so it has no frames to count. Without this
+  // guard compute() dereferences a run that was never built and the whole
+  // stepper dies on load -- which is how it ships if nobody opens it.
+  state.maxFrames = state.mode === "intro" ? 1
+    : state.mode === "compare"
+      ? Math.max(state.runs.bfs.length, state.runs.dfs.length)
+      : state.runs[state.mode].length;
   if (state.step >= state.maxFrames) state.step = state.maxFrames - 1;
   state.mh = null;        // the reservation belongs to the run just built
 }
@@ -1621,7 +1626,60 @@ function extraControls() {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Tab 1 -- orientation, not a trace.
+//
+// Everything after this tab is a walk through code. This one answers the
+// question the other four assume: what IS a graph, and how is it different
+// from the trees we spent Module 7 on. The diagram is the same one on the
+// concept page, inlined so the file still works offline.
+// ---------------------------------------------------------------------------
+var INTRO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 630" style="width:100%;max-width:900px;height:auto;display:block;margin:0 auto" role="img" aria-label="Graph versus tree. A tree has one root, no cycles and exactly one path between any two nodes; a graph has no root, allows cycles and allows several paths. Key terms: vertex, edge, degree, cycle, acyclic, undirected. A tree is a special case of a graph." font-family="\'Segoe UI\', Arial, sans-serif">\n  <rect width="100%" height="100%" fill="white"/>\n\n  <!-- Title -->\n  <text x="450" y="30" text-anchor="middle" font-size="20" font-weight="bold" fill="#2c3e50">Graph vs Tree</text>\n\n  <!-- ===== TREE SIDE ===== -->\n  <rect x="30" y="50" width="400" height="410" rx="10" fill="#f0faf0" stroke="#1c7e45" stroke-width="1.5"/>\n  <text x="230" y="78" text-anchor="middle" fill="#1c7e45" font-size="15" font-weight="bold">Tree</text>\n\n  <!-- Tree nodes -->\n  <circle cx="230" cy="115" r="20" fill="white" stroke="#1c7e45" stroke-width="2"/>\n  <text x="230" y="121" text-anchor="middle" fill="#2c3e50" font-size="13" font-weight="bold">A</text>\n\n  <circle cx="160" cy="185" r="20" fill="white" stroke="#1c7e45" stroke-width="2"/>\n  <text x="160" y="191" text-anchor="middle" fill="#2c3e50" font-size="13" font-weight="bold">B</text>\n\n  <circle cx="300" cy="185" r="20" fill="white" stroke="#1c7e45" stroke-width="2"/>\n  <text x="300" y="191" text-anchor="middle" fill="#2c3e50" font-size="13" font-weight="bold">C</text>\n\n  <circle cx="120" cy="250" r="20" fill="white" stroke="#1c7e45" stroke-width="2"/>\n  <text x="120" y="256" text-anchor="middle" fill="#2c3e50" font-size="13" font-weight="bold">D</text>\n\n  <circle cx="200" cy="250" r="20" fill="white" stroke="#1c7e45" stroke-width="2"/>\n  <text x="200" y="256" text-anchor="middle" fill="#2c3e50" font-size="13" font-weight="bold">E</text>\n\n  <!-- Tree edges -->\n  <line x1="230" y1="135" x2="160" y2="165" stroke="#1c7e45" stroke-width="2"/>\n  <line x1="230" y1="135" x2="300" y2="165" stroke="#1c7e45" stroke-width="2"/>\n  <line x1="160" y1="205" x2="120" y2="230" stroke="#1c7e45" stroke-width="2"/>\n  <line x1="160" y1="205" x2="200" y2="230" stroke="#1c7e45" stroke-width="2"/>\n\n  <!-- Tree properties -->\n  <text x="230" y="295" text-anchor="middle" fill="#555" font-size="12">One root, no cycles, exactly one path</text>\n  <text x="230" y="311" text-anchor="middle" fill="#555" font-size="12">between any two nodes</text>\n\n  <!-- Tree use cases -->\n  <line x1="60" y1="330" x2="400" y2="330" stroke="#ddd" stroke-width="1"/>\n  <text x="230" y="350" text-anchor="middle" fill="#1c7e45" font-size="13" font-weight="bold">Common Uses</text>\n  <circle cx="68" cy="372" r="3" fill="#1c7e45"/>\n  <text x="80" y="377" fill="#2c3e50" font-size="12">File systems (folders/files)</text>\n  <circle cx="68" cy="395" r="3" fill="#1c7e45"/>\n  <text x="80" y="400" fill="#2c3e50" font-size="12">HTML DOM (parent/child elements)</text>\n  <circle cx="68" cy="418" r="3" fill="#1c7e45"/>\n  <text x="80" y="423" fill="#2c3e50" font-size="12">BST, AVL &#x2014; fast search O(log n)</text>\n  <circle cx="68" cy="441" r="3" fill="#1c7e45"/>\n  <text x="80" y="446" fill="#2c3e50" font-size="12">Decision trees, org charts</text>\n\n  <!-- ===== GRAPH SIDE ===== -->\n  <rect x="470" y="50" width="400" height="410" rx="10" fill="#eaf2f8" stroke="#2573a7" stroke-width="1.5"/>\n  <text x="670" y="78" text-anchor="middle" fill="#2573a7" font-size="15" font-weight="bold">Graph</text>\n\n  <!-- Graph nodes -->\n  <circle cx="600" cy="115" r="20" fill="white" stroke="#2573a7" stroke-width="2"/>\n  <text x="600" y="121" text-anchor="middle" fill="#2c3e50" font-size="13" font-weight="bold">A</text>\n\n  <circle cx="740" cy="115" r="20" fill="white" stroke="#2573a7" stroke-width="2"/>\n  <text x="740" y="121" text-anchor="middle" fill="#2c3e50" font-size="13" font-weight="bold">B</text>\n\n  <circle cx="540" cy="200" r="20" fill="white" stroke="#2573a7" stroke-width="2"/>\n  <text x="540" y="206" text-anchor="middle" fill="#2c3e50" font-size="13" font-weight="bold">C</text>\n\n  <circle cx="670" cy="210" r="20" fill="white" stroke="#2573a7" stroke-width="2"/>\n  <text x="670" y="216" text-anchor="middle" fill="#2c3e50" font-size="13" font-weight="bold">D</text>\n\n  <circle cx="800" cy="200" r="20" fill="white" stroke="#2573a7" stroke-width="2"/>\n  <text x="800" y="206" text-anchor="middle" fill="#2c3e50" font-size="13" font-weight="bold">E</text>\n\n  <!-- Graph edges -->\n  <line x1="620" y1="115" x2="720" y2="115" stroke="#2573a7" stroke-width="2"/>\n  <line x1="590" y1="132" x2="550" y2="183" stroke="#2573a7" stroke-width="2"/>\n  <line x1="610" y1="132" x2="660" y2="193" stroke="#2573a7" stroke-width="2"/>\n  <line x1="756" y1="127" x2="786" y2="184" stroke="#2573a7" stroke-width="2"/>\n  <line x1="726" y1="130" x2="684" y2="195" stroke="#2573a7" stroke-width="2"/>\n  <line x1="560" y1="200" x2="650" y2="210" stroke="#2573a7" stroke-width="2"/>\n\n  <!-- Cycle highlight: A → B → D → A -->\n  <path d="M 618,125 L 722,125 L 670,193 Z" fill="#c0392b" fill-opacity="0.06" stroke="#c0392b" stroke-width="2" stroke-dasharray="5,3"/>\n  <text x="670" y="142" text-anchor="middle" fill="#c0392b" font-size="11" font-weight="bold">cycle!</text>\n  <text x="670" y="155" text-anchor="middle" fill="#c0392b" font-size="10">A&#x2192;B&#x2192;D&#x2192;A</text>\n\n  <!-- Edge label on B-E -->\n  <text x="790" y="148" fill="#a95c19" font-size="10" font-weight="bold">edge</text>\n  <path d="M 786,150 L 775,160" fill="none" stroke="#a95c19" stroke-width="1.2"/>\n\n  <!-- Graph properties -->\n  <text x="670" y="255" text-anchor="middle" fill="#555" font-size="12">No root, cycles allowed, multiple paths</text>\n\n  <!-- Graph use cases -->\n  <line x1="500" y1="330" x2="840" y2="330" stroke="#ddd" stroke-width="1"/>\n  <text x="670" y="350" text-anchor="middle" fill="#2573a7" font-size="13" font-weight="bold">Common Uses</text>\n  <circle cx="508" cy="372" r="3" fill="#2573a7"/>\n  <text x="520" y="377" fill="#2c3e50" font-size="12">Social networks (friends, followers)</text>\n  <circle cx="508" cy="395" r="3" fill="#2573a7"/>\n  <text x="520" y="400" fill="#2c3e50" font-size="12">Maps / GPS navigation (roads, routes)</text>\n  <circle cx="508" cy="418" r="3" fill="#2573a7"/>\n  <text x="520" y="423" fill="#2c3e50" font-size="12">Web links (pages linking to pages)</text>\n  <circle cx="508" cy="441" r="3" fill="#2573a7"/>\n  <text x="520" y="446" fill="#2c3e50" font-size="12">Network routing, dependency resolution</text>\n\n  <!-- ===== LEGEND ===== -->\n  <rect x="30" y="475" width="840" height="130" rx="10" fill="#fafafa" stroke="#ccc" stroke-width="1.2"/>\n  <text x="450" y="498" text-anchor="middle" fill="#2c3e50" font-size="14" font-weight="bold">Key Terms</text>\n\n  <!-- Vertex -->\n  <circle cx="70" cy="522" r="10" fill="white" stroke="#2573a7" stroke-width="2"/>\n  <text x="90" y="527" fill="#2c3e50" font-size="12"><tspan font-weight="bold">Vertex</tspan> &#x2014; a data point in the graph (called "node" in trees &#x2014; same concept)</text>\n\n  <!-- Edge -->\n  <line x1="55" y1="547" x2="85" y2="547" stroke="#2573a7" stroke-width="2.5"/>\n  <text x="90" y="552" fill="#2c3e50" font-size="12"><tspan font-weight="bold">Edge</tspan> &#x2014; a connection between two vertices</text>\n\n  <!-- Degree -->\n  <text x="60" y="577" fill="#2573a7" font-size="14" font-weight="bold">3</text>\n  <text x="90" y="577" fill="#2c3e50" font-size="12"><tspan font-weight="bold">Degree</tspan> &#x2014; number of edges on a vertex (no limit in a graph)</text>\n\n  <!-- Cycle -->\n  <line x1="510" y1="517" x2="540" y2="517" stroke="#c0392b" stroke-width="2" stroke-dasharray="5,3"/>\n  <text x="550" y="522" fill="#2c3e50" font-size="12"><tspan font-weight="bold">Cycle</tspan> &#x2014; a path that starts and ends at the same vertex</text>\n\n  <!-- Acyclic -->\n  <circle cx="520" cy="547" r="8" fill="#f0faf0" stroke="#1c7e45" stroke-width="1.5"/>\n  <text x="533" y="551" fill="#1c7e45" font-size="11" font-weight="bold">&#x2713;</text>\n  <text x="550" y="552" fill="#2c3e50" font-size="12"><tspan font-weight="bold">Acyclic</tspan> &#x2014; no cycles (trees are always acyclic)</text>\n\n  <!-- Undirected -->\n  <line x1="510" y1="572" x2="540" y2="572" stroke="#8e44ad" stroke-width="2.5"/>\n  <text x="550" y="577" fill="#2c3e50" font-size="12"><tspan font-weight="bold">Undirected</tspan> &#x2014; edges go both ways (A&#x2014;B means B&#x2014;A too)</text>\n\n  <!-- Bottom note -->\n  <text x="450" y="620" text-anchor="middle" fill="#a95c19" font-size="13" font-weight="bold">A tree is a special case of a graph &#x2014; connected, acyclic (no cycles), one root</text>\n</svg>';
+
+function renderIntro() {
+  document.getElementById("stage").innerHTML =
+    '<div class="card"><h2>Before the code: what a graph is</h2><div class="card-body">' +
+      '<p style="margin:0 0 .9rem">You have spent Module 7 on trees. A graph is the ' +
+      'same idea with two rules removed: <strong>there is no root</strong>, and ' +
+      '<strong>a path is allowed to come back to where it started</strong>. Those two ' +
+      'removals are why a graph needs BFS and DFS at all &mdash; without a root there ' +
+      'is no obvious place to begin, and with cycles you have to remember where you ' +
+      'have already been or you will loop forever.</p>' +
+      INTRO_SVG +
+      '<p style="margin:1rem 0 0"><strong>The one line to take from this:</strong> ' +
+      'a tree <em>is</em> a graph &mdash; a connected, acyclic one with a root chosen. ' +
+      'Everything you already know about walking a tree still applies; you just have ' +
+      'to carry a <code>visited</code> set now, because nothing else stops you going ' +
+      'round in circles.</p>' +
+    '</div></div>' +
+    '<div class="card"><h2>What the next four tabs do</h2><div class="card-body">' +
+      '<ol style="margin:0;padding-left:1.25rem">' +
+      '<li><strong>Build the list</strong> &mdash; an <code>unordered_map&lt;string, ' +
+      'vector&lt;string&gt;&gt;</code> filled one <code>push_back</code> at a time, with ' +
+      'the picture and the map side by side.</li>' +
+      '<li><strong>BFS</strong> &mdash; a queue, and the result in the order it comes out.</li>' +
+      '<li><strong>DFS</strong> &mdash; the same loop with a stack instead, which is the ' +
+      'entire difference.</li>' +
+      '<li><strong>BFS vs DFS</strong> &mdash; both walks on the same graph, step for step.</li>' +
+      '</ol></div></div>';
+  document.getElementById("watch").innerHTML = "";
+}
+
 function render() {
+  // The intro is a page, not a trace: no presets, no step controls, no legend
+  // about colours that nothing on screen is using.
+  var isIntro = state.mode === "intro";
+  var panel = document.querySelector(".panel");
+  var legend = document.querySelector("p.legend");
+  if (panel) panel.style.display = isIntro ? "none" : "";
+  if (legend) legend.style.display = isIntro ? "none" : "";
+  if (isIntro) {
+    renderIntro();
+    Array.prototype.forEach.call(document.querySelectorAll("#tabs [data-mode]"),
+      function (b) { b.classList.toggle("on", b.getAttribute("data-mode") === state.mode); });
+    return;
+  }
+
   extraControls();
   if (!state.mh && state.mode !== "compare") { renderSolo(); measureRun(); }
   if (state.mode === "compare") renderCompare(); else renderSolo();
@@ -1696,6 +1754,7 @@ document.addEventListener("keydown", function (e) {
   // A focused code line handles its own Enter; everything else is navigation.
   var onCodeLine = e.target && e.target.parentNode && e.target.parentNode.classList &&
                    e.target.parentNode.classList.contains("code");
+  if (state.mode === "intro") return;      // nothing to step through
   if (e.key === "ArrowRight") { stopPlay(); go(state.step + 1); }
   else if (e.key === "ArrowLeft") { stopPlay(); go(state.step - 1); }
   else if (e.key === " " && !onCodeLine) { e.preventDefault(); togglePlay(); }
@@ -1865,7 +1924,7 @@ document.addEventListener("keydown", function (e) {
 
 // Deep links: stepper.html#dfs opens that tab directly, so a Canvas page or a
 // lecture slide can point at one walk instead of "then click tab 3".
-var MODES = ["build", "bfs", "dfs", "compare"];
+var MODES = ["intro", "build", "bfs", "dfs", "compare"];
 
 function modeFromHash() {
   var h = (location.hash || "").replace("#", "");
