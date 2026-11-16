@@ -39,6 +39,7 @@
     .card.g h2 { background:var(--tint-red); }
     .card.h h2 { background:var(--tint-orange-2); }
     .card.i h2 { background:var(--tint-teal); }
+    .card.j h2 { background:#eaf2f8; }
   .card .body { padding:.9rem 1rem 1.1rem; flex:1; display:flex; flex-direction:column; }
   .card p { margin:0 0 .75rem; font-size:.93rem; }
   .card ul { margin:0 0 1rem; padding-left:1.15rem; font-size:.88rem; color:var(--muted); }
@@ -71,7 +72,7 @@
 </header>
 
 <div class="lede">
-  <p><strong>Nothing to install.</strong> Click any of the nine below and it runs in this browser
+  <p><strong>Nothing to install.</strong> Click any of the ten below and it runs in this browser
   — no account, no download, no setup. Each one is a single self-contained page.</p>
   <p>These were built to solve a specific classroom problem. A sorting algorithm is a process that
   unfolds over time, and a textbook can only show you single frozen frames of it. Each stepper
@@ -206,6 +207,25 @@
           <li>Both walks side by side on the same graph, step for step</li>
         </ul>
         <a class="open" href="graphs-bfs-dfs.html">Open the stepper</a>
+      </div>
+    </div>
+
+    <div class="card j">
+      <h2>Shortest Path and MST</h2>
+      <div class="body">
+        <p>Two algorithms, one weighted graph, the same min-heap &mdash; and a different
+        question each. Dijkstra asks <em>how far</em>; Prim&rsquo;s asks <em>which edges to
+        keep</em>.</p>
+        <ul>
+          <li>The heap drawn as it really is, with <strong>stale entries struck through</strong>
+              &mdash; the thing <code>if (d &gt; dist[u]) continue;</code> exists for</li>
+          <li>Dijkstra finds Provo at <strong>5 by two hops</strong>, not 6 by the direct edge
+              &mdash; which is why BFS cannot answer this</li>
+          <li>A second graph where Prim&rsquo;s rejects an edge for closing a cycle, because
+              the course&rsquo;s own demo graph never does</li>
+          <li>Both answers side by side: a number per vertex against a set of edges</li>
+        </ul>
+        <a class="open" href="shortest-path-mst.html">Open the stepper</a>
       </div>
     </div>
 
