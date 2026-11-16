@@ -194,6 +194,8 @@ useGraph("demo");
 function heapPush(h, item) { h.push(item); h.sort(function (a, b) { return a[0] - b[0]; }); }
 function heapPop(h) { return h.shift(); }
 function copyHeap(h) { return h.map(function (x) { return x.slice(); }); }
+// An undirected edge named the same way whichever end you came from.
+function edgeId(a, b) { return a < b ? a + "|" + b : b + "|" + a; }
 
 // ---------------------------------------------------------------------------
 // Code listings -- the solution's own lines, so a student can follow along in
@@ -290,11 +292,16 @@ function hl(line) {
 // ---------------------------------------------------------------------------
 function buildDijkstra() {
   var F = [], dist = {}, heap = [], settled = {}, declared = false;
+  // Not shown anywhere: dijkstra() as the students write it returns distances
+  // and keeps no parent. Recorded only so the compare tab can say truthfully
+  // whether the shortest-path tree and the MST landed on the same edges.
+  var via = {};
 
   function snap(o) {
     o.dist = declared ? Object.assign({}, dist) : null;
     o.heap = copyHeap(heap);
     o.settled = Object.assign({}, settled);
+    o.via = Object.assign({}, via);
     F.push(o);
   }
 
@@ -415,6 +422,7 @@ function buildDijkstra() {
                             "changes and nothing is pushed"] });
       if (better) {
         dist[e.to] = nd;
+        via[e.to] = edgeId(u, e.to);
         snap({ line: 21, hot: u, edge: [u, e.to],
           calc: "dist[" + e.to + "] = " + nd,
           head: "Relax the edge: <strong>" + e.to + "</strong> is now " + nd + " away",
@@ -728,9 +736,63 @@ function introHtml() {
     "</div></div>";
 }
 
+// Do the two algorithms end up keeping the same edges on the graph that is
+// loaded? On the demo graph they do -- which is worth saying out loud, because
+// tab 4 then shows two identical pictures and the honest conclusion from that
+// is "sometimes they agree", not "they are always the same". Computed from the
+// runs rather than written down, so it cannot go stale when a preset changes.
+function treeAgreement(d, p) {
+  var spt = Object.keys(d.via).map(function (v) { return d.via[v]; }).sort();
+  var mst = p.mst.map(function (m) { return edgeId(m[0], m[1]); }).sort();
+  var sptW = 0, mstW = 0;
+  Object.keys(d.via).forEach(function (v) {
+    EDGES.forEach(function (e) {
+      if (edgeId(e[0], e[1]) === d.via[v]) sptW += e[2];
+    });
+  });
+  p.mst.forEach(function (m) { mstW += m[2]; });
+  return { same: spt.join() === mst.join(), sptW: sptW, mstW: mstW };
+}
+
 function compareHtml() {
   var d = state.runs.dijkstra[state.runs.dijkstra.length - 1];
   var p = state.runs.prims[state.runs.prims.length - 1];
+  var ag = treeAgreement(d, p);
+
+  // Which neighbours of the source ended up closer by some other route than by
+  // their own direct edge? On the demo graph that is Provo, 5 beating 6, and it
+  // used to be written into the prose by name -- which read as nonsense on the
+  // second preset, where no direct edge loses. Found, not assumed.
+  var beaten = [];
+  ADJ[SOURCE].forEach(function (e) {
+    if (d.dist[e.to] < e.w) beaten.push({ v: e.to, direct: e.w, got: d.dist[e.to] });
+  });
+  var dijNote = beaten.length
+    ? "Note <b>" + beaten[0].v + " is " + beaten[0].got + ", not " + beaten[0].direct +
+      "</b> &mdash; the route round beats the direct edge."
+    : "On this graph every vertex is closest by its own direct edge from " + SOURCE +
+      ", so no distance ever gets replaced. Switch to the other graph to watch one that does.";
+  var primNote = beaten.length
+    ? "The direct " + SOURCE + "&ndash;" + beaten[0].v + " edge of " + beaten[0].direct +
+      " is <b>not</b> in the tree, even though Dijkstra walked along it to discover " +
+      beaten[0].v + " first."
+    : "Every edge here was chosen because it was the cheapest way to reach a vertex that " +
+      "was still outside the tree.";
+
+  var agree = ag.same
+    ? "<p style=\"margin:.7rem 0 0\"><b>On this graph the two pictures above are the " +
+      "same " + (VERTS.length - 1) + " edges</b> &mdash; the shortest-path tree and the " +
+      "minimum spanning tree " +
+      "both weigh " + ag.mstW + ". That is a coincidence of these weights, not a rule. " +
+      "Switch the graph at the top to <b>" + GRAPHS.cycle.label + "</b> and they come " +
+      "apart: Dijkstra&rsquo;s tree costs more than Prim&rsquo;s, because it is willing to " +
+      "pay for a direct edge that gets one vertex home faster.</p>"
+    : "<p style=\"margin:.7rem 0 0\"><b>Here the two trees are different.</b> " +
+      "Dijkstra&rsquo;s shortest-path tree weighs " + ag.sptW + "; Prim&rsquo;s minimum " +
+      "spanning tree weighs " + ag.mstW + ". Dijkstra&rsquo;s is <em>not</em> wrong &mdash; " +
+      "it is paying " + (ag.sptW - ag.mstW) + " more on purpose, to keep every vertex as " +
+      "close to " + SOURCE + " as it can be. Cheapest-overall and closest-to-" + SOURCE +
+      " are different jobs.</p>";
   return '<div class="goal"><p class="goalhead"><span class="tag">GOAL</span>' +
     "One graph, two answers &mdash; and they are not the same shape</p><ul>" +
     "<li>Dijkstra returns <b>a number per vertex</b>: how far each one is from " + SOURCE + ".</li>" +
@@ -741,20 +803,20 @@ function compareHtml() {
     '<div class="card"><h2>Dijkstra from ' + SOURCE + ' &mdash; shortest distances</h2>' +
     '<div class="card-body">' + graphSvg(d, "dijkstra") + distTable(d) +
     '<p style="margin:.6rem 0 0;font-size:.88rem">Every vertex carries its own total. ' +
-    "Note <b>Provo is 5, not 6</b> &mdash; the two-hop route through Logan beats the direct " +
-    "edge.</p></div></div></div><div class=\"col\">" +
+    dijNote + "</p></div></div></div><div class=\"col\">" +
     '<div class="card"><h2>Prim&rsquo;s from ' + SOURCE + ' &mdash; the spanning tree</h2>' +
     '<div class="card-body">' + graphSvg(p, "prims") + mstTable(p) +
-    '<p style="margin:.6rem 0 0;font-size:.88rem">Three edges for four vertices, total ' +
-    p.total + ". The direct " + SOURCE + "&ndash;Provo edge of 6 is <b>not</b> in the tree, " +
-    "even though Dijkstra walked along it to discover Provo first.</p></div></div>" +
+    '<p style="margin:.6rem 0 0;font-size:.88rem">' + (VERTS.length - 1) +
+    " edges for " + VERTS.length + " vertices, total " + p.total + ". " + primNote +
+    "</p></div></div>" +
     "</div></div>" +
     '<div class="card" style="margin-top:1rem"><h2>The difference in one line</h2>' +
     '<div class="card-body"><p style="margin:0">A shortest-path tree is built from one ' +
     "vertex&rsquo;s point of view and may contain an expensive edge because it is the fastest " +
     "way <em>there</em>. A minimum spanning tree has no point of view &mdash; it only cares " +
-    "that the total is as small as possible. Run Dijkstra from Provo instead and the distances " +
-    "all change; run Prim&rsquo;s from Provo and the tree comes out the same.</p></div></div>";
+    "that the total is as small as possible. Start Dijkstra somewhere else and every distance " +
+    "changes; start Prim&rsquo;s somewhere else and the tree comes out the same.</p>" +
+    agree + "</div></div>";
 }
 
 function soloHtml(f, key) {
@@ -956,15 +1018,36 @@ document.addEventListener("keydown", function (e) {
     fails.push("prims: the demo graph now rejects an edge -- the note saying it does not " +
                "is wrong");
 
+  // The compare tab now states whether the two trees landed on the same edges,
+  // in different words for each case. Lock both: these weights make them
+  // coincide on the demo graph and diverge on the other, and a weight change
+  // would quietly swap the branches, leaving the prose confidently wrong.
+  // useGraph again inside the loop -- treeAgreement prices the shortest-path
+  // tree out of the global EDGES, so it has to be the loaded graph's.
+  Object.keys(GRAPHS).forEach(function (key) {
+    useGraph(key);
+    var r = results[key];
+    var ag = treeAgreement(r.d[r.d.length - 1], r.p[r.p.length - 1]);
+    runs++;
+    if (key === "demo" && !(ag.same && ag.sptW === ag.mstW))
+      fails.push("demo: the shortest-path tree and the MST no longer coincide, but the " +
+                 "compare tab still says they are the same edges");
+    if (key === "cycle" && !(ag.same === false && ag.sptW > ag.mstW))
+      fails.push("cycle: this graph was supposed to make Dijkstra's tree cost more than " +
+                 "Prim's, and no longer does");
+  });
+  useGraph("demo");
+
   document.getElementById("selftest").innerHTML = fails.length === 0
     ? '<span class="ok">&#x2714; Self-check passed</span> &mdash; ' + runs +
       " checks: Dijkstra's distances match an independently written shortest-path routine " +
       "and Provo comes out 5 by the two-hop route rather than 6 by the direct edge; Prim's " +
       "total matches <strong>Kruskal</strong>, a different MST algorithm, at " + k.total +
       " over " + (VERTS.length - 1) + " edges with no vertex added twice; every frame " +
-      "highlights a real line and carries a THIS STEP band; and both of the lines students " +
+      "highlights a real line and carries a THIS STEP band; both of the lines students " +
       "leave out &mdash; the stale-entry skip and the cycle check &mdash; actually fire on " +
-      "this graph."
+      "this graph; and the two trees still coincide on this graph while diverging on the " +
+      "other, which is what the comparison on tab 4 claims."
     : '<span class="fail">&#x2716; Self-check FAILED (' + fails.length + ")</span>: " +
       fails.slice(0, 6).join("; ");
 })();
