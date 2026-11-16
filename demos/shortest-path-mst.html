@@ -207,6 +207,7 @@ var CODE = {
     "    for (const auto& [vertex, edges] : adj_list_) {",
     "        dist[vertex] = std::numeric_limits<int>::max();",
     "    }",
+    "    if (!has_vertex(source)) return dist;",
     "    dist[source] = 0;",
     "",
     "    using Pair = std::pair<int, std::string>;",
@@ -288,38 +289,94 @@ function hl(line) {
 // Dijkstra -- frames
 // ---------------------------------------------------------------------------
 function buildDijkstra() {
-  var F = [], dist = {}, heap = [], settled = {};
-  VERTS.forEach(function (v) { dist[v] = INF; });
+  var F = [], dist = {}, heap = [], settled = {}, declared = false;
 
   function snap(o) {
-    o.dist = Object.assign({}, dist);
+    o.dist = declared ? Object.assign({}, dist) : null;
     o.heap = copyHeap(heap);
     o.settled = Object.assign({}, settled);
     F.push(o);
   }
 
-  snap({ line: 4, calc: "every distance starts at infinity\nnothing is known yet",
-    head: "Set every distance to &infin;",
-    why: ["&infin; means <em>no route found yet</em>, not <em>no route exists</em>"] });
+  snap({ line: 1, calc: "dijkstra(source = \"" + SOURCE + "\")\nthe graph has " +
+      VERTS.length + " vertices and " + EDGES.length + " edges",
+    head: "Entering <code>dijkstra</code> with source <strong>" + SOURCE + "</strong>",
+    why: ["the answer will be one distance per vertex, all measured from here"] });
+
+  declared = true;
+  snap({ line: 2, calc: "std::unordered_map<std::string, int> dist;\ndist is empty",
+    head: "Create the map that will hold the answer",
+    why: ["one entry per vertex: the name, and how far it is from the source",
+          "empty right now &mdash; the next loop puts every vertex in it"] });
+
+  var filled = [];
+  VERTS.forEach(function (v, i) {
+    if (i === 0) {
+      snap({ line: 3, calc: "for (const auto& [vertex, edges] : adj_list_)\n" +
+          "walks every key in the adjacency list &mdash; " + VERTS.join(", "),
+        head: "Loop over every vertex in the graph",
+        why: ["the keys of <code>adj_list_</code> are exactly the vertices"] });
+    }
+    dist[v] = INF;
+    filled.push(v);
+    snap({ line: 4, hot: v,
+      calc: "dist[" + v + "] = numeric_limits<int>::max()\n" + filled.length + " of " +
+            VERTS.length + " filled in",
+      head: "<strong>" + v + "</strong> starts at &infin;",
+      why: i === 0
+        ? ["<code>max()</code> stands in for infinity &mdash; it means <em>no route " +
+           "found yet</em>, not <em>no route exists</em>",
+           "starting at 0 instead would claim every vertex is already reachable for free"]
+        : [] });
+  });
+
+  snap({ line: 6, calc: "has_vertex(\"" + SOURCE + "\")   →   true, so we do not return",
+    head: "The source really is in the graph",
+    why: ["asked for a vertex that is not here, the function hands back the all-&infin; " +
+          "map rather than crashing"] });
 
   dist[SOURCE] = 0;
-  snap({ line: 6, calc: "dist[" + SOURCE + "] = 0\nthe source costs nothing to reach",
-    head: "The source is 0 away from itself", why: [] });
+  snap({ line: 7, hot: SOURCE,
+    calc: "dist[" + SOURCE + "] = 0\nthe one distance we know for certain",
+    head: "The source is 0 away from itself",
+    why: ["this single known value is what the whole algorithm grows outward from"] });
+
+  snap({ line: 9, calc: "using Pair = std::pair<int, std::string>;\n" +
+      "a name for (distance, vertex) &mdash; nothing happens at run time",
+    head: "Name the pair type the heap will hold",
+    why: ["distance comes <em>first</em> in the pair on purpose: pairs compare on their " +
+          "first element, so the heap orders by distance without being told how"] });
+
+  snap({ line: 10, calc: "min_heap is created, empty\ngreater<Pair> makes it a MIN-heap",
+    head: "Create the min-heap",
+    why: ["<code>priority_queue</code> is a max-heap by default &mdash; " +
+          "<code>std::greater</code> is what turns it round",
+          "leave that out and you pull out the farthest vertex each time"] });
 
   heapPush(heap, [0, SOURCE]);
-  snap({ line: 10, calc: "min_heap.push({0, " + SOURCE + "})",
-    head: "Put the source in the heap",
-    why: ["the heap always hands back the smallest distance still waiting"] });
+  snap({ line: 11, hot: SOURCE,
+    calc: "min_heap.push({0, " + SOURCE + "})",
+    head: "Seed the heap with the source",
+    why: ["everything else gets discovered by relaxing edges from here"] });
 
   while (heap.length) {
+    snap({ line: 13, calc: "!min_heap.empty()   →   true, " + heap.length +
+        " entr" + (heap.length === 1 ? "y" : "ies") + " waiting",
+      head: "The heap still has something in it", why: [] });
+
     var top = heap[0];
-    snap({ line: 13, hot: top[1],
+    snap({ line: 14, hot: top[1],
       calc: "auto [d, u] = min_heap.top()\nd = " + top[0] + ",  u = " + top[1],
-      head: "Take the nearest unsettled vertex: <strong>" + top[1] + "</strong>", why: [] });
+      head: "Look at the nearest entry: <strong>" + top[1] + "</strong> at " + top[0],
+      why: ["<code>top()</code> reads it; it is still in the heap until the next line"] });
 
     var pair = heapPop(heap), d = pair[0], u = pair[1];
+    snap({ line: 15, hot: u,
+      calc: "min_heap.pop()\n" + heap.length + " left",
+      head: "Take it out of the heap", why: [] });
+
     var stale = d > dist[u];
-    snap({ line: 15, hot: u, staleHit: stale,
+    snap({ line: 16, hot: u, staleHit: stale,
       calc: stale
         ? "d > dist[u]   →   " + d + " > " + dist[u] + "   →   true, skip it"
         : "d > dist[u]   →   " + d + " > " + dist[u] + "   →   false, carry on",
@@ -329,42 +386,57 @@ function buildDijkstra() {
       why: stale
         ? ["this entry was pushed before a shorter route to " + u + " turned up",
            "nothing removes the old entry from the heap, so this line throws it away instead",
-           "<strong>leave this line out and " + u + " gets processed twice</strong>"]
+           "<strong>leave this line out and " + u + " is processed twice</strong>"]
         : ["no shorter route to " + u + " can appear now &mdash; everything still in the " +
-           "heap is at least this far"] });
+           "heap is at least this far away"] });
     if (stale) continue;
     settled[u] = true;
 
+    snap({ line: 18, hot: u,
+      calc: "for (const auto& edge : adj_list_.at(u))\n" + u + " has " + ADJ[u].length +
+            " neighbour" + (ADJ[u].length === 1 ? "" : "s") + ": " +
+            ADJ[u].map(function (e) { return e.to + "(" + e.w + ")"; }).join(", "),
+      head: "Try every edge out of <strong>" + u + "</strong>", why: [] });
+
     ADJ[u].forEach(function (e) {
       var nd = dist[u] + e.w, better = nd < dist[e.to];
-      snap({ line: 18, hot: u, edge: [u, e.to],
-        calc: "new_dist = dist[" + u + "] + " + e.w + " = " + nd,
-        head: "Could we reach <strong>" + e.to + "</strong> through " + u + "?", why: [] });
       snap({ line: 19, hot: u, edge: [u, e.to],
+        calc: "new_dist = dist[" + u + "] + " + e.w + " = " + dist[u] + " + " + e.w +
+              " = " + nd,
+        head: "Reaching <strong>" + e.to + "</strong> through " + u + " would cost " + nd,
+        why: [] });
+      snap({ line: 20, hot: u, edge: [u, e.to],
         calc: "new_dist < dist[" + e.to + "]   →   " + nd + " < " +
               (dist[e.to] === INF ? "∞" : dist[e.to]) + "   →   " + better,
         head: better
           ? "Yes &mdash; " + nd + " beats " + (dist[e.to] === INF ? "∞" : dist[e.to])
           : "No &mdash; " + e.to + " is already " + dist[e.to] + " away",
-        why: better ? [] : ["the route we already have is as good or better, so nothing changes"] });
+        why: better ? [] : ["the route we already have is as good or better, so nothing " +
+                            "changes and nothing is pushed"] });
       if (better) {
         dist[e.to] = nd;
-        heapPush(heap, [nd, e.to]);
         snap({ line: 21, hot: u, edge: [u, e.to],
-          calc: "dist[" + e.to + "] = " + nd + "\nmin_heap.push({" + nd + ", " + e.to + "})",
-          head: "Relax the edge: <strong>" + e.to + "</strong> is now " + nd,
-          why: ["the old entry for " + e.to + ", if there was one, is still in the heap",
-                "that is the stale entry line 15 will throw away later"] });
+          calc: "dist[" + e.to + "] = " + nd,
+          head: "Relax the edge: <strong>" + e.to + "</strong> is now " + nd + " away",
+          why: ["\"relaxing\" just means replacing a distance with a better one"] });
+        heapPush(heap, [nd, e.to]);
+        snap({ line: 22, hot: u, edge: [u, e.to],
+          calc: "min_heap.push({" + nd + ", " + e.to + "})",
+          head: "Queue <strong>" + e.to + "</strong> up at its new distance",
+          why: ["any older entry for " + e.to + " is still in the heap and is now wrong",
+                "line 16 is what throws that one away when it surfaces"] });
       }
     });
   }
 
-  snap({ line: 25, done: true,
+  snap({ line: 13, calc: "!min_heap.empty()   →   false, the heap is empty",
+    head: "Nothing left to settle", why: [] });
+  snap({ line: 26, done: true,
     calc: "return dist\n" + VERTS.slice().sort(function (a, b) { return dist[a] - dist[b]; })
       .map(function (v) { return v + "=" + dist[v]; }).join(",  "),
     head: "Done &mdash; the shortest distance from " + SOURCE + " to every vertex",
     why: ["Dijkstra answers <em>how far</em>, for every destination at once",
-          "it never asks which edges to keep &mdash; that is the other algorithm"] });
+          "it never decides which edges to keep &mdash; that is the other algorithm"] });
   return F;
 }
 
@@ -372,43 +444,88 @@ function buildDijkstra() {
 // Prim's -- frames
 // ---------------------------------------------------------------------------
 function buildPrims() {
-  var F = [], inMst = {}, heap = [], mst = [], total = 0;
+  var F = [], inMst = {}, heap = [], mst = [], total = 0, declared = false;
 
   function snap(o) {
     o.inMst = Object.assign({}, inMst);
     o.heap = copyHeap(heap);
-    o.mst = mst.map(function (x) { return x.slice(); });
+    o.mst = declared ? mst.map(function (x) { return x.slice(); }) : null;
     o.total = total;
     F.push(o);
   }
 
+  snap({ line: 1, calc: 'prims_mst(start = "' + SOURCE + '")\nthe graph has ' +
+      VERTS.length + " vertices and " + EDGES.length + " edges",
+    head: "Entering <code>prims_mst</code> from <strong>" + SOURCE + "</strong>",
+    why: ["the answer will be a set of edges, not a set of distances"] });
+
+  declared = true;
+  snap({ line: 2, calc: "std::vector<std::tuple<...>> mst_edges;\nempty",
+    head: "Create the list of edges the tree will keep",
+    why: ["each entry is (from, to, weight) &mdash; a tuple, because an edge is three " +
+          "things, not two"] });
+  snap({ line: 3, calc: "int total_weight = 0;",
+    head: "Start the running total at 0", why: [] });
+  snap({ line: 5, calc: "std::unordered_set<std::string> in_mst;\nempty",
+    head: "Create the set of vertices already in the tree",
+    why: ["a set, not a vector: the only question ever asked of it is <em>is this one " +
+          "already in?</em> &mdash; O(1) here, O(V) in a vector"] });
+
   inMst[SOURCE] = true;
   snap({ line: 6, hot: SOURCE,
-    calc: "in_mst.insert(" + SOURCE + ")\nthe tree starts as one vertex and no edges",
+    calc: "in_mst.insert(" + SOURCE + ")\n1 of " + VERTS.length + " vertices in the tree",
     head: "Start the tree at <strong>" + SOURCE + "</strong>",
-    why: ["any vertex works &mdash; the minimum spanning tree is the same whichever you pick"] });
+    why: ["any vertex works &mdash; the minimum spanning tree comes out the same weight " +
+          "whichever you start from"] });
 
-  ADJ[SOURCE].forEach(function (e) { heapPush(heap, [e.w, SOURCE, e.to]); });
-  snap({ line: 12, hot: SOURCE,
-    calc: "push every edge leaving " + SOURCE + "\n" +
-          ADJ[SOURCE].map(function (e) { return "(" + e.w + ", " + SOURCE + "→" + e.to + ")"; }).join("  "),
-    head: "Offer up every edge out of " + SOURCE,
-    why: ["the heap holds <em>candidate edges</em>, not vertices &mdash; that is the " +
-          "difference from Dijkstra"] });
+  snap({ line: 8, calc: "using EdgeTuple = std::tuple<int, std::string, std::string>;\n" +
+      "(weight, from, to) &mdash; nothing happens at run time",
+    head: "Name the tuple the heap will hold",
+    why: ["weight comes <strong>first</strong> so the heap orders by it",
+          "put it last and the heap sorts by vertex name, which is a wrong tree that " +
+          "still looks plausible"] });
+  snap({ line: 9, calc: "min_heap is created, empty\ngreater<EdgeTuple> makes it a MIN-heap",
+    head: "Create the min-heap of candidate edges",
+    why: ["Dijkstra's heap held vertices; this one holds <em>edges</em>, and that is the " +
+          "real difference between the two algorithms"] });
+
+  snap({ line: 11, hot: SOURCE,
+    calc: "for (const auto& edge : adj_list_.at(" + SOURCE + "))\n" + SOURCE + " has " +
+          ADJ[SOURCE].length + " edge" + (ADJ[SOURCE].length === 1 ? "" : "s"),
+    head: "Walk the edges leaving " + SOURCE, why: [] });
+  ADJ[SOURCE].forEach(function (e) {
+    heapPush(heap, [e.w, SOURCE, e.to]);
+    snap({ line: 12, hot: SOURCE, edge: [SOURCE, e.to],
+      calc: "min_heap.push({" + e.w + ", " + SOURCE + ", " + e.to + "})",
+      head: "Offer up <strong>" + SOURCE + "&ndash;" + e.to + "</strong> at " + e.w,
+      why: [] });
+  });
 
   var V = VERTS.length;
+  snap({ line: 15, calc: "const int V = vertex_count();   \u2192   " + V,
+    head: "How many vertices the tree has to reach",
+    why: ["the loop stops as soon as all " + V + " are in, which is why a spanning tree " +
+          "has V&minus;1 = " + (V - 1) + " edges"] });
+
   while (heap.length && Object.keys(inMst).length < V) {
+    snap({ line: 16, calc: "!empty (" + heap.length + " waiting)  &&  in_mst.size() < V   " +
+        "\u2192   " + Object.keys(inMst).length + " < " + V + "   \u2192   true",
+      head: "Edges still on offer, and vertices still outside the tree", why: [] });
+
     var top = heap[0];
     snap({ line: 17, edge: [top[1], top[2]],
       calc: "auto [w, from, to] = min_heap.top()\nw = " + top[0] + ",  " + top[1] +
-            " → " + top[2],
+            " \u2192 " + top[2],
       head: "Cheapest edge on offer: <strong>" + top[1] + "&ndash;" + top[2] +
             "</strong> at " + top[0], why: [] });
 
-    var t = heapPop(heap), w = t[0], from = t[1], to = t[2];
+    var e2 = heapPop(heap), w = e2[0], from = e2[1], to = e2[2];
+    snap({ line: 18, edge: [from, to], calc: "min_heap.pop()\n" + heap.length + " left",
+      head: "Take it out of the heap", why: [] });
+
     var cycle = !!inMst[to];
     snap({ line: 19, edge: [from, to], staleHit: cycle,
-      calc: "in_mst.count(" + to + ")   →   " + (cycle ? "1, skip it" : "0, take it"),
+      calc: "in_mst.count(" + to + ")   \u2192   " + (cycle ? "1, skip it" : "0, take it"),
       head: cycle
         ? "<strong>" + to + "</strong> is already in the tree &mdash; skip"
         : "<strong>" + to + "</strong> is new &mdash; take the edge",
@@ -419,30 +536,57 @@ function buildPrims() {
         : [] });
     if (cycle) continue;
 
-    mst.push([from, to, w]); total += w; inMst[to] = true;
+    mst.push([from, to, w]);
+    snap({ line: 21, edge: [from, to],
+      calc: "mst_edges.push_back({" + from + ", " + to + ", " + w + "})\n" + mst.length +
+            " edge" + (mst.length === 1 ? "" : "s") + " kept",
+      head: "Keep <strong>" + from + "&ndash;" + to + "</strong>", why: [] });
+    total += w;
+    snap({ line: 22, edge: [from, to], calc: "total_weight += " + w + "   \u2192   " + total,
+      head: "Total weight is now " + total, why: [] });
+    inMst[to] = true;
     snap({ line: 23, edge: [from, to], hot: to,
-      calc: "mst_edges.push_back({" + from + ", " + to + ", " + w + "})\ntotal_weight = " + total,
-      head: "Added <strong>" + from + "&ndash;" + to + "</strong>, total now " + total,
-      why: ["the tree now has " + mst.length + " edge" + (mst.length === 1 ? "" : "s") +
-            " and " + Object.keys(inMst).length + " of " + V + " vertices"] });
+      calc: "in_mst.insert(" + to + ")\n" + Object.keys(inMst).length + " of " + V +
+            " vertices in the tree",
+      head: "<strong>" + to + "</strong> joins the tree", why: [] });
 
-    var offers = ADJ[to].filter(function (e) { return !inMst[e.to]; });
-    offers.forEach(function (e) { heapPush(heap, [e.w, to, e.to]); });
-    snap({ line: 26, hot: to,
-      calc: offers.length
-        ? "push " + to + "'s edges to vertices not yet in the tree\n" +
-          offers.map(function (e) { return "(" + e.w + ", " + to + "→" + e.to + ")"; }).join("  ")
-        : to + " has no edges to vertices outside the tree",
-      head: offers.length ? "Offer up " + to + "'s new edges" : "Nothing new to offer from " + to,
-      why: ["the check keeps edges that would obviously close a cycle out of the heap " +
-            "in the first place"] });
+    var offers = ADJ[to].filter(function (x) { return !inMst[x.to]; });
+    snap({ line: 25, hot: to,
+      calc: "for (const auto& edge : adj_list_.at(" + to + "))\n" + to + " has " +
+            ADJ[to].length + " neighbour" + (ADJ[to].length === 1 ? "" : "s") + ", " +
+            offers.length + " not yet in the tree",
+      head: "Look at " + to + "'s own edges", why: [] });
+    ADJ[to].forEach(function (x) {
+      if (inMst[x.to]) {
+        snap({ line: 26, hot: to, edge: [to, x.to],
+          calc: "!in_mst.count(" + x.to + ")   \u2192   false, do not push",
+          head: x.to + " is already in &mdash; no point offering this edge",
+          why: ["filtering here keeps edges that would obviously close a cycle out of " +
+                "the heap in the first place"] });
+      } else {
+        heapPush(heap, [x.w, to, x.to]);
+        snap({ line: 27, hot: to, edge: [to, x.to],
+          calc: "min_heap.push({" + x.w + ", " + to + ", " + x.to + "})",
+          head: "Offer up <strong>" + to + "&ndash;" + x.to + "</strong> at " + x.w,
+          why: [] });
+      }
+    });
   }
 
-  snap({ line: 30, done: true,
+  snap({ line: 16,
+    calc: Object.keys(inMst).length >= V
+      ? "in_mst.size() < V   \u2192   " + Object.keys(inMst).length + " < " + V +
+        "   \u2192   false"
+      : "!min_heap.empty()   \u2192   false, no edges left",
+    head: Object.keys(inMst).length >= V
+      ? "Every vertex is in the tree &mdash; stop"
+      : "No candidate edges left", why: [] });
+  snap({ line: 31, done: true,
     calc: "return {mst_edges, " + total + "}\n" +
-          mst.map(function (m) { return m[0] + "–" + m[1] + " " + m[2]; }).join(",  "),
+          mst.map(function (m) { return m[0] + "\u2013" + m[1] + " " + m[2]; }).join(",  "),
     head: "Done &mdash; " + mst.length + " edges, total weight " + total,
-    why: ["V&minus;1 = " + (VERTS.length - 1) + " edges, which is what a spanning tree always has",
+    why: ["V&minus;1 = " + (VERTS.length - 1) + " edges, which is what a spanning tree " +
+          "always has",
           "Prim's answers <em>which edges to keep</em>, never how far anything is"] });
   return F;
 }
@@ -515,6 +659,7 @@ function heapHtml(f, kind) {
 }
 
 function distTable(f) {
+  if (!f.dist) return '<p class="empty">the map does not exist yet</p>';
   return '<table class="t"><thead><tr><th>Vertex</th><th>Distance from ' + SOURCE +
     "</th><th>Settled</th></tr></thead><tbody>" +
     VERTS.slice().sort().map(function (v) {
@@ -526,6 +671,7 @@ function distTable(f) {
 }
 
 function mstTable(f) {
+  if (!f.mst) return '<p class="empty">the list does not exist yet</p>';
   if (!f.mst.length) return '<p class="empty">no edges yet</p>';
   return '<table class="t"><thead><tr><th>Edge</th><th>Weight</th></tr></thead><tbody>' +
     f.mst.map(function (m) {
