@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CT 19 Stepper — Dijkstra and Prim's</title>
+<style>
+  :root {
+    --ink:#2c3e50; --muted:#6e6e6e; --rule:#d8dee6;
+    --green:#1c7e45; --blue:#2573a7; --orange:#a95c19; --dkorange:#c64500;
+    --red:#c0392b; --purple:#8e44ad; --deep:#4527a0; --teal:#00695c;
+    --tint-green:#f2fbf4; --tint-blue:#eaf2f8; --tint-orange:#fff3e0;
+    --tint-red:#fce4ec; --tint-purple:#ede7f6; --tint-teal:#e0f2f1;
+    --code-bg:#1e1e2e; --code-fg:#cdd6f4; --code-dim:#9399b2; --code-hit:#45475a;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:1rem 1.1rem 2.5rem;
+         font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+         color:var(--ink); background:#fff; line-height:1.5; }
+  h1 { font-size:1.35rem; margin:0 0 .15rem; }
+  .sub { color:var(--muted); margin:0 0 .8rem; font-size:.92rem; }
+
+  #selftest { font-size:.78rem; margin:0 0 .7rem; padding:.4rem .7rem;
+              border-radius:6px; background:#f6f8fa; border:1px solid var(--rule); }
+  #selftest .ok { color:var(--green); font-weight:700; }
+  #selftest .fail { color:var(--red); font-weight:700; }
+
+  .tabs { display:flex; flex-wrap:wrap; gap:.3rem; align-items:center;
+          border-bottom:2px solid var(--rule); margin-bottom:.7rem; }
+  .tabs button { font:inherit; font-size:.9rem; padding:.45rem .9rem; cursor:pointer;
+                 background:#f6f8fa; color:var(--muted); border:1px solid var(--rule);
+                 border-bottom:none; border-radius:7px 7px 0 0; margin-bottom:-2px; }
+  .tabs button.on { background:#fff; color:var(--ink); font-weight:600; }
+  .tabs button[data-mode="intro"].on    { border-top:3px solid var(--deep);  color:var(--deep); }
+  .tabs button[data-mode="dijkstra"].on { border-top:3px solid var(--blue);  color:var(--blue); }
+  .tabs button[data-mode="prims"].on    { border-top:3px solid var(--green); color:var(--green); }
+  .tabs button[data-mode="compare"].on  { border-top:3px solid var(--orange);color:var(--orange); }
+  .tabs .spacer { flex:1; }
+  .step-hint { font-size:.76rem; color:var(--muted); }
+
+  .bar { display:flex; flex-wrap:wrap; gap:.45rem; align-items:center; margin-bottom:.8rem; }
+  .ctl { font:inherit; font-size:.86rem; padding:.35rem .8rem; cursor:pointer;
+         background:#fff; border:1px solid var(--rule); border-radius:6px; color:var(--ink); }
+  .ctl:hover:not(:disabled) { background:#f6f8fa; }
+  .ctl:disabled { opacity:.4; cursor:default; }
+  .ctl.primary { background:var(--deep); border-color:var(--deep); color:#fff; font-weight:600; }
+  .counter { font-size:.82rem; color:var(--muted); margin-left:.2rem; }
+  .barlab { font-size:.78rem; color:var(--muted); }
+
+  .solo { display:grid; grid-template-columns:1.05fr .95fr; gap:1rem; align-items:start; }
+  @media (max-width:1040px) { .solo { grid-template-columns:1fr; } }
+  .col { display:flex; flex-direction:column; gap:1rem; min-width:0; }
+
+  .card { border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
+  .card > h2 { font-size:.92rem; margin:0; padding:.5rem .85rem;
+               background:#f6f8fa; border-bottom:1px solid var(--rule); }
+  .card-body { padding:.7rem .85rem .85rem; }
+
+  svg.graph { display:block; width:100%; height:auto; }
+
+  table.t { border-collapse:collapse; width:100%; font-size:.85rem; }
+  table.t th, table.t td { border:1px solid var(--rule); padding:5px 9px; text-align:left; }
+  table.t th { background:#f6f8fa; font-size:.78rem; }
+  table.t td.n { text-align:right; font-variant-numeric:tabular-nums; }
+  table.t tr.hot td { background:var(--tint-orange); font-weight:600; }
+  table.t tr.done td { background:var(--tint-green); }
+
+  .heap { display:flex; flex-wrap:wrap; gap:.3rem; margin:.1rem 0 0; }
+  .hp { font-size:.78rem; padding:.15rem .5rem; border-radius:999px;
+        background:#f1f3f5; border:1px solid var(--rule); font-variant-numeric:tabular-nums; }
+  .hp.top { background:var(--tint-orange); border-color:var(--dkorange);
+            color:var(--dkorange); font-weight:700; }
+  .hp.stale { text-decoration:line-through; opacity:.55; }
+  .empty { font-size:.8rem; color:var(--muted); font-style:italic; }
+
+  .code { background:var(--code-bg); color:var(--code-fg); border-radius:8px;
+          font-family:Consolas,"Courier New",monospace; font-size:.8rem; line-height:1.5;
+          padding:.5rem 0; overflow-x:auto; }
+  .code div { padding:0 .9rem; white-space:pre; }
+  .code div.hit { background:var(--code-hit); }
+  .code div.calc { background:#f9e2af; color:#1e1e2e; white-space:pre-wrap;
+                   padding:.35rem .9rem; border-left:4px solid #b8860b; margin:.1rem 0; }
+  .code div.calc::before { content:"THIS STEP"; font-size:.62rem; font-weight:800;
+                           letter-spacing:.08em; display:block; color:#6b4f04; }
+  .kw { color:#cba6f7; } .ty { color:#89b4fa; } .cm { color:var(--code-dim); font-style:italic; }
+  .st { color:#a6e3a1; } .nu { color:#fab387; }
+
+  .nowbox { background:var(--tint-orange); border-left:5px solid var(--dkorange);
+            border-radius:8px; padding:.5rem .8rem; }
+  .nowbox p { margin:0; font-size:.93rem; font-weight:600; }
+  .why { margin:.45rem 0 0; padding-left:1.15rem; font-size:.85rem; color:var(--muted); }
+  .why li { margin-bottom:.2rem; }
+
+  .goal { background:var(--tint-purple); border-left:5px solid var(--deep);
+          border-radius:8px; padding:.6rem .9rem; font-size:.88rem; margin-bottom:1rem; }
+  .goal .tag { display:inline-block; font-size:.62rem; font-weight:800;
+               letter-spacing:.09em; color:var(--deep); margin-right:.5rem; }
+  .goal .goalhead { margin:0 0 .4rem; font-weight:600; }
+  .goal ul { margin:0; padding-left:1.2rem; } .goal li { margin-bottom:.25rem; }
+  .goal b { color:var(--deep); }
+
+  .callout { border-radius:8px; padding:.6rem .9rem; font-size:.87rem; margin-top:.8rem; }
+  .callout.warn { background:var(--tint-red); border-left:5px solid var(--red); }
+  .legend { font-size:.78rem; color:var(--muted); margin:.5rem 0 0;
+            display:flex; gap:1rem; flex-wrap:wrap; }
+  .legend i { display:inline-block; width:.8rem; height:.8rem; border-radius:50%;
+              border:2px solid; margin-right:.25rem; vertical-align:-.1rem; }
+</style>
+</head>
+<body>
+
+<h1>Shortest path and minimum spanning tree</h1>
+<p class="sub">CT 19. Two algorithms, one weighted graph, the same min-heap &mdash; and a
+   different question each. Every step shows the line running, the heap, and what it changed.</p>
+
+<div id="selftest">checking&hellip;</div>
+
+<div class="tabs" id="tabs">
+  <button data-mode="intro">1 &middot; Weighted graphs</button>
+  <button data-mode="dijkstra">2 &middot; Dijkstra</button>
+  <button data-mode="prims">3 &middot; Prim&rsquo;s</button>
+  <button data-mode="compare">4 &middot; Dijkstra vs Prim&rsquo;s</button>
+  <span class="spacer"></span>
+  <span class="step-hint">&larr; &rarr; arrow keys step &middot; space plays</span>
+</div>
+
+<div class="bar" id="presetBar"></div>
+
+<div class="bar" id="ctlBar">
+  <span class="barlab">Step</span>
+  <button class="ctl" id="first">&laquo; First</button>
+  <button class="ctl" id="prev">&lsaquo; Prev</button>
+  <button class="ctl primary" id="play">&#9654; Play</button>
+  <button class="ctl" id="next">Next &rsaquo;</button>
+  <button class="ctl" id="last">Last &raquo;</button>
+  <span class="counter" id="counter"></span>
+</div>
+
+<div id="stage"></div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// The graph. The same five edges as src/main.cpp, so the numbers on screen are
+// the numbers the program prints -- a stepper that used its own graph would be
+// a different problem wearing the same name.
+// ---------------------------------------------------------------------------
+var GRAPHS = {
+  demo: {
+    label: "the demo graph (src/main.cpp)",
+    note: "The five edges your own program builds.",
+    edges: [["SLC","Ogden",4],["SLC","Provo",6],["SLC","Logan",3],
+            ["Ogden","Logan",5],["Provo","Logan",2]],
+    pos: { Logan:[260,62], Ogden:[80,178], SLC:[260,236], Provo:[440,178] },
+    source: "SLC"
+  },
+  // Prim's never rejects an edge on the demo graph: the tree is finished
+  // before the leftover edges reach the top of the heap, so the `continue`
+  // line -- the one that stops you building a cycle -- is never demonstrated.
+  // This graph makes it fire. Saying so is the teaching point, the same way
+  // CT 18 keeps a second preset for the one-child case.
+  cycle: {
+    label: "a graph that rejects an edge",
+    note: "Here Prim's pops an edge whose far end is already in the tree, and " +
+          "the cycle check earns its keep.",
+    edges: [["Alta","Brighton",1],["Brighton","Solitude",2],
+            ["Alta","Solitude",3],["Solitude","Park City",10]],
+    pos: { Brighton:[250,62], Alta:[90,215], Solitude:[300,215], "Park City":[470,130] },
+    source: "Alta"
+  }
+};
+var EDGES, POS, SOURCE, ADJ, VERTS;
+var INF = Infinity;
+
+function adj() {
+  var a = {};
+  EDGES.forEach(function (e) {
+    (a[e[0]] = a[e[0]] || []).push({ to: e[1], w: e[2] });
+    (a[e[1]] = a[e[1]] || []).push({ to: e[0], w: e[2] });
+  });
+  return a;
+}
+function useGraph(key) {
+  var g = GRAPHS[key];
+  EDGES = g.edges; POS = g.pos; SOURCE = g.source;
+  ADJ = adj(); VERTS = Object.keys(POS);
+}
+useGraph("demo");
+
+// A heap is an implementation detail; what matters on screen is which entry
+// comes out next. Kept as a sorted array so the picture cannot disagree with
+// the order -- and sorted stably, so equal keys pop in push order.
+function heapPush(h, item) { h.push(item); h.sort(function (a, b) { return a[0] - b[0]; }); }
+function heapPop(h) { return h.shift(); }
+function copyHeap(h) { return h.map(function (x) { return x.slice(); }); }
+
+// ---------------------------------------------------------------------------
+// Code listings -- the solution's own lines, so a student can follow along in
+// their editor.
+// ---------------------------------------------------------------------------
+var CODE = {
+  dijkstra: [
+    "std::unordered_map<std::string, int>",
+    "WeightedGraph::dijkstra(const std::string& source) const {",
+    "    std::unordered_map<std::string, int> dist;",
+    "    for (const auto& [vertex, edges] : adj_list_) {",
+    "        dist[vertex] = std::numeric_limits<int>::max();",
+    "    }",
+    "    dist[source] = 0;",
+    "",
+    "    using Pair = std::pair<int, std::string>;",
+    "    std::priority_queue<Pair, std::vector<Pair>, std::greater<Pair>> min_heap;",
+    "    min_heap.push({0, source});",
+    "",
+    "    while (!min_heap.empty()) {",
+    "        auto [d, u] = min_heap.top();",
+    "        min_heap.pop();",
+    "        if (d > dist[u]) continue;        // a stale entry -- already beaten",
+    "",
+    "        for (const auto& edge : adj_list_.at(u)) {",
+    "            const int new_dist = dist[u] + edge.weight;",
+    "            if (new_dist < dist[edge.to]) {",
+    "                dist[edge.to] = new_dist;",
+    "                min_heap.push({new_dist, edge.to});",
+    "            }",
+    "        }",
+    "    }",
+    "    return dist;",
+    "}"
+  ],
+  prims: [
+    "std::pair<std::vector<std::tuple<std::string, std::string, int>>, int>",
+    "WeightedGraph::prims_mst(const std::string& start) const {",
+    "    std::vector<std::tuple<std::string, std::string, int>> mst_edges;",
+    "    int total_weight = 0;",
+    "",
+    "    std::unordered_set<std::string> in_mst;",
+    "    in_mst.insert(start);",
+    "",
+    "    using EdgeTuple = std::tuple<int, std::string, std::string>;",
+    "    std::priority_queue<EdgeTuple, std::vector<EdgeTuple>,",
+    "                        std::greater<EdgeTuple>> min_heap;",
+    "    for (const auto& edge : adj_list_.at(start)) {",
+    "        min_heap.push({edge.weight, start, edge.to});",
+    "    }",
+    "",
+    "    const int V = vertex_count();",
+    "    while (!min_heap.empty() && (int)in_mst.size() < V) {",
+    "        auto [w, from, to] = min_heap.top();",
+    "        min_heap.pop();",
+    "        if (in_mst.count(to)) continue;   // both ends already in -- a cycle",
+    "",
+    "        mst_edges.push_back({from, to, w});",
+    "        total_weight += w;",
+    "        in_mst.insert(to);",
+    "",
+    "        for (const auto& edge : adj_list_.at(to)) {",
+    "            if (!in_mst.count(edge.to)) {",
+    "                min_heap.push({edge.weight, to, edge.to});",
+    "            }",
+    "        }",
+    "    }",
+    "    return {mst_edges, total_weight};",
+    "}"
+  ]
+};
+
+var HL_KW = ("auto const continue for if int return using while std".split(" "));
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function hl(line) {
+  var i = line.indexOf("//");
+  var code = i === -1 ? line : line.slice(0, i);
+  var cm = i === -1 ? "" : line.slice(i);
+  var out = esc(code)
+    .replace(/\b(\d+)\b/g, '<span class="nu">$1</span>')
+    .replace(/\b(auto|const|continue|for|if|return|using|while|int|bool)\b/g,
+             '<span class="kw">$1</span>')
+    .replace(/\b(std|unordered_map|unordered_set|vector|string|pair|tuple|priority_queue|greater|size_t)\b/g,
+             '<span class="ty">$1</span>');
+  if (cm) out += '<span class="cm">' + esc(cm) + "</span>";
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Dijkstra -- frames
+// ---------------------------------------------------------------------------
+function buildDijkstra() {
+  var F = [], dist = {}, heap = [], settled = {};
+  VERTS.forEach(function (v) { dist[v] = INF; });
+
+  function snap(o) {
+    o.dist = Object.assign({}, dist);
+    o.heap = copyHeap(heap);
+    o.settled = Object.assign({}, settled);
+    F.push(o);
+  }
+
+  snap({ line: 4, calc: "every distance starts at infinity\nnothing is known yet",
+    head: "Set every distance to &infin;",
+    why: ["&infin; means <em>no route found yet</em>, not <em>no route exists</em>"] });
+
+  dist[SOURCE] = 0;
+  snap({ line: 6, calc: "dist[" + SOURCE + "] = 0\nthe source costs nothing to reach",
+    head: "The source is 0 away from itself", why: [] });
+
+  heapPush(heap, [0, SOURCE]);
+  snap({ line: 10, calc: "min_heap.push({0, " + SOURCE + "})",
+    head: "Put the source in the heap",
+    why: ["the heap always hands back the smallest distance still waiting"] });
+
+  while (heap.length) {
+    var top = heap[0];
+    snap({ line: 13, hot: top[1],
+      calc: "auto [d, u] = min_heap.top()\nd = " + top[0] + ",  u = " + top[1],
+      head: "Take the nearest unsettled vertex: <strong>" + top[1] + "</strong>", why: [] });
+
+    var pair = heapPop(heap), d = pair[0], u = pair[1];
+    var stale = d > dist[u];
+    snap({ line: 15, hot: u, staleHit: stale,
+      calc: stale
+        ? "d > dist[u]   →   " + d + " > " + dist[u] + "   →   true, skip it"
+        : "d > dist[u]   →   " + d + " > " + dist[u] + "   →   false, carry on",
+      head: stale
+        ? "<strong>" + u + "</strong> at " + d + " is stale &mdash; we already found " + dist[u]
+        : "<strong>" + u + "</strong> is settled at " + d,
+      why: stale
+        ? ["this entry was pushed before a shorter route to " + u + " turned up",
+           "nothing removes the old entry from the heap, so this line throws it away instead",
+           "<strong>leave this line out and " + u + " gets processed twice</strong>"]
+        : ["no shorter route to " + u + " can appear now &mdash; everything still in the " +
+           "heap is at least this far"] });
+    if (stale) continue;
+    settled[u] = true;
+
+    ADJ[u].forEach(function (e) {
+      var nd = dist[u] + e.w, better = nd < dist[e.to];
+      snap({ line: 18, hot: u, edge: [u, e.to],
+        calc: "new_dist = dist[" + u + "] + " + e.w + " = " + nd,
+        head: "Could we reach <strong>" + e.to + "</strong> through " + u + "?", why: [] });
+      snap({ line: 19, hot: u, edge: [u, e.to],
+        calc: "new_dist < dist[" + e.to + "]   →   " + nd + " < " +
+              (dist[e.to] === INF ? "∞" : dist[e.to]) + "   →   " + better,
+        head: better
+          ? "Yes &mdash; " + nd + " beats " + (dist[e.to] === INF ? "∞" : dist[e.to])
+          : "No &mdash; " + e.to + " is already " + dist[e.to] + " away",
+        why: better ? [] : ["the route we already have is as good or better, so nothing changes"] });
+      if (better) {
+        dist[e.to] = nd;
+        heapPush(heap, [nd, e.to]);
+        snap({ line: 21, hot: u, edge: [u, e.to],
+          calc: "dist[" + e.to + "] = " + nd + "\nmin_heap.push({" + nd + ", " + e.to + "})",
+          head: "Relax the edge: <strong>" + e.to + "</strong> is now " + nd,
+          why: ["the old entry for " + e.to + ", if there was one, is still in the heap",
+                "that is the stale entry line 15 will throw away later"] });
+      }
+    });
+  }
+
+  snap({ line: 25, done: true,
+    calc: "return dist\n" + VERTS.slice().sort(function (a, b) { return dist[a] - dist[b]; })
+      .map(function (v) { return v + "=" + dist[v]; }).join(",  "),
+    head: "Done &mdash; the shortest distance from " + SOURCE + " to every vertex",
+    why: ["Dijkstra answers <em>how far</em>, for every destination at once",
+          "it never asks which edges to keep &mdash; that is the other algorithm"] });
+  return F;
+}
+
+// ---------------------------------------------------------------------------
+// Prim's -- frames
+// ---------------------------------------------------------------------------
+function buildPrims() {
+  var F = [], inMst = {}, heap = [], mst = [], total = 0;
+
+  function snap(o) {
+    o.inMst = Object.assign({}, inMst);
+    o.heap = copyHeap(heap);
+    o.mst = mst.map(function (x) { return x.slice(); });
+    o.total = total;
+    F.push(o);
+  }
+
+  inMst[SOURCE] = true;
+  snap({ line: 6, hot: SOURCE,
+    calc: "in_mst.insert(" + SOURCE + ")\nthe tree starts as one vertex and no edges",
+    head: "Start the tree at <strong>" + SOURCE + "</strong>",
+    why: ["any vertex works &mdash; the minimum spanning tree is the same whichever you pick"] });
+
+  ADJ[SOURCE].forEach(function (e) { heapPush(heap, [e.w, SOURCE, e.to]); });
+  snap({ line: 12, hot: SOURCE,
+    calc: "push every edge leaving " + SOURCE + "\n" +
+          ADJ[SOURCE].map(function (e) { return "(" + e.w + ", " + SOURCE + "→" + e.to + ")"; }).join("  "),
+    head: "Offer up every edge out of " + SOURCE,
+    why: ["the heap holds <em>candidate edges</em>, not vertices &mdash; that is the " +
+          "difference from Dijkstra"] });
+
+  var V = VERTS.length;
+  while (heap.length && Object.keys(inMst).length < V) {
+    var top = heap[0];
+    snap({ line: 17, edge: [top[1], top[2]],
+      calc: "auto [w, from, to] = min_heap.top()\nw = " + top[0] + ",  " + top[1] +
+            " → " + top[2],
+      head: "Cheapest edge on offer: <strong>" + top[1] + "&ndash;" + top[2] +
+            "</strong> at " + top[0], why: [] });
+
+    var t = heapPop(heap), w = t[0], from = t[1], to = t[2];
+    var cycle = !!inMst[to];
+    snap({ line: 19, edge: [from, to], staleHit: cycle,
+      calc: "in_mst.count(" + to + ")   →   " + (cycle ? "1, skip it" : "0, take it"),
+      head: cycle
+        ? "<strong>" + to + "</strong> is already in the tree &mdash; skip"
+        : "<strong>" + to + "</strong> is new &mdash; take the edge",
+      why: cycle
+        ? ["both ends are already connected, so this edge would close a cycle",
+           "a spanning tree has exactly V&minus;1 edges and no cycles",
+           "<strong>leave this line out and you build a graph, not a tree</strong>"]
+        : [] });
+    if (cycle) continue;
+
+    mst.push([from, to, w]); total += w; inMst[to] = true;
+    snap({ line: 23, edge: [from, to], hot: to,
+      calc: "mst_edges.push_back({" + from + ", " + to + ", " + w + "})\ntotal_weight = " + total,
+      head: "Added <strong>" + from + "&ndash;" + to + "</strong>, total now " + total,
+      why: ["the tree now has " + mst.length + " edge" + (mst.length === 1 ? "" : "s") +
+            " and " + Object.keys(inMst).length + " of " + V + " vertices"] });
+
+    var offers = ADJ[to].filter(function (e) { return !inMst[e.to]; });
+    offers.forEach(function (e) { heapPush(heap, [e.w, to, e.to]); });
+    snap({ line: 26, hot: to,
+      calc: offers.length
+        ? "push " + to + "'s edges to vertices not yet in the tree\n" +
+          offers.map(function (e) { return "(" + e.w + ", " + to + "→" + e.to + ")"; }).join("  ")
+        : to + " has no edges to vertices outside the tree",
+      head: offers.length ? "Offer up " + to + "'s new edges" : "Nothing new to offer from " + to,
+      why: ["the check keeps edges that would obviously close a cycle out of the heap " +
+            "in the first place"] });
+  }
+
+  snap({ line: 30, done: true,
+    calc: "return {mst_edges, " + total + "}\n" +
+          mst.map(function (m) { return m[0] + "–" + m[1] + " " + m[2]; }).join(",  "),
+    head: "Done &mdash; " + mst.length + " edges, total weight " + total,
+    why: ["V&minus;1 = " + (VERTS.length - 1) + " edges, which is what a spanning tree always has",
+          "Prim's answers <em>which edges to keep</em>, never how far anything is"] });
+  return F;
+}
+
+// ---------------------------------------------------------------------------
+// Drawing
+// ---------------------------------------------------------------------------
+function graphSvg(f, kind) {
+  var W = 540, H = 300, out = "";
+  var mstSet = {};
+  if (kind === "prims" && f.mst) f.mst.forEach(function (m) { mstSet[m[0] + "|" + m[1]] = 1; mstSet[m[1] + "|" + m[0]] = 1; });
+
+  EDGES.forEach(function (e) {
+    var a = POS[e[0]], b = POS[e[1]];
+    var live = f.edge && ((f.edge[0] === e[0] && f.edge[1] === e[1]) ||
+                          (f.edge[0] === e[1] && f.edge[1] === e[0]));
+    var inMst = mstSet[e[0] + "|" + e[1]];
+    var col = live ? "#c64500" : inMst ? "#1c7e45" : "#c7cdd1";
+    var wd = live ? 4 : inMst ? 4 : 2;
+    out += '<line x1="' + a[0] + '" y1="' + a[1] + '" x2="' + b[0] + '" y2="' + b[1] +
+           '" stroke="' + col + '" stroke-width="' + wd + '"/>';
+    var mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+    out += '<circle cx="' + mx + '" cy="' + my + '" r="11" fill="#fff" stroke="' + col +
+           '" stroke-width="1.5"/>' +
+           '<text x="' + mx + '" y="' + (my + 4) + '" text-anchor="middle" font-size="11" ' +
+           'font-weight="700" fill="' + (live || inMst ? col : "#555") + '">' + e[2] + "</text>";
+  });
+
+  VERTS.forEach(function (v) {
+    var p = POS[v];
+    var isHot = f.hot === v;
+    var done = (f.settled && f.settled[v]) || (f.inMst && f.inMst[v]);
+    var stroke = isHot ? "#c64500" : done ? "#1c7e45" : "#2573a7";
+    out += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="26" fill="' +
+           (done ? "#f2fbf4" : "#fff") + '" stroke="' + stroke + '" stroke-width="' +
+           (isHot ? 4 : 2.5) + '"/>' +
+           '<text x="' + p[0] + '" y="' + (p[1] + 1) + '" text-anchor="middle" font-size="12" ' +
+           'font-weight="700" fill="#2c3e50">' + v + "</text>";
+    if (f.dist) {
+      var d = f.dist[v];
+      out += '<text x="' + p[0] + '" y="' + (p[1] + 15) + '" text-anchor="middle" ' +
+             'font-size="11" font-weight="700" fill="' + (d === INF ? "#9aa4ad" : "#c64500") +
+             '">' + (d === INF ? "∞" : d) + "</text>";
+    }
+  });
+
+  var label = kind === "prims"
+    ? "Weighted graph of four Utah cities. Edges in the spanning tree so far are green."
+    : "Weighted graph of four Utah cities, each labelled with its distance from " + SOURCE + ".";
+  return '<svg class="graph" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' +
+         label + '">' + out + "</svg>";
+}
+
+function codeHtml(key, f) {
+  return '<div class="code">' + CODE[key].map(function (ln, i) {
+    var hit = i === f.line;
+    return "<div" + (hit ? ' class="hit"' : "") + ">" + (ln === "" ? "&nbsp;" : hl(ln)) + "</div>" +
+      (hit && f.calc ? '<div class="calc">' + esc(f.calc) + "</div>" : "");
+  }).join("") + "</div>";
+}
+
+function heapHtml(f, kind) {
+  if (!f.heap.length) return '<p class="empty">empty</p>';
+  return '<div class="heap">' + f.heap.map(function (h, i) {
+    var txt = kind === "prims" ? h[0] + " : " + h[1] + "→" + h[2] : h[0] + " : " + h[1];
+    var stale = kind === "dijkstra" && f.dist && h[0] > f.dist[h[1]];
+    return '<span class="hp' + (i === 0 ? " top" : "") + (stale ? " stale" : "") + '">' +
+           txt + "</span>";
+  }).join("") + "</div>";
+}
+
+function distTable(f) {
+  return '<table class="t"><thead><tr><th>Vertex</th><th>Distance from ' + SOURCE +
+    "</th><th>Settled</th></tr></thead><tbody>" +
+    VERTS.slice().sort().map(function (v) {
+      var cls = f.hot === v ? " class=\"hot\"" : f.settled && f.settled[v] ? " class=\"done\"" : "";
+      return "<tr" + cls + "><td>" + v + '</td><td class="n">' +
+             (f.dist[v] === INF ? "∞" : f.dist[v]) + "</td><td>" +
+             (f.settled && f.settled[v] ? "✔" : "") + "</td></tr>";
+    }).join("") + "</tbody></table>";
+}
+
+function mstTable(f) {
+  if (!f.mst.length) return '<p class="empty">no edges yet</p>';
+  return '<table class="t"><thead><tr><th>Edge</th><th>Weight</th></tr></thead><tbody>' +
+    f.mst.map(function (m) {
+      return "<tr><td>" + m[0] + " &ndash; " + m[1] + '</td><td class="n">' + m[2] + "</td></tr>";
+    }).join("") +
+    '<tr class="done"><td><strong>Total</strong></td><td class="n"><strong>' + f.total +
+    "</strong></td></tr></tbody></table>";
+}
+
+// ---------------------------------------------------------------------------
+// Pages
+// ---------------------------------------------------------------------------
+function introHtml() {
+  return '<div class="goal"><p class="goalhead"><span class="tag">GOAL</span>' +
+    "Same graph, same heap, two different questions</p><ul>" +
+    "<li><b>Dijkstra</b> asks <b>how far</b> &mdash; the cheapest total distance from one " +
+    "source to every other vertex. Its answer is a number per vertex.</li>" +
+    "<li><b>Prim&rsquo;s</b> asks <b>which edges to keep</b> &mdash; the cheapest set that " +
+    "connects everything with no cycles. Its answer is a list of edges.</li>" +
+    "<li>They are easy to confuse because both use a min-heap and both are greedy. Tab 4 " +
+    "runs them side by side on this graph, where they disagree.</li></ul></div>" +
+
+    '<div class="solo"><div class="col">' +
+    '<div class="card"><h2>The graph both tabs use</h2><div class="card-body">' +
+    graphSvg({}, "intro") +
+    '<p style="margin:.6rem 0 0;font-size:.9rem">The five edges from <code>src/main.cpp</code>, ' +
+    "so what you see here is what your program prints. <b>V</b> = 4 vertices, " +
+    "<b>E</b> = 5 edges.</p>" +
+    "</div></div></div><div class=\"col\">" +
+
+    '<div class="card"><h2>What a weight changes</h2><div class="card-body">' +
+    "<p style=\"margin:0 0 .6rem\">In CT 18 every edge counted the same, so <em>fewest hops</em> " +
+    "was the only sensible question and BFS answered it. Put a number on each edge and that " +
+    "stops being true: <b>the shortest route is often not the one with the fewest hops</b>.</p>" +
+    "<p style=\"margin:0 0 .6rem\">On this graph, " + SOURCE + "&rarr;Provo direct is one hop " +
+    "costing <b>6</b>. Going " + SOURCE + "&rarr;Logan&rarr;Provo is two hops costing " +
+    "<b>3&nbsp;+&nbsp;2&nbsp;=&nbsp;5</b>. BFS would hand you the 6 and call it shortest.</p>" +
+    "<p style=\"margin:0\">That is the whole reason Dijkstra exists, and it is the first thing " +
+    "tab 2 shows.</p>" +
+    '<div class="callout warn" style="margin-top:.8rem"><b>Both algorithms here assume ' +
+    "weights are not negative.</b> Dijkstra settles a vertex and never revisits it, which is " +
+    "only safe if no later edge can make a route cheaper. A negative edge breaks that " +
+    "promise.</div>" +
+    "</div></div>" +
+
+    '<div class="card"><h2>What the next tabs do</h2><div class="card-body">' +
+    '<ol style="margin:0;padding-left:1.25rem;font-size:.92rem">' +
+    "<li><b>Dijkstra</b> &mdash; the one you implement. Watch the stale-entry line; it is the " +
+    "part most people leave out.</li>" +
+    "<li><b>Prim&rsquo;s</b> &mdash; provided for you, demonstrated in class. The heap holds " +
+    "<em>edges</em> here, not vertices.</li>" +
+    "<li><b>Side by side</b> &mdash; the same graph, and the answer each one gives.</li>" +
+    "</ol></div></div>" +
+    "</div></div>";
+}
+
+function compareHtml() {
+  var d = state.runs.dijkstra[state.runs.dijkstra.length - 1];
+  var p = state.runs.prims[state.runs.prims.length - 1];
+  return '<div class="goal"><p class="goalhead"><span class="tag">GOAL</span>' +
+    "One graph, two answers &mdash; and they are not the same shape</p><ul>" +
+    "<li>Dijkstra returns <b>a number per vertex</b>: how far each one is from " + SOURCE + ".</li>" +
+    "<li>Prim&rsquo;s returns <b>a set of edges</b>: the cheapest way to connect everything.</li>" +
+    "<li>Neither answer can be read off the other. That is the point of running both.</li>" +
+    "</ul></div>" +
+    '<div class="solo"><div class="col">' +
+    '<div class="card"><h2>Dijkstra from ' + SOURCE + ' &mdash; shortest distances</h2>' +
+    '<div class="card-body">' + graphSvg(d, "dijkstra") + distTable(d) +
+    '<p style="margin:.6rem 0 0;font-size:.88rem">Every vertex carries its own total. ' +
+    "Note <b>Provo is 5, not 6</b> &mdash; the two-hop route through Logan beats the direct " +
+    "edge.</p></div></div></div><div class=\"col\">" +
+    '<div class="card"><h2>Prim&rsquo;s from ' + SOURCE + ' &mdash; the spanning tree</h2>' +
+    '<div class="card-body">' + graphSvg(p, "prims") + mstTable(p) +
+    '<p style="margin:.6rem 0 0;font-size:.88rem">Three edges for four vertices, total ' +
+    p.total + ". The direct " + SOURCE + "&ndash;Provo edge of 6 is <b>not</b> in the tree, " +
+    "even though Dijkstra walked along it to discover Provo first.</p></div></div>" +
+    "</div></div>" +
+    '<div class="card" style="margin-top:1rem"><h2>The difference in one line</h2>' +
+    '<div class="card-body"><p style="margin:0">A shortest-path tree is built from one ' +
+    "vertex&rsquo;s point of view and may contain an expensive edge because it is the fastest " +
+    "way <em>there</em>. A minimum spanning tree has no point of view &mdash; it only cares " +
+    "that the total is as small as possible. Run Dijkstra from Provo instead and the distances " +
+    "all change; run Prim&rsquo;s from Provo and the tree comes out the same.</p></div></div>";
+}
+
+function soloHtml(f, key) {
+  var isD = key === "dijkstra";
+  return '<div class="solo"><div class="col">' +
+    '<div class="card"><h2>' + (isD ? "Shortest paths from " + SOURCE : "Building the spanning tree") +
+    '</h2><div class="card-body">' + graphSvg(f, key) +
+    '<p class="legend"><span><i style="border-color:#c64500"></i>being looked at</span>' +
+    "<span><i style=\"border-color:#1c7e45;background:#f2fbf4\"></i>" +
+    (isD ? "settled" : "in the tree") + "</span>" +
+    '<span><i style="border-color:#2573a7"></i>not yet</span></p>' +
+    "</div></div>" +
+    '<div class="card"><h2>' + (isD ? "Distances" : "Edges chosen") + '</h2>' +
+    '<div class="card-body">' + (isD ? distTable(f) : mstTable(f)) + "</div></div>" +
+    '<div class="card"><h2>The heap &mdash; ' +
+    (isD ? "vertices waiting, nearest first" : "candidate edges, cheapest first") + "</h2>" +
+    '<div class="card-body">' + heapHtml(f, key) +
+    '<p style="margin:.5rem 0 0;font-size:.82rem;color:#6e6e6e">' +
+    (isD ? "A struck-through entry is stale &mdash; a shorter route to that vertex was found "
+         + "after it was pushed."
+         : "Each entry is an edge: weight, then where it leads.") + "</p>" +
+    "</div></div></div><div class=\"col\">" +
+    '<div class="card"><h2>The code</h2><div class="card-body">' + codeHtml(key, f) +
+    "</div></div>" +
+    '<div class="card"><h2>What just happened</h2><div class="card-body">' +
+    '<div class="nowbox"><p>' + f.head + "</p></div>" +
+    (f.why && f.why.length
+      ? '<ul class="why">' + f.why.map(function (w) { return "<li>" + w + "</li>"; }).join("") + "</ul>"
+      : "") +
+    "</div></div></div></div>";
+}
+
+// ---------------------------------------------------------------------------
+// State and render
+// ---------------------------------------------------------------------------
+var state = { mode: "intro", preset: "demo", step: 0, runs: {}, maxFrames: 1, timer: null };
+
+function compute() {
+  useGraph(state.preset);
+  state.runs = { dijkstra: buildDijkstra(), prims: buildPrims() };
+  state.maxFrames = (state.mode === "intro" || state.mode === "compare")
+    ? 1 : state.runs[state.mode].length;
+  if (state.step >= state.maxFrames) state.step = state.maxFrames - 1;
+}
+
+function render() {
+  var page = state.mode === "intro" || state.mode === "compare";
+  document.getElementById("ctlBar").style.display = page ? "none" : "";
+  var pb = document.getElementById("presetBar");
+  pb.innerHTML = state.mode === "intro" ? "" :
+    '<span class="barlab">Graph</span>' + Object.keys(GRAPHS).map(function (k) {
+      return '<button class="ctl' + (k === state.preset ? " primary" : "") +
+             '" data-preset="' + k + '">' + GRAPHS[k].label + "</button>";
+    }).join("") + '<span class="barlab">' + GRAPHS[state.preset].note + "</span>";
+  Array.prototype.forEach.call(pb.querySelectorAll("[data-preset]"), function (b) {
+    b.addEventListener("click", function () {
+      stopPlay(); state.preset = b.getAttribute("data-preset");
+      state.step = 0; compute(); render();
+    });
+  });
+  if (state.mode === "intro") document.getElementById("stage").innerHTML = introHtml();
+  else if (state.mode === "compare") document.getElementById("stage").innerHTML = compareHtml();
+  else {
+    var f = state.runs[state.mode][Math.min(state.step, state.maxFrames - 1)];
+    document.getElementById("stage").innerHTML = soloHtml(f, state.mode);
+    document.getElementById("counter").textContent =
+      "step " + (state.step + 1) + " of " + state.maxFrames;
+    document.getElementById("first").disabled = state.step === 0;
+    document.getElementById("prev").disabled = state.step === 0;
+    document.getElementById("next").disabled = state.step >= state.maxFrames - 1;
+    document.getElementById("last").disabled = state.step >= state.maxFrames - 1;
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("#tabs [data-mode]"), function (b) {
+    b.classList.toggle("on", b.getAttribute("data-mode") === state.mode);
+  });
+}
+
+function go(n) { state.step = Math.max(0, Math.min(n, state.maxFrames - 1)); render(); }
+function stopPlay() {
+  if (state.timer) { clearInterval(state.timer); state.timer = null; }
+  var p = document.getElementById("play"); if (p) p.innerHTML = "&#9654; Play";
+}
+function play() {
+  if (state.timer) { stopPlay(); return; }
+  if (state.step >= state.maxFrames - 1) state.step = 0;
+  document.getElementById("play").innerHTML = "&#10073;&#10073; Pause";
+  state.timer = setInterval(function () {
+    if (state.step >= state.maxFrames - 1) { stopPlay(); return; }
+    go(state.step + 1);
+  }, 900);
+}
+
+document.getElementById("first").addEventListener("click", function () { stopPlay(); go(0); });
+document.getElementById("prev").addEventListener("click", function () { stopPlay(); go(state.step - 1); });
+document.getElementById("next").addEventListener("click", function () { stopPlay(); go(state.step + 1); });
+document.getElementById("last").addEventListener("click", function () { stopPlay(); go(state.maxFrames - 1); });
+document.getElementById("play").addEventListener("click", play);
+Array.prototype.forEach.call(document.querySelectorAll("#tabs [data-mode]"), function (b) {
+  b.addEventListener("click", function () {
+    stopPlay(); state.mode = b.getAttribute("data-mode"); state.step = 0; compute(); render();
+  });
+});
+document.addEventListener("keydown", function (e) {
+  if (state.mode === "intro" || state.mode === "compare") return;
+  if (e.key === "ArrowRight") { e.preventDefault(); stopPlay(); go(state.step + 1); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); stopPlay(); go(state.step - 1); }
+  else if (e.key === " ") { e.preventDefault(); play(); }
+});
+
+// ---------------------------------------------------------------------------
+// Self-check -- re-derives both answers independently and compares.
+// ---------------------------------------------------------------------------
+(function selftest() {
+  var fails = [], runs = 0;
+
+  // Plain Dijkstra, written without reference to the frame builder.
+  function plainDijkstra(src) {
+    var dist = {}, done = {};
+    VERTS.forEach(function (v) { dist[v] = INF; });
+    dist[src] = 0;
+    for (var k = 0; k < VERTS.length; k++) {
+      var best = null;
+      VERTS.forEach(function (v) {
+        if (!done[v] && dist[v] !== INF && (best === null || dist[v] < dist[best])) best = v;
+      });
+      if (best === null) break;
+      done[best] = true;
+      ADJ[best].forEach(function (e) {
+        if (dist[best] + e.w < dist[e.to]) dist[e.to] = dist[best] + e.w;
+      });
+    }
+    return dist;
+  }
+
+  // Kruskal, for the MST weight -- a different algorithm, so agreeing means
+  // something. Prim's compared against Prim's would only prove it is stable.
+  function kruskalWeight() {
+    var parent = {}; VERTS.forEach(function (v) { parent[v] = v; });
+    function find(a) { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; }
+    var total = 0, used = 0;
+    EDGES.slice().sort(function (a, b) { return a[2] - b[2]; }).forEach(function (e) {
+      var x = find(e[0]), y = find(e[1]);
+      if (x !== y) { parent[x] = y; total += e[2]; used++; }
+    });
+    return { total: total, edges: used };
+  }
+
+  // Both graphs, because each exists to demonstrate a different line.
+  var results = {};
+  Object.keys(GRAPHS).forEach(function (key) {
+    useGraph(key);
+    results[key] = { d: buildDijkstra(), p: buildPrims(), src: SOURCE,
+                     verts: VERTS.slice(), kr: kruskalWeight() };
+    runs += 2;
+  });
+  useGraph("demo");
+  var dFrames = results.demo.d, pFrames = results.demo.p;
+
+  var want = plainDijkstra(SOURCE), got = dFrames[dFrames.length - 1].dist;
+  VERTS.forEach(function (v) {
+    if (got[v] !== want[v])
+      fails.push("dijkstra " + v + ": got " + got[v] + ", expected " + want[v]);
+  });
+  if (got.Provo !== 5)
+    fails.push("dijkstra: Provo should be 5 via Logan, not the direct 6");
+
+  var k = results.demo.kr;
+  Object.keys(results).forEach(function (key) {
+    var r = results[key], last = r.p[r.p.length - 1];
+    runs++;
+    if (last.total !== r.kr.total)
+      fails.push(key + "/prims: total " + last.total + ", Kruskal says " + r.kr.total);
+    if (last.mst.length !== r.verts.length - 1)
+      fails.push(key + "/prims: " + last.mst.length + " edges, a spanning tree needs " +
+                 (r.verts.length - 1));
+    var seen = {}, bad = false;
+    last.mst.forEach(function (m) { if (seen[m[1]]) bad = true; seen[m[1]] = 1; });
+    if (bad) fails.push(key + "/prims: a vertex was added to the tree twice");
+  });
+
+  // Every frame must point at a real line and carry a THIS STEP band.
+  [["dijkstra", dFrames], ["prims", pFrames]].forEach(function (pair) {
+    pair[1].forEach(function (f, i) {
+      runs++;
+      if (!(f.line >= 0 && f.line < CODE[pair[0]].length))
+        fails.push(pair[0] + " frame " + i + ": line " + f.line + " is outside the listing");
+      if (!f.calc) fails.push(pair[0] + " frame " + i + ": no THIS STEP band");
+      if (!f.head) fails.push(pair[0] + " frame " + i + ": no narration");
+    });
+  });
+
+  // The two lines everyone leaves out must actually be exercised.
+  if (!dFrames.some(function (f) { return f.staleHit; }))
+    fails.push("dijkstra: this graph never produces a stale heap entry, so the " +
+               "continue line is never demonstrated");
+  if (!results.cycle.p.some(function (f) { return f.staleHit; }))
+    fails.push("prims: the second graph was supposed to reject a cycle edge and did not");
+  if (pFrames.some(function (f) { return f.staleHit; }))
+    fails.push("prims: the demo graph now rejects an edge -- the note saying it does not " +
+               "is wrong");
+
+  document.getElementById("selftest").innerHTML = fails.length === 0
+    ? '<span class="ok">&#x2714; Self-check passed</span> &mdash; ' + runs +
+      " checks: Dijkstra's distances match an independently written shortest-path routine " +
+      "and Provo comes out 5 by the two-hop route rather than 6 by the direct edge; Prim's " +
+      "total matches <strong>Kruskal</strong>, a different MST algorithm, at " + k.total +
+      " over " + (VERTS.length - 1) + " edges with no vertex added twice; every frame " +
+      "highlights a real line and carries a THIS STEP band; and both of the lines students " +
+      "leave out &mdash; the stale-entry skip and the cycle check &mdash; actually fire on " +
+      "this graph."
+    : '<span class="fail">&#x2716; Self-check FAILED (' + fails.length + ")</span>: " +
+      fails.slice(0, 6).join("; ");
+})();
+
+compute();
+render();
+</script>
+</body>
+</html>
