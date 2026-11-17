@@ -347,9 +347,10 @@
     <button data-mode="intro">1 &middot; Graph vs tree</button>
     <button data-mode="repr">2 &middot; List vs matrix</button>
     <button data-mode="build">3 &middot; Build the list</button>
-    <button data-mode="bfs">4 &middot; BFS</button>
-    <button data-mode="dfs">5 &middot; DFS</button>
-    <button data-mode="compare">6 &middot; BFS vs DFS</button>
+    <button data-mode="ask">4 &middot; Ask the list</button>
+    <button data-mode="bfs">5 &middot; BFS</button>
+    <button data-mode="dfs">6 &middot; DFS</button>
+    <button data-mode="compare">7 &middot; BFS vs DFS</button>
     <span class="spacer"></span>
     <span class="step-hint">&larr; &rarr; arrow keys step &middot; space plays</span>
   </div>
@@ -618,6 +619,36 @@ var CODE = {
     "    adj_list_[to].push_back(from);     // on BOTH vertices",
     "}"
   ],
+  ask: [
+    "bool Graph::has_vertex(const std::string& vertex) const {",
+    "    return adj_list_.find(vertex) != adj_list_.end();",
+    "}",
+    "",
+    "bool Graph::has_edge(const std::string& from, const std::string& to) const {",
+    "    auto it = adj_list_.find(from);",
+    "    if (it == adj_list_.end()) return false;",
+    "    const auto& nbrs = it->second;",
+    "    return std::find(nbrs.begin(), nbrs.end(), to) != nbrs.end();",
+    "}",
+    "",
+    "int Graph::vertex_count() const {",
+    "    return static_cast<int>(adj_list_.size());",
+    "}",
+    "",
+    "int Graph::edge_count() const {",
+    "    int total = 0;",
+    "    for (const auto& [vertex, nbrs] : adj_list_) {",
+    "        total += static_cast<int>(nbrs.size());",
+    "    }",
+    "    return total / 2;              // every edge was stored twice",
+    "}",
+    "",
+    "std::vector<std::string> Graph::neighbors(const std::string& vertex) const {",
+    "    auto it = adj_list_.find(vertex);",
+    "    if (it == adj_list_.end()) return {};",
+    "    return it->second;",
+    "}"
+  ],
   bfs: [
     "std::vector<std::string> Graph::bfs(const std::string& start) const {",
     "    std::vector<std::string> result;",
@@ -672,6 +703,32 @@ var CODE = {
 };
 
 var LINE_INFO = {
+  ask: {
+    1: { src: "return adj_list_.find(vertex) != adj_list_.end();",
+      what: "A vertex exists exactly when it is a key.",
+      items: [
+        ["trap", "<code class='inl'>adj_list_[vertex]</code> would CREATE the key and then report that the vertex exists &mdash; the question answers itself wrongly. On a <code class='inl'>const</code> method it does not even compile, which is the compiler doing you a favour."],
+        ["syntax", "<code class='inl'>find</code> returns an iterator; comparing it against <code class='inl'>end()</code> is how you ask <em>did you find anything</em>."]
+      ] },
+    6: { src: "if (it == adj_list_.end()) return false;",
+      what: "If `from` is not even a vertex, there is no edge to find.",
+      items: [
+        ["trap", "Without this line, <code class='inl'>it->second</code> dereferences <code class='inl'>end()</code> &mdash; undefined behaviour, and it will often appear to work."],
+        ["why", "Only <code class='inl'>from</code>'s list is checked. That is enough because <code class='inl'>add_edge</code> stored the edge on both ends; if it is missing here it is missing everywhere."]
+      ] },
+    20: { src: "return total / 2;",
+      what: "Every undirected edge was counted once from each end.",
+      items: [
+        ["trap", "Forget the <code class='inl'>/ 2</code> and a 5-edge graph reports 10. This is the direct consequence of the two <code class='inl'>push_back</code> calls on tab 3."],
+        ["why", "An odd total would mean an edge stored on one end only, which is a bug in <code class='inl'>add_edge</code>, not here."]
+      ] },
+    25: { src: "if (it == adj_list_.end()) return {};",
+      what: "A missing vertex gets an empty list back.",
+      items: [
+        ["why", "This is what lets <code class='inl'>bfs</code> and <code class='inl'>dfs</code> call <code class='inl'>neighbors(current)</code> without checking first &mdash; the loop simply runs zero times."],
+        ["syntax", "<code class='inl'>return {}</code> builds an empty vector of the return type."]
+      ] }
+  },
   build: {
     1: { src: "if (adj_list_.find(vertex) == adj_list_.end())",
       what: "Only create the key if it is not already there.",
@@ -762,6 +819,9 @@ var STEP_TAG = {
 
 var PHASE_OF = {
   build: { 0: 0, 1: 0, 2: 0, 6: 1, 7: 1, 8: 1, 10: 2, 11: 2 },
+  ask:   { 0: 0, 1: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0,
+           11: 1, 12: 1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1,
+           23: 2, 24: 2, 25: 2, 26: 2 },
   bfs:   { 0: 0, 2: 0, 7: 0, 8: 0, 10: 1, 11: 1, 12: 1, 13: 1,
            15: 2, 16: 2, 17: 2, 18: 2, 22: 1 },
   dfs:   { 0: 0, 2: 0, 7: 0, 9: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1,
@@ -786,6 +846,22 @@ var GUIDE = {
             "<code>edge_count()</code> divides by two for exactly this reason"] }
     ],
     watch: "<strong>The guard in <code>add_vertex</code> is load-bearing.</strong> Write <code>adj_list_[vertex] = {};</code> without checking and every <code>add_edge</code> wipes the neighbours of both endpoints, because <code>add_edge</code> calls <code>add_vertex</code> on both every single time. The graph ends up with one edge &mdash; the last one you added."
+  },
+  ask: {
+    steps: [
+      { t: "Is it there?",
+        b: ["<code>has_vertex</code> &mdash; is this a key in the map?",
+            "<code>has_edge</code> &mdash; is <code>to</code> in <code>from</code>'s list?",
+            "both use <code>find</code>, never <code>[]</code>"] },
+      { t: "How many?",
+        b: ["<code>vertex_count</code> is just <code>adj_list_.size()</code>",
+            "<code>edge_count</code> sums every list and halves it",
+            "the halving is because an undirected edge is stored on both ends"] },
+      { t: "Hand back the list",
+        b: ["<code>neighbors</code> returns a copy of one vertex's vector",
+            "a missing vertex gets an empty vector, not a crash",
+            "this is the function BFS and DFS live on"] }
+    ]
   },
   bfs: {
     idea: "Use a queue, and mark a vertex the moment it is queued. Everything one edge away comes out before anything two edges away.",
@@ -932,6 +1008,147 @@ function buildBuild(p) {
       why: ["now the edge exists in both directions, which is what undirected means",
             "the structure holds " + (edgeCount(g) * 2) + " entries for " + edgeCount(g) + " edges"] }));
   });
+
+  return frames;
+}
+
+function buildAsk(g) {
+  var frames = [], v0 = g.order[0];
+
+  // A name that is deliberately NOT in whichever preset is loaded, so the
+  // false branches can be demonstrated rather than described.
+  var miss = ["Provo", "Zion", "Mallory", "Nowhere"].filter(function (x) {
+    return g.adj[x] === undefined;
+  })[0];
+
+  // --- 3a: has_vertex -----------------------------------------------------
+  frames.push(F({ g: snapshot(g), line: 0, tag: "has_vertex (3a)", phase: 0,
+    calc: 'has_vertex("' + v0 + '")',
+    head: "Does <strong>" + v0 + "</strong> exist?",
+    why: ["every other function on this tab starts by asking this",
+          "the <code>const</code> on the signature is a promise not to change the map &mdash; it is about to matter"] }));
+  frames.push(F({ g: snapshot(g), line: 1, look: v0,
+    calc: 'adj_list_.find("' + v0 + '") != adj_list_.end()   \u2192   true',
+    head: "<strong>" + v0 + "</strong> is a key, so <strong>true</strong>.",
+    why: ["a vertex exists exactly when it is a key; its neighbour list is never consulted",
+          "an isolated vertex still exists &mdash; a key with an empty vector"] }));
+  frames.push(F({ g: snapshot(g), line: 1,
+    calc: 'adj_list_.find("' + miss + '") != adj_list_.end()   \u2192   false',
+    head: "<strong>" + miss + "</strong> is not a key, so <strong>false</strong>.",
+    why: ["write <code>adj_list_[\"" + miss + '\"]</code> here and you CREATE the key, then report that it exists',
+          "on a <code>const</code> method that does not compile at all, which is the compiler saving you"] }));
+
+  // --- 3b: has_edge -------------------------------------------------------
+  var a = g.order[0], b = g.adj[a][0];
+  frames.push(F({ g: snapshot(g), line: 4, tag: "has_edge (3b)",
+    calc: 'has_edge("' + a + '", "' + b + '")',
+    head: "Is there an edge between <strong>" + a + "</strong> and <strong>" + b + "</strong>?",
+    why: ["two questions in order: does <code>from</code> exist, and is <code>to</code> in its list"] }));
+  frames.push(F({ g: snapshot(g), line: 5, look: a,
+    calc: 'auto it = adj_list_.find("' + a + '")   \u2192   found',
+    head: "Find <strong>" + a + "</strong>'s entry.",
+    why: ["the iterator is kept so the list can be read without a second lookup"] }));
+  frames.push(F({ g: snapshot(g), line: 6, look: a,
+    calc: "it == adj_list_.end()   \u2192   false, carry on",
+    head: "It exists, so we do not return early.",
+    why: ["skip this guard and <code>it->second</code> below would dereference <code>end()</code>"] }));
+  frames.push(F({ g: snapshot(g), line: 7, look: a,
+    calc: "const auto& nbrs = it->second\n" + a + " lists " + g.adj[a].join(", "),
+    head: "<strong>" + a + "</strong>'s neighbour list, by reference.",
+    why: ["<code>const auto&</code> &mdash; no copy is made, and it cannot be modified"] }));
+  frames.push(F({ g: snapshot(g), line: 8, hit: a, neighbor: b,
+    edge: (a < b ? a + "|" + b : b + "|" + a),
+    calc: 'std::find(nbrs.begin(), nbrs.end(), "' + b + '")   \u2192   found',
+    head: "<strong>" + b + "</strong> is in the list &mdash; <strong>true</strong>.",
+    why: ["a linear scan of one vertex's neighbours: O(degree), not O(V)",
+          "only " + a + "'s side is checked, which is enough because the edge was stored on both"] }));
+
+  // The interesting negative: both vertices real, no edge between them.
+  var pair = null;
+  g.order.forEach(function (x) {
+    if (pair) return;
+    g.order.forEach(function (y) {
+      if (pair || x === y) return;
+      if (g.adj[x].indexOf(y) === -1) pair = [x, y];
+    });
+  });
+  if (pair) {
+    frames.push(F({ g: snapshot(g), line: 8, look: pair[0],
+      calc: 'std::find(...)   for has_edge("' + pair[0] + '", "' + pair[1] +
+            '")   \u2192   not found',
+      head: "Both are real vertices, but there is no edge &mdash; <strong>false</strong>.",
+      why: ["<strong>existing is not the same as adjacent</strong>, and this is the case tests check",
+            pair[0] + " lists " + g.adj[pair[0]].join(", ") + " &mdash; no " + pair[1]] }));
+  }
+  frames.push(F({ g: snapshot(g), line: 6,
+    calc: 'has_edge("' + miss + '", "' + v0 + '")   \u2192   it == end(), return false',
+    head: "And an edge from a vertex that does not exist is <strong>false</strong>.",
+    why: ["this is the line that makes that safe rather than undefined"] }));
+
+  // --- 3c: vertex_count ---------------------------------------------------
+  frames.push(F({ g: snapshot(g), line: 11, tag: "vertex_count (3c)", phase: 1,
+    calc: "vertex_count()",
+    head: "How many vertices?",
+    why: ["one key per vertex, so the map already knows"] }));
+  frames.push(F({ g: snapshot(g), line: 12,
+    calc: "static_cast<int>(adj_list_.size())   \u2192   " + g.order.length,
+    head: "<strong>" + g.order.length + "</strong> vertices.",
+    why: ["no loop needed &mdash; <code>size()</code> is O(1)",
+          "the cast is because <code>size()</code> returns <code>size_t</code> and the signature says <code>int</code>"] }));
+
+  // --- 3d: edge_count -----------------------------------------------------
+  frames.push(F({ g: snapshot(g), line: 15, tag: "edge_count (3d)",
+    calc: "edge_count()",
+    head: "How many edges?",
+    why: ["this one cannot just ask the map &mdash; edges live inside the lists"] }));
+  frames.push(F({ g: snapshot(g), line: 16,
+    calc: "int total = 0;",
+    head: "Start the running total at 0.", why: [] }));
+  var total = 0;
+  g.order.forEach(function (v, i) {
+    frames.push(F({ g: snapshot(g), line: 17, look: v,
+      calc: "for (const auto& [vertex, nbrs] : adj_list_)   \u2192   " + v,
+      head: "Visiting <strong>" + v + "</strong>'s list.",
+      why: i === 0
+        ? ["a structured binding splits each map entry into its key and its value",
+           "the order the map hands these back is unspecified, which does not matter for a sum"]
+        : [] }));
+    total += g.adj[v].length;
+    frames.push(F({ g: snapshot(g), line: 18, hit: v,
+      calc: "total += " + g.adj[v].length + "   \u2192   " + total,
+      head: "<strong>" + v + "</strong> has " + g.adj[v].length + " neighbour" +
+            (g.adj[v].length === 1 ? "" : "s") + "; total is now " + total + ".",
+      why: [] }));
+  });
+  frames.push(F({ g: snapshot(g), line: 20,
+    calc: "return " + total + " / 2   \u2192   " + (total / 2),
+    head: "<strong>" + (total / 2) + "</strong> edges.",
+    why: ["every edge was counted twice, once from each end &mdash; that is the two " +
+          "<code>push_back</code> calls on tab 3 coming back around",
+          "forget the <code>/ 2</code> and this graph reports " + total + " edges instead of " + (total / 2),
+          "an ODD total would mean an edge stored on one end only &mdash; a bug in <code>add_edge</code>"] }));
+
+  // --- 3e: neighbors ------------------------------------------------------
+  frames.push(F({ g: snapshot(g), line: 23, tag: "neighbors (3e)", phase: 2,
+    calc: 'neighbors("' + v0 + '")',
+    head: "Hand back <strong>" + v0 + "</strong>'s neighbours.",
+    why: ["this is the function BFS and DFS are built on, so it has to be safe to call blindly"] }));
+  frames.push(F({ g: snapshot(g), line: 24, look: v0,
+    calc: 'auto it = adj_list_.find("' + v0 + '")   \u2192   found',
+    head: "Find the entry.", why: [] }));
+  frames.push(F({ g: snapshot(g), line: 25, look: v0,
+    calc: "it == adj_list_.end()   \u2192   false",
+    head: "It exists, so there is a real list to return.", why: [] }));
+  frames.push(F({ g: snapshot(g), line: 26, hit: v0,
+    calc: "return it->second\n" + g.adj[v0].join(", "),
+    head: "<strong>" + v0 + "</strong> &rarr; " + g.adj[v0].join(", "),
+    why: ["the return type is by value, so this is a COPY of the vector",
+          "returning <code>const std::vector&amp;</code> would avoid the copy &mdash; the signature CT 18 gives you does not, and that is a fair thing to notice"] }));
+  frames.push(F({ g: snapshot(g), line: 25,
+    calc: 'neighbors("' + miss + '")   \u2192   return {}',
+    head: "A vertex that does not exist gets an <strong>empty list</strong>.",
+    why: ["not a crash and not an exception &mdash; an empty vector",
+          "this is exactly why <code>for (auto& n : neighbors(current))</code> in BFS needs no guard: the loop runs zero times"] }));
 
   return frames;
 }
@@ -1267,6 +1484,7 @@ function compute() {
   state.graph = g;
   state.runs = {
     build: buildBuild(p),
+    ask: buildAsk(g),
     bfs: buildBFS(g, state.start),
     dfs: buildDFS(g, state.start)
   };
@@ -1456,7 +1674,8 @@ function railHtml(f) {
   var key = codeKey();
   var at = phaseAt(f, key);
   var tag = f.tag || (STEP_TAG[key] && STEP_TAG[key][f.line]);
-  var mode = { insert: "in insert", search: "in search", height: "in height",
+  var mode = { ask: "in the five accessors",
+               insert: "in insert", search: "in search", height: "in height",
                destroy: "in the destructor", apply: "in inorder_apply",
                traverse: "in the traversal" }[state.mode] || "";
   return '<div class="card rail"><h2>Where we are</h2><div class="card-body">' +
@@ -1958,6 +2177,37 @@ document.addEventListener("keydown", function (e) {
                ", but test_graph_bfs.cpp pins A, B, C, D, E");
   runs++;
 
+  // ---- tab 4, the five accessors (TODO 3a-3e) -------------------------------
+  // The counts are derived from the graph so they cannot disagree with it. What
+  // CAN rot is the negative case: the "both real, but not adjacent" frame only
+  // exists when the loaded graph has a non-adjacent pair, and a fully-connected
+  // preset would delete the lesson without failing anything.
+  Object.keys(PRESETS).forEach(function (name) {
+    var p = PRESETS[name], g = buildGraph(p);
+    var fr = buildAsk(g);
+    runs++;
+
+    var txt = fr.map(function (f) { return f.calc + " " + f.head; }).join(" ");
+
+    if (txt.indexOf("/ 2   \u2192   " + p.es.length) === -1)
+      fails.push(name + "/ask: edge_count frame does not arrive at " + p.es.length);
+    if (txt.indexOf("adj_list_.size())   \u2192   " + p.vs.length) === -1)
+      fails.push(name + "/ask: vertex_count frame does not arrive at " + p.vs.length);
+
+    if (txt.indexOf("no edge") === -1)
+      fails.push(name + "/ask: no 'both real but not adjacent' frame -- has_edge's " +
+                 "interesting false case is not demonstrated on this graph");
+    if (txt.indexOf("empty list") === -1)
+      fails.push(name + "/ask: neighbors' empty-vector case is not demonstrated");
+
+    fr.forEach(function (f, i) {
+      if (!(f.line >= 0 && f.line < CODE.ask.length))
+        fails.push(name + "/ask frame " + i + ": line " + f.line + " is outside the listing");
+      if (!f.calc) fails.push(name + "/ask frame " + i + ": no THIS STEP band");
+      if (!f.head) fails.push(name + "/ask frame " + i + ": no narration");
+    });
+  });
+
   var el = document.getElementById("selftest");
   el.innerHTML = fails.length
     ? '<span style="color:#c0392b;font-weight:700">&#x2716; Self-check failed</span> &mdash; ' +
@@ -1965,7 +2215,7 @@ document.addEventListener("keydown", function (e) {
     : '<span style="color:#1c7e45;font-weight:700">&#x2714; Self-check passed</span> &mdash; ' +
       runs + " walks across " + Object.keys(PRESETS).length + " graphs: BFS and DFS both agree " +
       "with a plain implementation, neither repeats a vertex, both reach everything reachable, " +
-      "BFS comes out in distance order every time, and the fixture graph gives exactly the order test_graph_bfs.cpp pins";
+      "BFS comes out in distance order every time, the fixture graph gives exactly the order test_graph_bfs.cpp pins, and on every graph the five accessors on tab 4 reach the right counts and still demonstrate both of their interesting false cases";
 })();
 
 
