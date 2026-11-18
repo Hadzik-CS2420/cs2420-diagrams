@@ -677,7 +677,7 @@ function heapHtml(f, kind) {
 }
 
 function distTable(f) {
-  if (!f.dist) return '<p class="empty">the map does not exist yet</p>';
+  if (!f.dist) return '<p class="empty">the <code>dist</code> map does not exist yet</p>';
   return '<table class="t"><thead><tr><th>Vertex</th><th>Distance from ' + SOURCE +
     "</th><th>Settled</th></tr></thead><tbody>" +
     VERTS.slice().sort().map(function (v) {
@@ -689,7 +689,7 @@ function distTable(f) {
 }
 
 function mstTable(f) {
-  if (!f.mst) return '<p class="empty">the list does not exist yet</p>';
+  if (!f.mst) return '<p class="empty">the <code>mst_edges</code> vector does not exist yet</p>';
   if (!f.mst.length) return '<p class="empty">no edges yet</p>';
   return '<table class="t"><thead><tr><th>Edge</th><th>Weight</th></tr></thead><tbody>' +
     f.mst.map(function (m) {
@@ -839,8 +839,20 @@ function soloHtml(f, key) {
     (isD ? "settled" : "in the tree") + "</span>" +
     '<span><i style="border-color:#2573a7"></i>not yet</span></p>' +
     "</div></div>" +
-    '<div class="card"><h2>' + (isD ? "Distances" : "Edges chosen") + '</h2>' +
-    '<div class="card-body">' + (isD ? distTable(f) : mstTable(f)) + "</div></div>" +
+    '<div class="card"><h2>' +
+      (isD ? "<code>dist</code> &mdash; best known distance to every vertex"
+           : "<code>mst_edges</code> &mdash; the edges kept so far") + "</h2>" +
+    '<div class="card-body">' + (isD ? distTable(f) : mstTable(f)) +
+    '<p style="margin:.5rem 0 0;font-size:.82rem;color:#6e6e6e">' +
+    (isD ? "<code>std::unordered_map&lt;std::string, int&gt;</code>. Every vertex starts at "
+         + "&infin; except the source at 0, and a number only ever gets smaller. "
+         + "<strong>The tick is this page&rsquo;s marker, not a variable</strong> &mdash; "
+         + "there is no <code>settled</code> container in the code. Once a vertex is popped "
+         + "without being stale its distance is final, and the stale check is what enforces "
+         + "that."
+         : "<code>std::vector&lt;std::tuple&lt;std::string, std::string, int&gt;&gt;</code>. "
+         + "Finishes with exactly V&minus;1 edges.") + "</p>" +
+    "</div></div>" +
     '<div class="card"><h2>The heap &mdash; ' +
     (isD ? "vertices waiting, nearest first" : "candidate edges, cheapest first") + "</h2>" +
     '<div class="card-body">' + heapHtml(f, key) +
