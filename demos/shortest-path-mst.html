@@ -319,8 +319,7 @@ function buildDijkstra() {
   }
 
   snap({ line: 0, lineEnd: 1,
-    calc: "one declaration, split across two lines \u2014 together it runs to 95 characters\n" +
-      "returns  std::unordered_map<std::string, int> \u2014 the string is a vertex name, " +
+    calc: "returns  std::unordered_map<std::string, int> \u2014 the string is a vertex name, " +
       "the int is its distance\n" +
       "takes    const std::string& source \u2014 borrowed, not copied; const promises not " +
       "to change it\n" +
@@ -498,8 +497,7 @@ function buildPrims() {
   }
 
   snap({ line: 0, lineEnd: 1,
-    calc: "one declaration, split across two lines \u2014 the return type alone is 70 characters\n" +
-      "returns  std::pair<std::vector<std::tuple<...>>, int> \u2014 .first the edges kept, " +
+    calc: "returns  std::pair<std::vector<std::tuple<...>>, int> \u2014 .first the edges kept, " +
       ".second their total weight\n" +
       "takes    const std::string& start \u2014 borrowed, not copied; const promises not " +
       "to change it\n" +
