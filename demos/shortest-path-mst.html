@@ -942,7 +942,10 @@ function soloHtml(f, key) {
          + "<strong>The tick is this page&rsquo;s marker, not a variable</strong> &mdash; "
          + "there is no <code>settled</code> container in the code. Once a vertex is popped "
          + "without being stale its distance is final, and the stale check is what enforces "
-         + "that."
+         + "that. <strong>Rows are sorted by name; the fill loop is not</strong> "
+         + "&mdash; it takes whatever order the <code>unordered_map</code> hands it, "
+         + "which is why the column fills out of sequence. A real one may differ "
+         + "between compilers and between runs."
          : "<code>std::vector&lt;std::tuple&lt;std::string, std::string, int&gt;&gt;</code>. "
          + "Finishes with exactly V&minus;1 edges.") + "</p>" +
     "</div></div>" +
