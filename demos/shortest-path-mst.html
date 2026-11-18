@@ -359,8 +359,10 @@ function buildDijkstra() {
     filled.push(v);
     snap({ line: 4, hot: v,
       calc: "vertex = " + v + "\n" +
-                  "dist[" + v + "] = numeric_limits<int>::max()\n" + filled.length + " of " +
-            VERTS.length + " filled in",
+            "dist[" + v + "] = numeric_limits<int>::max()\n" +
+            "    2147483647 \u2014 the largest int there is, not actual infinity\n" +
+            "    it means no route found YET, not that none exists\n" +
+            filled.length + " of " + VERTS.length + " filled in",
       head: "<strong>" + v + "</strong> starts at &infin;",
       why: i === 0
         ? ["<code>max()</code> stands in for infinity &mdash; it means <em>no route " +
