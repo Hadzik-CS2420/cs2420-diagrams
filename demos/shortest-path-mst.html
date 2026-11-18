@@ -320,7 +320,7 @@ function buildDijkstra() {
   VERTS.forEach(function (v, i) {
     if (i === 0) {
       snap({ line: 3, calc: "for (const auto& [vertex, edges] : adj_list_)\n" +
-          "walks every key in the adjacency list &mdash; " + VERTS.join(", "),
+          "walks every key in the adjacency list — " + VERTS.join(", "),
         head: "Loop over every vertex in the graph",
         why: ["the keys of <code>adj_list_</code> are exactly the vertices"] });
     }
@@ -349,9 +349,17 @@ function buildDijkstra() {
     why: ["this single known value is what the whole algorithm grows outward from"] });
 
   snap({ line: 9, calc: "using Pair = std::pair<int, std::string>;\n" +
-      "a name for (distance, vertex) &mdash; nothing happens at run time",
+      "a name for (distance, vertex) — nothing happens at run time",
     head: "Name the pair type the heap will hold",
-    why: ["distance comes <em>first</em> in the pair on purpose: pairs compare on their " +
+    why: ["<code>using X = Y;</code> renames an existing type &mdash; the modern " +
+          "<code>typedef</code>. Nothing is built and nothing runs",
+          "it earns a line because <code>priority_queue</code> makes you name the element " +
+          "type <strong>three times</strong>: the element, the container holding them, " +
+          "and the comparator that orders them",
+          "spelled out: <code>priority_queue&lt;pair&lt;int,string&gt;, " +
+          "vector&lt;pair&lt;int,string&gt;&gt;, greater&lt;pair&lt;int,string&gt;&gt;&gt;</code>" +
+          " &mdash; the alias is the difference between a line you can read and one you cannot",
+          "distance comes <em>first</em> in the pair on purpose: pairs compare on their " +
           "first element, so the heap orders by distance without being told how"] });
 
   snap({ line: 10, calc: "min_heap is created, empty\ngreater<Pair> makes it a MIN-heap",
@@ -487,9 +495,11 @@ function buildPrims() {
           "whichever you start from"] });
 
   snap({ line: 8, calc: "using EdgeTuple = std::tuple<int, std::string, std::string>;\n" +
-      "(weight, from, to) &mdash; nothing happens at run time",
+      "(weight, from, to) — nothing happens at run time",
     head: "Name the tuple the heap will hold",
-    why: ["weight comes <strong>first</strong> so the heap orders by it",
+    why: ["the same idea as <code>Pair</code> in Dijkstra&rsquo;s, one element wider " +
+          "&mdash; a tuple because three things travel together, not two",
+          "weight comes <strong>first</strong> so the heap orders by it",
           "put it last and the heap sorts by vertex name, which is a wrong tree that " +
           "still looks plausible"] });
   snap({ line: 9, calc: "min_heap is created, empty\ngreater<EdgeTuple> makes it a MIN-heap",
