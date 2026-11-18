@@ -382,7 +382,11 @@ function buildDijkstra() {
           "<code>.at()</code> is the opposite &mdash; it throws on a missing key, which " +
           "is where the crash would land a few lines later",
           "with the guard, a bad source returns the all-&infin; map: no route to " +
-          "anywhere, which is the truthful answer"] });
+          "anywhere, which is the truthful answer",
+          "<strong>that is also why the check sits after the loop</strong> &mdash; move it "
+          + "above and a bad source returns an EMPTY map instead of every vertex at "
+          + "&infin;. Checking first would be a shade cheaper; this way the caller gets "
+          + "the same keys either way"] });
 
   dist[SOURCE] = 0;
   snap({ line: 7, hot: SOURCE,
