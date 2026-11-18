@@ -303,7 +303,8 @@ function hl(line) {
 // Dijkstra -- frames
 // ---------------------------------------------------------------------------
 function buildDijkstra() {
-  var F = [], dist = {}, heap = [], settled = {}, declared = false;
+  var F = [], dist = {}, heap = [], settled = {}, declared = false,
+      heapDeclared = false;
   // Not shown anywhere: dijkstra() as the students write it returns distances
   // and keeps no parent. Recorded only so the compare tab can say truthfully
   // whether the shortest-path tree and the MST landed on the same edges.
@@ -311,27 +312,28 @@ function buildDijkstra() {
 
   function snap(o) {
     o.dist = declared ? Object.assign({}, dist) : null;
-    o.heap = copyHeap(heap);
+    o.heap = heapDeclared ? copyHeap(heap) : null;
     o.settled = Object.assign({}, settled);
     o.via = Object.assign({}, via);
     F.push(o);
   }
 
-  snap({ line: 0, calc: "std::unordered_map<std::string, int>\n" +
-      "the return type \u2014 the string is a vertex name, the int is its distance",
-    head: "What <code>dijkstra</code> hands back",
-    why: ["these two lines are <strong>one declaration</strong>: the return type, then " +
-          "<code>WeightedGraph::dijkstra(...)</code>. Split only because together they " +
-          "run to 95 characters",
-          "the answer is returned, not stored on the object &mdash; the graph is unchanged, " +
-          "which is why the method is <code>const</code>",
-          "it is the same <code>dist</code> map you see built on the next line and handed " +
-          "back at the end"] });
-
-  snap({ line: 1, calc: "dijkstra(source = \"" + SOURCE + "\")\nthe graph has " +
-      VERTS.length + " vertices and " + EDGES.length + " edges" + "\n" + "const std::string& \u2014 borrowed, not copied; const promises not to change it",
+  snap({ line: 0, lineEnd: 1,
+    calc: "one declaration, split across two lines \u2014 together it runs to 95 characters\n" +
+      "returns  std::unordered_map<std::string, int> \u2014 the string is a vertex name, " +
+      "the int is its distance\n" +
+      "takes    const std::string& source \u2014 borrowed, not copied; const promises not " +
+      "to change it\n" +
+      "const    the graph itself is not modified\n" +
+      "called as dijkstra(\"" + SOURCE + "\") on a graph of " + VERTS.length +
+      " vertices and " + EDGES.length + " edges",
     head: "Entering <code>dijkstra</code> with source <strong>" + SOURCE + "</strong>",
-    why: ["the answer will be one distance per vertex, all measured from here"] });
+    why: ["the return type sits on its own line only because the whole signature would " +
+          "not fit on one &mdash; it is not a separate statement",
+          "the answer is returned, not stored on the object, which is what the trailing " +
+          "<code>const</code> promises",
+          "it is the same <code>dist</code> map built on the next line and handed back at " +
+          "the end, one distance per vertex, all measured from " + SOURCE] });
 
   declared = true;
   snap({ line: 2, calc: "std::unordered_map<std::string, int> dist;\ndist is empty",
@@ -385,6 +387,7 @@ function buildDijkstra() {
           "distance comes <em>first</em> in the pair on purpose: pairs compare on their " +
           "first element, so the heap orders by distance without being told how"] });
 
+  heapDeclared = true;
   snap({ line: 10, calc: "min_heap is created, empty\ngreater<Pair> makes it a MIN-heap",
     head: "Create the min-heap",
     why: ["<code>priority_queue</code> is a max-heap by default &mdash; " +
@@ -483,30 +486,33 @@ function buildDijkstra() {
 // Prim's -- frames
 // ---------------------------------------------------------------------------
 function buildPrims() {
-  var F = [], inMst = {}, heap = [], mst = [], total = 0, declared = false;
+  var F = [], inMst = {}, heap = [], mst = [], total = 0, declared = false,
+      heapDeclared = false;
 
   function snap(o) {
     o.inMst = Object.assign({}, inMst);
-    o.heap = copyHeap(heap);
+    o.heap = heapDeclared ? copyHeap(heap) : null;
     o.mst = declared ? mst.map(function (x) { return x.slice(); }) : null;
     o.total = total;
     F.push(o);
   }
 
-  snap({ line: 0, calc: "std::pair<std::vector<std::tuple<std::string, std::string, int>>, int>\n" +
-      "the return type \u2014 the chosen edges, and their total weight",
-    head: "What <code>prims_mst</code> hands back",
-    why: ["a <code>pair</code>: <code>.first</code> is the list of edges kept, " +
-          "<code>.second</code> is what they add up to",
+  snap({ line: 0, lineEnd: 1,
+    calc: "one declaration, split across two lines \u2014 the return type alone is 70 characters\n" +
+      "returns  std::pair<std::vector<std::tuple<...>>, int> \u2014 .first the edges kept, " +
+      ".second their total weight\n" +
+      "takes    const std::string& start \u2014 borrowed, not copied; const promises not " +
+      "to change it\n" +
+      "const    the graph itself is not modified\n" +
+      "called as prims_mst(\"" + SOURCE + "\") on a graph of " + VERTS.length +
+      " vertices and " + EDGES.length + " edges",
+    head: "Entering <code>prims_mst</code> from <strong>" + SOURCE + "</strong>",
+    why: ["the return type sits on its own line only because the whole signature would " +
+          "not fit on one &mdash; it is not a separate statement",
           "each edge is a <code>tuple</code> of (from, to, weight) &mdash; three things " +
           "travelling together",
-          "unlike Dijkstra&rsquo;s this is not a distance per vertex: it is a set of " +
-          "edges, and that difference is the whole point of the two algorithms"] });
-
-  snap({ line: 1, calc: 'prims_mst(start = "' + SOURCE + '")\nthe graph has ' +
-      VERTS.length + " vertices and " + EDGES.length + " edges" + "\n" + "const std::string& \u2014 borrowed, not copied; const promises not to change it",
-    head: "Entering <code>prims_mst</code> from <strong>" + SOURCE + "</strong>",
-    why: ["the answer will be a set of edges, not a set of distances"] });
+          "unlike Dijkstra&rsquo;s this is not a distance per vertex: it is a set of edges, " +
+          "and that difference is the whole point of the two algorithms"] });
 
   declared = true;
   snap({ line: 2, calc: "std::vector<std::tuple<...>> mst_edges;\nempty",
@@ -535,6 +541,7 @@ function buildPrims() {
           "weight comes <strong>first</strong> so the heap orders by it",
           "put it last and the heap sorts by vertex name, which is a wrong tree that " +
           "still looks plausible"] });
+  heapDeclared = true;
   snap({ line: 9, calc: "min_heap is created, empty\ngreater<EdgeTuple> makes it a MIN-heap",
     head: "Create the min-heap of candidate edges",
     why: ["Dijkstra's heap held vertices; this one holds <em>edges</em>, and that is the " +
@@ -678,9 +685,13 @@ function graphSvg(f, kind) {
            'font-weight="700" fill="#2c3e50">' + v + "</text>";
     if (f.dist) {
       var d = f.dist[v];
-      out += '<text x="' + p[0] + '" y="' + (p[1] + 15) + '" text-anchor="middle" ' +
-             'font-size="11" font-weight="700" fill="' + (d === INF ? "#9aa4ad" : "#c64500") +
-             '">' + (d === INF ? "∞" : d) + "</text>";
+      // not a key yet: the loop below has not reached it, so there is
+      // nothing to report and a label would be inventing one
+      if (v in f.dist) {
+        out += '<text x="' + p[0] + '" y="' + (p[1] + 15) + '" text-anchor="middle" ' +
+               'font-size="11" font-weight="700" fill="' + (d === INF ? "#9aa4ad" : "#c64500") +
+               '">' + (d === INF ? "∞" : d) + "</text>";
+      }
     }
   });
 
@@ -692,14 +703,21 @@ function graphSvg(f, kind) {
 }
 
 function codeHtml(key, f) {
+  // A frame may span several listing lines via lineEnd. The band is emitted
+  // after the LAST line of the span, never between -- a declaration split
+  // across two lines has to stay whole on screen, or it reads as two
+  // statements with a yellow block driven through the middle.
+  var last = (f.lineEnd === undefined ? f.line : f.lineEnd);
   return '<div class="code">' + CODE[key].map(function (ln, i) {
-    var hit = i === f.line;
+    var hit = i >= f.line && i <= last;
     return "<div" + (hit ? ' class="hit"' : "") + ">" + (ln === "" ? "&nbsp;" : hl(ln)) + "</div>" +
-      (hit && f.calc ? '<div class="calc">' + esc(f.calc) + "</div>" : "");
+      (i === last && f.calc ? '<div class="calc">' + esc(f.calc) + "</div>" : "");
   }).join("") + "</div>";
 }
 
 function heapHtml(f, kind) {
+  if (!f.heap) return '<p class="empty">the <code>min_heap</code> does not exist yet'
+             + ' &mdash; it is declared further down</p>';
   if (!f.heap.length) return '<p class="empty">empty</p>';
   return '<div class="heap">' + f.heap.map(function (h, i) {
     var txt = kind === "prims" ? h[0] + " : " + h[1] + "→" + h[2] : h[0] + " : " + h[1];
@@ -710,13 +728,15 @@ function heapHtml(f, kind) {
 }
 
 function distTable(f) {
-  if (!f.dist) return '<p class="empty">the <code>dist</code> map does not exist yet</p>';
+  if (!f.dist) return '<p class="empty">the <code>dist</code> map does not exist yet'
+             + ' &mdash; it is declared on the next line</p>';
   return '<table class="t"><thead><tr><th>Vertex</th><th>Distance from ' + SOURCE +
     "</th><th>Settled</th></tr></thead><tbody>" +
     VERTS.slice().sort().map(function (v) {
       var cls = f.hot === v ? " class=\"hot\"" : f.settled && f.settled[v] ? " class=\"done\"" : "";
       return "<tr" + cls + "><td>" + v + '</td><td class="n">' +
-             (f.dist[v] === INF ? "∞" : f.dist[v]) + "</td><td>" +
+             (!(v in f.dist) ? "—"
+                : f.dist[v] === INF ? "∞" : f.dist[v]) + "</td><td>" +
              (f.settled && f.settled[v] ? "✔" : "") + "</td></tr>";
     }).join("") + "</tbody></table>";
 }
@@ -890,6 +910,8 @@ function soloHtml(f, key) {
     (isD ? "vertices waiting, nearest first" : "candidate edges, cheapest first") + "</h2>" +
     '<div class="card-body">' + heapHtml(f, key) +
     '<p style="margin:.5rem 0 0;font-size:.82rem;color:#6e6e6e">' +
+    "<code>std::priority_queue</code> from <code>&lt;queue&gt;</code>, built inside the "
+    + "function &mdash; the graph does not carry one. " +
     (isD ? "A struck-through entry is stale &mdash; a shorter route to that vertex was found "
          + "after it was pushed."
          : "Each entry is an edge: weight, then where it leads.") + "</p>" +
