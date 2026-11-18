@@ -329,7 +329,7 @@ function buildDijkstra() {
           "back at the end"] });
 
   snap({ line: 1, calc: "dijkstra(source = \"" + SOURCE + "\")\nthe graph has " +
-      VERTS.length + " vertices and " + EDGES.length + " edges",
+      VERTS.length + " vertices and " + EDGES.length + " edges" + "\n" + "const std::string& \u2014 borrowed, not copied; const promises not to change it",
     head: "Entering <code>dijkstra</code> with source <strong>" + SOURCE + "</strong>",
     why: ["the answer will be one distance per vertex, all measured from here"] });
 
@@ -343,7 +343,7 @@ function buildDijkstra() {
   VERTS.forEach(function (v, i) {
     if (i === 0) {
       snap({ line: 3, calc: "for (const auto& [vertex, edges] : adj_list_)\n" +
-          "walks every key in the adjacency list — " + VERTS.join(", "),
+          "walks every key in the adjacency list — " + VERTS.join(", ") + "\n" + "const auto& \u2014 bound in place; without the & every edge list is copied",
         head: "Loop over every vertex in the graph",
         why: ["the keys of <code>adj_list_</code> are exactly the vertices"] });
     }
@@ -433,7 +433,7 @@ function buildDijkstra() {
     snap({ line: 18, hot: current,
       calc: "for (const auto& edge : adj_list_.at(current))\n" + current + " has " + ADJ[current].length +
             " neighbour" + (ADJ[current].length === 1 ? "" : "s") + ": " +
-            ADJ[current].map(function (e) { return e.to + "(" + e.w + ")"; }).join(", "),
+            ADJ[current].map(function (e) { return e.to + "(" + e.w + ")"; }).join(", ") + "\n" + "const auto& \u2014 each edge is borrowed, not copied, as the loop walks",
       head: "Try every edge out of <strong>" + current + "</strong>", why: [] });
 
     ADJ[current].forEach(function (e) {
@@ -504,7 +504,7 @@ function buildPrims() {
           "edges, and that difference is the whole point of the two algorithms"] });
 
   snap({ line: 1, calc: 'prims_mst(start = "' + SOURCE + '")\nthe graph has ' +
-      VERTS.length + " vertices and " + EDGES.length + " edges",
+      VERTS.length + " vertices and " + EDGES.length + " edges" + "\n" + "const std::string& \u2014 borrowed, not copied; const promises not to change it",
     head: "Entering <code>prims_mst</code> from <strong>" + SOURCE + "</strong>",
     why: ["the answer will be a set of edges, not a set of distances"] });
 
@@ -542,7 +542,7 @@ function buildPrims() {
 
   snap({ line: 11, hot: SOURCE,
     calc: "for (const auto& edge : adj_list_.at(" + SOURCE + "))\n" + SOURCE + " has " +
-          ADJ[SOURCE].length + " edge" + (ADJ[SOURCE].length === 1 ? "" : "s"),
+          ADJ[SOURCE].length + " edge" + (ADJ[SOURCE].length === 1 ? "" : "s") + "\n" + "const auto& \u2014 each edge is borrowed, not copied, as the loop walks",
     head: "Walk the edges leaving " + SOURCE, why: [] });
   ADJ[SOURCE].forEach(function (e) {
     heapPush(heap, [e.w, SOURCE, e.to]);
@@ -605,7 +605,7 @@ function buildPrims() {
     snap({ line: 25, hot: to,
       calc: "for (const auto& edge : adj_list_.at(" + to + "))\n" + to + " has " +
             ADJ[to].length + " neighbour" + (ADJ[to].length === 1 ? "" : "s") + ", " +
-            offers.length + " not yet in the tree",
+            offers.length + " not yet in the tree" + "\n" + "const auto& \u2014 each edge is borrowed, not copied, as the loop walks",
       head: "Look at " + to + "'s own edges", why: [] });
     ADJ[to].forEach(function (x) {
       if (inMst[x.to]) {
