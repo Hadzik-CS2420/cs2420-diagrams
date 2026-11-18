@@ -352,7 +352,8 @@ function buildDijkstra() {
     dist[v] = INF;
     filled.push(v);
     snap({ line: 4, hot: v,
-      calc: "dist[" + v + "] = numeric_limits<int>::max()\n" + filled.length + " of " +
+      calc: "vertex = " + v + "\n" +
+                  "dist[" + v + "] = numeric_limits<int>::max()\n" + filled.length + " of " +
             VERTS.length + " filled in",
       head: "<strong>" + v + "</strong> starts at &infin;",
       why: i === 0
@@ -442,7 +443,8 @@ function buildDijkstra() {
     ADJ[current].forEach(function (e) {
       var nd = dist[current] + e.w, better = nd < dist[e.to];
       snap({ line: 19, hot: current, edge: [current, e.to],
-        calc: "new_dist = dist[" + current + "] + " + e.w + " = " + dist[current] + " + " + e.w +
+        calc: "edge = " + current + " \u2192 " + e.to + ", weight " + e.w + "\n" +
+                    "new_dist = dist[" + current + "] + " + e.w + " = " + dist[current] + " + " + e.w +
               " = " + nd,
         head: "Reaching <strong>" + e.to + "</strong> through " + current + " would cost " + nd,
         why: [] });
