@@ -318,7 +318,7 @@ function buildDijkstra() {
   }
 
   snap({ line: 0, calc: "std::unordered_map<std::string, int>\n" +
-      "the return type \u2014 one distance per vertex, keyed by name",
+      "the return type \u2014 the string is a vertex name, the int is its distance",
     head: "What <code>dijkstra</code> hands back",
     why: ["these two lines are <strong>one declaration</strong>: the return type, then " +
           "<code>WeightedGraph::dijkstra(...)</code>. Split only because together they " +
