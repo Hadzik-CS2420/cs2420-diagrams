@@ -1405,6 +1405,16 @@ var TODO_AT = {
       ? { todo: "2b", fn: "add_edge", part: 2 }
       : { todo: "2a", fn: "add_vertex", part: 1 };
   },
+  // Five TODOs on one tab, so the banner switches at each signature.
+  // Lines are 1-based into CODE.ask, same as build above. The README puts
+  // the four cheap queries in Part 3 and neighbors on its own in Part 4.
+  ask: function (line) {
+    if (line >= 24) return { todo: "3e", fn: "neighbors",    part: 4 };
+    if (line >= 16) return { todo: "3d", fn: "edge_count",   part: 3 };
+    if (line >= 12) return { todo: "3c", fn: "vertex_count", part: 3 };
+    if (line >= 5)  return { todo: "3b", fn: "has_edge",     part: 3 };
+    return            { todo: "3a", fn: "has_vertex",  part: 3 };
+  },
   bfs: function () { return { todo: "4", fn: "bfs", part: 5 }; },
   dfs: function () { return { todo: "5", fn: "dfs", part: 6 }; }
 };
@@ -2221,7 +2231,7 @@ document.addEventListener("keydown", function (e) {
 
 // Deep links: stepper.html#dfs opens that tab directly, so a Canvas page or a
 // lecture slide can point at one walk instead of "then click tab 3".
-var MODES = ["intro", "repr", "build", "bfs", "dfs", "compare"];
+var MODES = ["intro", "repr", "build", "ask", "bfs", "dfs", "compare"];
 
 function modeFromHash() {
   var h = (location.hash || "").replace("#", "");
