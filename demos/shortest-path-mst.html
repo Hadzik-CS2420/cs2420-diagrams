@@ -344,8 +344,14 @@ function buildDijkstra() {
   var filled = [];
   VERTS.forEach(function (v, i) {
     if (i === 0) {
-      snap({ line: 3, calc: "for (const auto& [vertex, edges] : adj_list_)\n" +
-          "walks every key in the adjacency list — " + VERTS.join(", ") + "\n" + "const auto& \u2014 bound in place; without the & every edge list is copied",
+          snap({ line: 3,
+            calc: "over\n" +
+              "    adj_list_ \u2014 " + VERTS.length + " entries: " + VERTS.join(", ") + "\n" +
+              "binds\n" +
+              "    vertex \u2014 the key, one vertex name per pass\n" +
+              "    edges  \u2014 the value, that vertex\u2019s edge list (not used here)\n" +
+              "const auto&\n" +
+              "    bound in place; without the & every edge list is copied",
         head: "Loop over every vertex in the graph",
         why: ["the keys of <code>adj_list_</code> are exactly the vertices"] });
     }
@@ -435,10 +441,15 @@ function buildDijkstra() {
     settled[current] = true;
 
     snap({ line: 18, hot: current,
-      calc: "for (const auto& edge : adj_list_.at(current))\n" + current + " has " + ADJ[current].length +
-            " neighbour" + (ADJ[current].length === 1 ? "" : "s") + ": " +
-            ADJ[current].map(function (e) { return e.to + "(" + e.w + ")"; }).join(", ") + "\n" + "const auto& \u2014 each edge is borrowed, not copied, as the loop walks",
-      head: "Try every edge out of <strong>" + current + "</strong>", why: [] });
+          calc: "over\n" +
+            "    adj_list_.at(" + current + ") \u2014 " + ADJ[current].length + " edge" +
+            (ADJ[current].length === 1 ? "" : "s") + ": " +
+            ADJ[current].map(function (e) { return e.to + "(" + e.w + ")"; }).join(", ") + "\n" +
+            "binds\n" +
+            "    edge \u2014 one Edge at a time, with .to and .weight\n" +
+            "const auto&\n" +
+            "    borrowed, not copied, as the loop walks",
+            head: "Try every edge out of <strong>" + current + "</strong>", why: [] });
 
     ADJ[current].forEach(function (e) {
       var nd = dist[current] + e.w, better = nd < dist[e.to];
@@ -550,9 +561,14 @@ function buildPrims() {
           "real difference between the two algorithms"] });
 
   snap({ line: 11, hot: SOURCE,
-    calc: "for (const auto& edge : adj_list_.at(" + SOURCE + "))\n" + SOURCE + " has " +
-          ADJ[SOURCE].length + " edge" + (ADJ[SOURCE].length === 1 ? "" : "s") + "\n" + "const auto& \u2014 each edge is borrowed, not copied, as the loop walks",
-    head: "Walk the edges leaving " + SOURCE, why: [] });
+        calc: "over\n" +
+          "    adj_list_.at(" + SOURCE + ") \u2014 " + ADJ[SOURCE].length + " edge" +
+          (ADJ[SOURCE].length === 1 ? "" : "s") + " leaving " + SOURCE + "\n" +
+          "binds\n" +
+          "    edge \u2014 one Edge at a time, with .to and .weight\n" +
+          "const auto&\n" +
+          "    borrowed, not copied, as the loop walks",
+          head: "Walk the edges leaving " + SOURCE, why: [] });
   ADJ[SOURCE].forEach(function (e) {
     heapPush(heap, [e.w, SOURCE, e.to]);
     snap({ line: 12, hot: SOURCE, edge: [SOURCE, e.to],
@@ -612,10 +628,14 @@ function buildPrims() {
 
     var offers = ADJ[to].filter(function (x) { return !inMst[x.to]; });
     snap({ line: 25, hot: to,
-      calc: "for (const auto& edge : adj_list_.at(" + to + "))\n" + to + " has " +
-            ADJ[to].length + " neighbour" + (ADJ[to].length === 1 ? "" : "s") + ", " +
-            offers.length + " not yet in the tree" + "\n" + "const auto& \u2014 each edge is borrowed, not copied, as the loop walks",
-      head: "Look at " + to + "'s own edges", why: [] });
+          calc: "over\n" +
+            "    adj_list_.at(" + to + ") \u2014 " + ADJ[to].length + " neighbour" +
+            (ADJ[to].length === 1 ? "" : "s") + ", " + offers.length + " not yet in the tree\n" +
+            "binds\n" +
+            "    edge \u2014 one Edge at a time, with .to and .weight\n" +
+            "const auto&\n" +
+            "    borrowed, not copied, as the loop walks",
+            head: "Look at " + to + "'s own edges", why: [] });
     ADJ[to].forEach(function (x) {
       if (inMst[x.to]) {
         snap({ line: 26, hot: to, edge: [to, x.to],
