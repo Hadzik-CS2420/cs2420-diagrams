@@ -317,6 +317,17 @@ function buildDijkstra() {
     F.push(o);
   }
 
+  snap({ line: 0, calc: "std::unordered_map<std::string, int>\n" +
+      "the return type \u2014 one distance per vertex, keyed by name",
+    head: "What <code>dijkstra</code> hands back",
+    why: ["these two lines are <strong>one declaration</strong>: the return type, then " +
+          "<code>WeightedGraph::dijkstra(...)</code>. Split only because together they " +
+          "run to 95 characters",
+          "the answer is returned, not stored on the object &mdash; the graph is unchanged, " +
+          "which is why the method is <code>const</code>",
+          "it is the same <code>dist</code> map you see built on the next line and handed " +
+          "back at the end"] });
+
   snap({ line: 1, calc: "dijkstra(source = \"" + SOURCE + "\")\nthe graph has " +
       VERTS.length + " vertices and " + EDGES.length + " edges",
     head: "Entering <code>dijkstra</code> with source <strong>" + SOURCE + "</strong>",
@@ -481,6 +492,16 @@ function buildPrims() {
     o.total = total;
     F.push(o);
   }
+
+  snap({ line: 0, calc: "std::pair<std::vector<std::tuple<std::string, std::string, int>>, int>\n" +
+      "the return type \u2014 the chosen edges, and their total weight",
+    head: "What <code>prims_mst</code> hands back",
+    why: ["a <code>pair</code>: <code>.first</code> is the list of edges kept, " +
+          "<code>.second</code> is what they add up to",
+          "each edge is a <code>tuple</code> of (from, to, weight) &mdash; three things " +
+          "travelling together",
+          "unlike Dijkstra&rsquo;s this is not a distance per vertex: it is a set of " +
+          "edges, and that difference is the whole point of the two algorithms"] });
 
   snap({ line: 1, calc: 'prims_mst(start = "' + SOURCE + '")\nthe graph has ' +
       VERTS.length + " vertices and " + EDGES.length + " edges",
