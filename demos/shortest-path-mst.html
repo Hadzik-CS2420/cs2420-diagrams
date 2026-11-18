@@ -49,7 +49,10 @@
 
   .solo { display:grid; grid-template-columns:1.05fr .95fr; gap:1rem; align-items:start; }
   @media (max-width:1040px) { .solo { grid-template-columns:1fr; } }
-  .col { display:flex; flex-direction:column; gap:1rem; min-width:0; }
+  /* a query container, so the code below can size itself against THIS
+     column rather than the whole window */
+  .col { display:flex; flex-direction:column; gap:1rem; min-width:0;
+         container-type:inline-size; }
 
   .card { border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
   .card > h2 { font-size:.92rem; margin:0; padding:.5rem .85rem;
@@ -74,11 +77,20 @@
   .empty { font-size:.8rem; color:var(--muted); font-style:italic; }
 
   .code { background:var(--code-bg); color:var(--code-fg); border-radius:8px;
-          font-family:Consolas,"Courier New",monospace; font-size:.8rem; line-height:1.5;
+          font-family:Consolas,"Courier New",monospace; line-height:1.5;
+          /* Sized against the column, not the window. At 1920 the column is
+             ~844px and the widest line 76 characters, which lands this near
+             19px; at 1366 it comes down to ~13px and still fits. Fixed at
+             .8rem it was 12.8px on every screen -- readable on a laptop,
+             far too small on a projector. */
+          font-size:clamp(.75rem, 2.15cqw, 1.2rem);
           padding:.5rem 0; overflow-x:auto; }
   .code div { padding:0 .9rem; white-space:pre; }
   .code div.hit { background:var(--code-hit); }
   .code div.calc { background:#f9e2af; color:#1e1e2e; white-space:pre-wrap;
+                   /* inherit rather than a second clamp: the band is read
+                      alongside the line it explains and should match it */
+                   font-size:inherit;
                    padding:.35rem .9rem; border-left:4px solid #b8860b; margin:.1rem 0; }
   .code div.calc::before { content:"THIS STEP"; font-size:.62rem; font-weight:800;
                            letter-spacing:.08em; display:block; color:#6b4f04; }
@@ -219,7 +231,7 @@ var CODE = {
     "    while (!min_heap.empty()) {",
     "        auto [popped_dist, current] = min_heap.top();",
     "        min_heap.pop();",
-    "        if (popped_dist > dist[current]) continue;        // a stale entry -- already beaten",
+    "        if (popped_dist > dist[current]) continue;  // stale, already beaten",
     "",
     "        for (const auto& edge : adj_list_.at(current)) {",
     "            const int new_dist = dist[current] + edge.weight;",
