@@ -415,9 +415,10 @@ function buildDijkstra() {
     calc: "Pair\n" +
       "    what it holds \u2014 one (distance, vertex)\n" +
       "std::vector<Pair>\n" +
-      "    the default container, named only so the third can be given\n" +
+      "    where it stores them \u2014 and this is already the default\n" +
+      "    you name it anyway, because arguments cannot be skipped\n" +
       "std::greater<Pair>\n" +
-      "    compares with > not < \u2014 smallest on top, not largest\n" +
+      "    the reason for naming the other two: > not <, so smallest sits on top\n" +
       "min_heap starts empty",
     head: "Create the min-heap",
     why: ["<code>priority_queue</code> is a max-heap by default &mdash; " +
@@ -582,9 +583,10 @@ function buildPrims() {
     calc: "EdgeTuple\n" +
       "    what it holds \u2014 one (weight, from, to)\n" +
       "std::vector<EdgeTuple>\n" +
-      "    the default container, named only so the third can be given\n" +
+      "    where it stores them \u2014 and this is already the default\n" +
+      "    you name it anyway, because arguments cannot be skipped\n" +
       "std::greater<EdgeTuple>\n" +
-      "    compares with > not < \u2014 smallest on top, not largest\n" +
+      "    the reason for naming the other two: > not <, so smallest sits on top\n" +
       "min_heap starts empty",
     head: "Create the min-heap of candidate edges",
     why: ["Dijkstra's heap held vertices; this one holds <em>edges</em>, and that is the " +
