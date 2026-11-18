@@ -319,13 +319,14 @@ function buildDijkstra() {
   }
 
   snap({ line: 0, lineEnd: 1,
-    calc: "returns  std::unordered_map<std::string, int> \u2014 the string is a vertex name, " +
-      "the int is its distance\n" +
-      "takes    const std::string& source \u2014 borrowed, not copied; const promises not " +
-      "to change it\n" +
-      "const    the graph itself is not modified\n" +
-      "called as dijkstra(\"" + SOURCE + "\") on a graph of " + VERTS.length +
-      " vertices and " + EDGES.length + " edges",
+    calc: "returns\n" +
+      "    std::unordered_map<std::string, int>\n" +
+      "    the string is a vertex name, the int is its distance\n" +
+      "takes\n" +
+      "    const std::string& source\n" +
+      "    borrowed, not copied; const promises not to change it\n" +
+      "const\n" +
+      "    the graph itself is not modified",
     head: "Entering <code>dijkstra</code> with source <strong>" + SOURCE + "</strong>",
     why: ["the return type sits on its own line only because the whole signature would " +
           "not fit on one &mdash; it is not a separate statement",
@@ -497,13 +498,14 @@ function buildPrims() {
   }
 
   snap({ line: 0, lineEnd: 1,
-    calc: "returns  std::pair<std::vector<std::tuple<...>>, int> \u2014 .first the edges kept, " +
-      ".second their total weight\n" +
-      "takes    const std::string& start \u2014 borrowed, not copied; const promises not " +
-      "to change it\n" +
-      "const    the graph itself is not modified\n" +
-      "called as prims_mst(\"" + SOURCE + "\") on a graph of " + VERTS.length +
-      " vertices and " + EDGES.length + " edges",
+    calc: "returns\n" +
+      "    std::pair<std::vector<std::tuple<...>>, int>\n" +
+      "    .first the edges kept, .second their total weight\n" +
+      "takes\n" +
+      "    const std::string& start\n" +
+      "    borrowed, not copied; const promises not to change it\n" +
+      "const\n" +
+      "    the graph itself is not modified",
     head: "Entering <code>prims_mst</code> from <strong>" + SOURCE + "</strong>",
     why: ["the return type sits on its own line only because the whole signature would " +
           "not fit on one &mdash; it is not a separate statement",
