@@ -371,10 +371,18 @@ function buildDijkstra() {
         : [] });
   });
 
-  snap({ line: 6, calc: "has_vertex(\"" + SOURCE + "\")   →   true, so we do not return",
+  snap({ line: 6,
+    calc: "has_vertex(\"" + SOURCE + "\")   \u2192   true, so we do not return\n" +
+      "    a caller can name a vertex this graph does not have\n" +
+      "    without this, dist[source] = 0 would invent it, and\n" +
+      "    adj_list_.at(source) would throw std::out_of_range",
     head: "The source really is in the graph",
-    why: ["asked for a vertex that is not here, the function hands back the all-&infin; " +
-          "map rather than crashing"] });
+    why: ["<code>operator[]</code> creates a missing key rather than complaining, so " +
+          "the answer would carry a vertex the graph never had, at distance 0",
+          "<code>.at()</code> is the opposite &mdash; it throws on a missing key, which " +
+          "is where the crash would land a few lines later",
+          "with the guard, a bad source returns the all-&infin; map: no route to " +
+          "anywhere, which is the truthful answer"] });
 
   dist[SOURCE] = 0;
   snap({ line: 7, hot: SOURCE,
