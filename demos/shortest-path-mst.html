@@ -394,19 +394,21 @@ function buildDijkstra() {
     head: "The source is 0 away from itself",
     why: ["this single known value is what the whole algorithm grows outward from"] });
 
-  snap({ line: 9, calc: "using Pair = std::pair<int, std::string>;\n" +
-      "a name for (distance, vertex) — nothing happens at run time",
-    head: "Name the pair type the heap will hold",
-    why: ["<code>using X = Y;</code> renames an existing type &mdash; the modern " +
-          "<code>typedef</code>. Nothing is built and nothing runs",
-          "it earns a line because <code>priority_queue</code> makes you name the element " +
-          "type <strong>three times</strong>: the element, the container holding them, " +
-          "and the comparator that orders them",
-          "spelled out: <code>priority_queue&lt;pair&lt;int,string&gt;, " +
-          "vector&lt;pair&lt;int,string&gt;&gt;, greater&lt;pair&lt;int,string&gt;&gt;&gt;</code>" +
-          " &mdash; the alias is the difference between a line you can read and one you cannot",
-          "distance comes <em>first</em> in the pair on purpose: pairs compare on their " +
-          "first element, so the heap orders by distance without being told how"] });
+  snap({ line: 9,
+    calc: "what it is\n" +
+    "    a second name for a type that already exists \u2014 nothing runs\n" +
+    "why bother\n" +
+    "    priority_queue makes you name the element type three times\n" +
+    "    <Pair, vector<Pair>, greater<Pair>> rather than the whole thing twice more\n" +
+    "why distance first\n" +
+    "    pairs compare on .first, so the heap orders by distance for free",
+  head: "Name the pair type the heap will hold",
+  why: ["<code>using X = Y;</code> is the modern <code>typedef</code> &mdash; the new " +
+        "name comes first instead of being buried at the end",
+        "spelled out, the declaration is <code>priority_queue&lt;pair&lt;int,string&gt;, " +
+        "vector&lt;pair&lt;int,string&gt;&gt;, greater&lt;pair&lt;int,string&gt;&gt;&gt;</code>",
+        "put the vertex first instead and the heap would order alphabetically by " +
+        "name, which is not Dijkstra&rsquo;s at all"] });
 
   heapDeclared = true;
   snap({ line: 10, calc: "min_heap is created, empty\ngreater<Pair> makes it a MIN-heap",
@@ -961,7 +963,7 @@ function soloHtml(f, key) {
          : "<code>std::vector&lt;std::tuple&lt;std::string, std::string, int&gt;&gt;</code>. "
          + "Finishes with exactly V&minus;1 edges.") + "</p>" +
     "</div></div>" +
-    '<div class="card"><h2>The heap &mdash; ' +
+    '<div class="card"><h2><code>min_heap</code> &mdash; ' +
     (isD ? "vertices waiting, nearest first" : "candidate edges, cheapest first") + "</h2>" +
     '<div class="card-body">' + heapHtml(f, key) +
     '<p style="margin:.5rem 0 0;font-size:.82rem;color:#6e6e6e">' +
