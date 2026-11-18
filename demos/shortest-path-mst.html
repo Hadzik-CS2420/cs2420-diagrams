@@ -217,12 +217,12 @@ var CODE = {
     "    min_heap.push({0, source});",
     "",
     "    while (!min_heap.empty()) {",
-    "        auto [d, u] = min_heap.top();",
+    "        auto [popped_dist, current] = min_heap.top();",
     "        min_heap.pop();",
-    "        if (d > dist[u]) continue;        // a stale entry -- already beaten",
+    "        if (popped_dist > dist[current]) continue;        // a stale entry -- already beaten",
     "",
-    "        for (const auto& edge : adj_list_.at(u)) {",
-    "            const int new_dist = dist[u] + edge.weight;",
+    "        for (const auto& edge : adj_list_.at(current)) {",
+    "            const int new_dist = dist[current] + edge.weight;",
     "            if (new_dist < dist[edge.to]) {",
     "                dist[edge.to] = new_dist;",
     "                min_heap.push({new_dist, edge.to});",
@@ -381,46 +381,46 @@ function buildDijkstra() {
 
     var top = heap[0];
     snap({ line: 14, hot: top[1],
-      calc: "auto [d, u] = min_heap.top()\nd = " + top[0] + ",  u = " + top[1],
+      calc: "auto [popped_dist, current] = min_heap.top()\npopped_dist = " + top[0] + ",  current = " + top[1],
       head: "Look at the nearest entry: <strong>" + top[1] + "</strong> at " + top[0],
       why: ["<code>top()</code> reads it; it is still in the heap until the next line"] });
 
-    var pair = heapPop(heap), d = pair[0], u = pair[1];
-    snap({ line: 15, hot: u,
+    var pair = heapPop(heap), popped_dist = pair[0], current = pair[1];
+    snap({ line: 15, hot: current,
       calc: "min_heap.pop()\n" + heap.length + " left",
       head: "Take it out of the heap", why: [] });
 
-    var stale = d > dist[u];
-    snap({ line: 16, hot: u, staleHit: stale,
+    var stale = popped_dist > dist[current];
+    snap({ line: 16, hot: current, staleHit: stale,
       calc: stale
-        ? "d > dist[u]   →   " + d + " > " + dist[u] + "   →   true, skip it"
-        : "d > dist[u]   →   " + d + " > " + dist[u] + "   →   false, carry on",
+        ? "popped_dist > dist[current]   →   " + popped_dist + " > " + dist[current] + "   →   true, skip it"
+        : "popped_dist > dist[current]   →   " + popped_dist + " > " + dist[current] + "   →   false, carry on",
       head: stale
-        ? "<strong>" + u + "</strong> at " + d + " is stale &mdash; we already found " + dist[u]
-        : "<strong>" + u + "</strong> is settled at " + d,
+        ? "<strong>" + current + "</strong> at " + popped_dist + " is stale &mdash; we already found " + dist[current]
+        : "<strong>" + current + "</strong> is settled at " + popped_dist,
       why: stale
-        ? ["this entry was pushed before a shorter route to " + u + " turned up",
+        ? ["this entry was pushed before a shorter route to " + current + " turned up",
            "nothing removes the old entry from the heap, so this line throws it away instead",
-           "<strong>leave this line out and " + u + " is processed twice</strong>"]
-        : ["no shorter route to " + u + " can appear now &mdash; everything still in the " +
+           "<strong>leave this line out and " + current + " is processed twice</strong>"]
+        : ["no shorter route to " + current + " can appear now &mdash; everything still in the " +
            "heap is at least this far away"] });
     if (stale) continue;
-    settled[u] = true;
+    settled[current] = true;
 
-    snap({ line: 18, hot: u,
-      calc: "for (const auto& edge : adj_list_.at(u))\n" + u + " has " + ADJ[u].length +
-            " neighbour" + (ADJ[u].length === 1 ? "" : "s") + ": " +
-            ADJ[u].map(function (e) { return e.to + "(" + e.w + ")"; }).join(", "),
-      head: "Try every edge out of <strong>" + u + "</strong>", why: [] });
+    snap({ line: 18, hot: current,
+      calc: "for (const auto& edge : adj_list_.at(current))\n" + current + " has " + ADJ[current].length +
+            " neighbour" + (ADJ[current].length === 1 ? "" : "s") + ": " +
+            ADJ[current].map(function (e) { return e.to + "(" + e.w + ")"; }).join(", "),
+      head: "Try every edge out of <strong>" + current + "</strong>", why: [] });
 
-    ADJ[u].forEach(function (e) {
-      var nd = dist[u] + e.w, better = nd < dist[e.to];
-      snap({ line: 19, hot: u, edge: [u, e.to],
-        calc: "new_dist = dist[" + u + "] + " + e.w + " = " + dist[u] + " + " + e.w +
+    ADJ[current].forEach(function (e) {
+      var nd = dist[current] + e.w, better = nd < dist[e.to];
+      snap({ line: 19, hot: current, edge: [current, e.to],
+        calc: "new_dist = dist[" + current + "] + " + e.w + " = " + dist[current] + " + " + e.w +
               " = " + nd,
-        head: "Reaching <strong>" + e.to + "</strong> through " + u + " would cost " + nd,
+        head: "Reaching <strong>" + e.to + "</strong> through " + current + " would cost " + nd,
         why: [] });
-      snap({ line: 20, hot: u, edge: [u, e.to],
+      snap({ line: 20, hot: current, edge: [current, e.to],
         calc: "new_dist < dist[" + e.to + "]   →   " + nd + " < " +
               (dist[e.to] === INF ? "∞" : dist[e.to]) + "   →   " + better,
         head: better
@@ -430,13 +430,13 @@ function buildDijkstra() {
                             "changes and nothing is pushed"] });
       if (better) {
         dist[e.to] = nd;
-        via[e.to] = edgeId(u, e.to);
-        snap({ line: 21, hot: u, edge: [u, e.to],
+        via[e.to] = edgeId(current, e.to);
+        snap({ line: 21, hot: current, edge: [current, e.to],
           calc: "dist[" + e.to + "] = " + nd,
           head: "Relax the edge: <strong>" + e.to + "</strong> is now " + nd + " away",
           why: ["\"relaxing\" just means replacing a distance with a better one"] });
         heapPush(heap, [nd, e.to]);
-        snap({ line: 22, hot: u, edge: [u, e.to],
+        snap({ line: 22, hot: current, edge: [current, e.to],
           calc: "min_heap.push({" + nd + ", " + e.to + "})",
           head: "Queue <strong>" + e.to + "</strong> up at its new distance",
           why: ["any older entry for " + e.to + " is still in the heap and is now wrong",
