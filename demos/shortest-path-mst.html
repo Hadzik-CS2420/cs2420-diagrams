@@ -702,6 +702,21 @@ function graphSvg(f, kind) {
          label + '">' + out + "</svg>";
 }
 
+// A band that opens by restating its own code line wastes its first row.
+// Drop that line -- but only on an exact match once whitespace and a trailing
+// brace or semicolon are ignored, so `dist[Logan] = ...` under
+// `dist[vertex] = ...` survives: that one has the real value in it.
+function bandText(t, codeLine) {
+  var NL = String.fromCharCode(10);
+  var rows = String(t == null ? "" : t).split(NL);
+  if (rows.length < 2) return t;
+  var norm = function (x) {
+    return String(x == null ? "" : x).replace(/\s+/g, "").replace(/[{;]+$/, "");
+  };
+  if (norm(codeLine) !== "" && norm(rows[0]) === norm(codeLine)) rows.shift();
+  return rows.join(NL);
+}
+
 function codeHtml(key, f) {
   // A frame may span several listing lines via lineEnd. The band is emitted
   // after the LAST line of the span, never between -- a declaration split
@@ -711,7 +726,8 @@ function codeHtml(key, f) {
   return '<div class="code">' + CODE[key].map(function (ln, i) {
     var hit = i >= f.line && i <= last;
     return "<div" + (hit ? ' class="hit"' : "") + ">" + (ln === "" ? "&nbsp;" : hl(ln)) + "</div>" +
-      (i === last && f.calc ? '<div class="calc">' + esc(f.calc) + "</div>" : "");
+      (i === last && f.calc
+        ? '<div class="calc">' + esc(bandText(f.calc, ln)) + "</div>" : "");
   }).join("") + "</div>";
 }
 
